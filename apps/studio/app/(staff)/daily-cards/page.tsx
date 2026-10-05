@@ -65,10 +65,32 @@ export default function DailyCardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
-  // Daisy: the board does the tracking, so the table card can stop being
-  // a machine-readable thing and just be a nice one. The QR still earns
-  // its place on the collection card -- that is the one they bring back.
-  const [plainCard, setPlainCard] = useState(false);
+  // Daisy: "don't need qr it's not at all good."
+  //
+  // So the card IS the chalk tag, printed. Same four facts the board
+  // carries and the photo already reads off it -- name, painted, due,
+  // table -- but set in type instead of chalk. Printed text reads far
+  // more reliably than handwriting, so this should push the 91% match
+  // rate up rather than cost anything.
+  //
+  // Nothing machine readable on it. The board was never scanned either.
+  const [collectDate, setCollectDate] = useState<string | null>(null);
+  // The chalk tag carries the collection date, so the printed card has to
+  // as well -- otherwise it is a prettier card that does less.
+  const [collectionDate, setCollectionDate] = useState<string | null>(null);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`)
+      .then((r) => r.json())
+      .then((d) => setCollectDate(d?.current_collection_date || null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setCollectionDate(d.collection_date || null))
+      .catch(() => {});
+  }, []);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Arriving from a booking: open that booking's day and preselect only
   // its card. Every booking already HAS a card -- the QR on it points
@@ -391,26 +413,6 @@ export default function DailyCardsPage() {
         )}
       </div>
 
-      <div className="no-print" style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
-        {[
-          { v: false, label: 'With QR', hint: 'scan to open the booking' },
-          { v: true,  label: 'Plain card', hint: 'nice stock, nothing to scan' },
-        ].map((o) => (
-          <button
-            key={String(o.v)}
-            onClick={() => setPlainCard(o.v)}
-            title={o.hint}
-            style={{
-              padding: '0.45rem 0.9rem', borderRadius: 999, fontSize: 'var(--text-sm)',
-              fontWeight: 700, cursor: 'pointer',
-              border: `1px solid ${plainCard === o.v ? 'var(--clay)' : '#ddd'}`,
-              backgroundColor: plainCard === o.v ? 'var(--clay)' : 'transparent',
-              color: plainCard === o.v ? '#fff' : '#666',
-            }}
-          >{o.label}</button>
-        ))}
-      </div>
-
       <div className="card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
         {visibleBookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
@@ -441,21 +443,42 @@ export default function DailyCardsPage() {
                 style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', cursor: 'pointer', width: '18px', height: '18px' }}
               />
               {isNew && <p style={{ fontSize: 'var(--text-xs)', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
-              {plainCard ? (
-                /* No QR, no booking reference. The chalk board does the
-                   tracking now, so this card only has to look like it was
-                   worth keeping. */
-                <div style={{
-                  width: 120, height: 120, margin: '0 auto', borderRadius: '50%',
-                  border: '1px solid var(--clay)', display: 'grid', placeItems: 'center',
-                }}>
-                  <span style={{
-                    fontFamily: 'Georgia, serif', fontSize: '2.4rem', color: 'var(--clay)',
-                    lineHeight: 1,
-                  }}>
-                    {(b.customer_name || '?').trim().charAt(0).toUpperCase()}
-                  </span>
-                </div>
+              {(() => {
+                const d = new Date(b.session_start);
+                const short = (x: Date) => `${x.getDate()}/${x.getMonth() + 1}`;
+                return (
+                  <div style={{ padding: '0.2rem 0 0.1rem' }}>
+                    {/* Painted, and due back. The two dates the board carries,
+                        and the pair that tells two visits by the same person
+                        apart. */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between',
+                                  fontSize: 'var(--text-xs)', color: '#8A7F74', fontWeight: 600 }}>
+                      <span>{short(d)}</span>
+                      <span>{d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div style={{ height: 1, backgroundColor: 'var(--clay)', opacity: .35, margin: '.45rem 0 .55rem' }} />
+                    <p style={{ fontFamily: 'Georgia, serif', fontSize: '1.45rem',
+                                lineHeight: 1.1, color: 'var(--charcoal)' }}>
+                      {b.customer_name}
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between',
+                                  alignItems: 'flex-end', marginTop: '.7rem' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: '#8A7F74', fontWeight: 600 }}>
+                        Ready {collectDate ? short(new Date(collectDate)) : '\u2014'}
+                      </span>
+                      {/* Table stays a box to write in. It is the one thing
+                          not known until they sit down. */}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem',
+                                     fontSize: 'var(--text-xs)', color: '#8A7F74', fontWeight: 600 }}>
+                        Table
+                        <span style={{ display: 'inline-block', width: 30, height: 22,
+                                       border: '1px solid #C9BCAE', borderRadius: 3 }} />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+              {false ? (
               ) : qrUrls[b.booking_code] ? (
                 <img src={qrUrls[b.booking_code]} alt="" style={{ width: 120, height: 120, margin: '0 auto' }} />
               ) : (
@@ -475,10 +498,6 @@ export default function DailyCardsPage() {
                     {b.photo_count}
                   </span>
                 )}
-                {b.customer_name}
-              </p>
-              <p style={{ fontSize: 'var(--text-sm)', color: '#666' }}>
-                {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </p>
 
               {/* No printed table number or room. Daisy: "they get seated
@@ -518,9 +537,7 @@ export default function DailyCardsPage() {
               )}
               {/* The reference is for us, not for them. A plain card has
                   nothing on it a customer would not want on their table. */}
-              {!plainCard && (
-                <p style={{ fontSize: 'var(--text-xs)', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
-              )}
+
             </div>
           );
         })}
