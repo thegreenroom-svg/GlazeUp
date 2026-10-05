@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch, Calculator, HelpCircle } from 'lucide-react';
+import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch, Calculator, HelpCircle, AlertTriangle } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -69,6 +69,7 @@ const TOOLS = [
   { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
   { key: 'returns',  label: 'Returns shelf',        detail: 'Sent back, and why',                  href: '/returns',  icon: RotateCcw, tint: '#A8651A' },
   { key: 'owner',    label: 'The numbers',          detail: 'Takings, records and where it comes from', href: '/owner', icon: TrendingUp, tint: '#2E7D6B' },
+  { key: 'piece-check', label: 'All accounted for?',   detail: 'Paid for, against photographed',        href: '/piece-check', icon: AlertTriangle, tint: '#E0A23C' },
   { key: 'other-items', label: 'Unknown items',       detail: 'Deleted from Square, waiting to be named', href: '/other-items', icon: HelpCircle, tint: '#A8651A' },
   { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
   // The sticker that goes on a greenware shelf before dipping. Sits

@@ -6169,6 +6169,77 @@ export function parseTicketName(raw) {
 }
 
 
+// ---- PAID FOR vs PHOTOGRAPHED ----------------------------------------
+// Daisy: "never more if they split bill." So the till is a FLOOR, not a
+// target. Several tickets on one booking add up; nobody ever pays for
+// fewer pieces than they carried to the table.
+//
+// That makes the comparison one-sided and therefore worth trusting:
+//   photo < paid  -> something is hidden behind something else. Flag it
+//                    tonight, while the table is still in living memory,
+//                    rather than in three weeks when it is a mystery.
+//   photo > paid  -> quieter note. Either the recognition split one piece
+//                    into two, or somebody else's pot wandered onto the
+//                    table. Both worth knowing, neither an emergency.
+//
+// The known weakness, worth saying out loud: a split bill rung through as
+// a walk-in rather than against the booking leaves part of the money
+// unattached, so the floor reads too low and the booking looks short when
+// it is not. That shows as a shortfall with only one ticket matched, which
+// is why the ticket count is on the screen.
+export function registerPieceCheckRoutes(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/piece-check', async (req, res) => {
+    try {
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, paid_piece_count, paid_piece_cents, paid_ticket_count, live_ticket_name')
+        .eq('studio_id', STUDIO_ID)
+        .not('paid_piece_count', 'is', null)
+        .gt('paid_piece_count', 0)
+        .order('session_start', { ascending: false })
+        .limit(400);
+      if (error) throw error;
+
+      const codes = (bookings || []).map((b) => b.booking_code);
+      const found = new Map();
+      for (let i = 0; i < codes.length; i += 200) {
+        const { data: pieces } = await supabase
+          .from('pottery_pieces')
+          .select('booking_id')
+          .eq('studio_id', STUDIO_ID)
+          .neq('archived', true)
+          .in('booking_id', codes.slice(i, i + 200));
+        for (const p of pieces || []) found.set(p.booking_id, (found.get(p.booking_id) || 0) + 1);
+      }
+
+      const rows = (bookings || []).map((b) => {
+        const photographed = found.get(b.booking_code) || 0;
+        return {
+          booking_code: b.booking_code,
+          customer_name: b.customer_name,
+          session_start: b.session_start,
+          paid: b.paid_piece_count,
+          photographed,
+          tickets: b.paid_ticket_count || 1,
+          gap: photographed - b.paid_piece_count,
+        };
+      });
+
+      res.json({
+        // Short first, and the biggest shortfalls at the top -- those are
+        // the ones most likely to turn into a phone call in three weeks.
+        short: rows.filter((r) => r.gap < 0).sort((a, b) => a.gap - b.gap),
+        over: rows.filter((r) => r.gap > 0).sort((a, b) => b.gap - a.gap),
+        ok: rows.filter((r) => r.gap === 0).length,
+        checked: rows.length,
+      });
+    } catch (err) {
+      logger.error('piece-check failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axios) {
   app.post('/api/spec/bookings/match-tickets', async (req, res) => {
     const dryRun = req.body?.dry_run === true;
@@ -6213,6 +6284,35 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         .eq('studio_id', STUDIO_ID)
         .gte('session_start', since.toISOString());
 
+      // Every catalogue id that is a piece of bisque, so a round of lattes
+      // on the same ticket does not get counted as pottery.
+      const bisqueIds = new Set();
+      {
+        const { data: cat } = await supabase
+          .from('piece_catalogue')
+          .select('square_item_id, variations')
+          .eq('studio_id', STUDIO_ID)
+          .limit(2000);
+        for (const c of cat || []) {
+          if (c.square_item_id) bisqueIds.add(c.square_item_id);
+          for (const v of (Array.isArray(c.variations) ? c.variations : [])) {
+            if (v && v.id) bisqueIds.add(v.id);
+          }
+        }
+      }
+      // How many pieces a ticket is for. Quantity matters: one line saying
+      // x3 is three pots, not one.
+      const piecesOn = (order) => {
+        let n = 0, cents = 0;
+        for (const li of (order.line_items || [])) {
+          const id = li.catalog_object_id;
+          if (!id || !bisqueIds.has(id)) continue;
+          n += Number(li.quantity || 1);
+          cents += (li.total_money?.amount || 0);
+        }
+        return { n, cents };
+      };
+
       const prepared = (bookings || []).map((b) => {
         const first = String(b.customer_name || '').trim().split(/\s+/)[0].toLowerCase();
         return {
@@ -6255,9 +6355,14 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         if (claimedOrders.has(p.order.id)) continue;
         claimedOrders.add(p.order.id);
         // Several tickets can belong to one booking, so accumulate.
-        const cur = byBooking.get(p.booking.booking_code) || { names: [], total: 0, basis: new Set() };
+        const cur = byBooking.get(p.booking.booking_code) || { names: [], total: 0, basis: new Set(), pieces: 0, pieceCents: 0 };
         cur.names.push(p.ticketName);
         cur.total += (p.order.total_money?.amount || 0);
+        // Split bills add up rather than replace. Nobody pays for FEWER
+        // pieces than they took, so the sum is a floor, never a ceiling.
+        const pc = piecesOn(p.order);
+        cur.pieces += pc.n;
+        cur.pieceCents += pc.cents;
         cur.basis.add(p.basis);
         byBooking.set(p.booking.booking_code, cur);
       }
@@ -6269,6 +6374,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
           ticket_names: v.names,
           tickets: v.names.length,
           total_cents: v.total,
+          paid_pieces: v.pieces,
           basis: Array.from(v.basis).join(', '),
         });
         if (!dryRun) {
@@ -6277,6 +6383,10 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
             live_ticket_total_cents: v.total,
             live_ticket_matched_at: new Date().toISOString(),
             live_ticket_match_basis: Array.from(v.basis).join(', '),
+            paid_piece_count: v.pieces,
+            paid_piece_cents: v.pieceCents,
+            paid_ticket_count: v.names.length,
+            paid_pieces_at: new Date().toISOString(),
           }).eq('studio_id', STUDIO_ID).eq('booking_code', code);
         }
       }
