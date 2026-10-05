@@ -6187,6 +6187,74 @@ export function parseTicketName(raw) {
 // unattached, so the floor reads too low and the booking looks short when
 // it is not. That shows as a shortfall with only one ticket matched, which
 // is why the ticket count is on the screen.
+// ---- HEARTBEAT --------------------------------------------------------
+// Three jobs have stopped silently so far: takings for 43 days, pieces for
+// 27, the catalogue refresh this morning. Each was found weeks late by
+// noticing a wrong number, and each was diagnosed from scratch.
+//
+// So: every job says when it last worked, one table holds it, and one
+// screen goes amber. A job that fails loudly is a nuisance. A job that
+// stops quietly is a liability, because everything downstream keeps
+// working and keeps being wrong.
+export function makeHeartbeat(supabase, logger) {
+  return {
+    async ok(job) {
+      try {
+        await supabase.from('job_runs').upsert({
+          job, last_ok_at: new Date().toISOString(), last_try_at: new Date().toISOString(),
+          last_error: null, updated_at: new Date().toISOString(),
+        }, { onConflict: 'job' });
+      } catch (e) { logger.warn(`[heartbeat] could not record ${job}`, e.message); }
+    },
+    async fail(job, err) {
+      try {
+        await supabase.from('job_runs').upsert({
+          job, last_try_at: new Date().toISOString(),
+          last_error: String(err || '').slice(0, 400), updated_at: new Date().toISOString(),
+        }, { onConflict: 'job' });
+      } catch (e) { logger.warn(`[heartbeat] could not record ${job} failure`, e.message); }
+    },
+    // Wrap a job so neither outcome can be forgotten. The whole point is
+    // that nobody has to remember to call ok().
+    async run(job, fn) {
+      try { const r = await fn(); await this.ok(job); return r; }
+      catch (err) { await this.fail(job, err.message); throw err; }
+    },
+  };
+}
+
+export function registerHeartbeatRoutes(app, supabase, logger) {
+  app.get('/api/spec/heartbeat', async (req, res) => {
+    try {
+      const { data, error } = await supabase.from('job_runs').select('*').order('job');
+      if (error) throw error;
+      const now = Date.now();
+      const jobs = (data || []).map((j) => {
+        const mins = j.last_ok_at ? Math.round((now - new Date(j.last_ok_at).getTime()) / 60000) : null;
+        return {
+          job: j.job,
+          last_ok_at: j.last_ok_at,
+          mins_ago: mins,
+          stale_after_mins: j.stale_after_mins,
+          // Never run at all is its own thing, not "stale". A job that has
+          // never once worked is usually not wired up, which is a different
+          // conversation from one that has stopped.
+          state: mins === null ? 'never' : (mins > j.stale_after_mins ? 'stale' : 'ok'),
+          last_error: j.last_error,
+        };
+      });
+      res.json({
+        jobs,
+        stale: jobs.filter((j) => j.state === 'stale').length,
+        never: jobs.filter((j) => j.state === 'never').length,
+      });
+    } catch (err) {
+      logger.error('heartbeat failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 export function registerPieceCheckRoutes(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/piece-check', async (req, res) => {
     try {

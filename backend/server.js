@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute, registerShapeRecognitionRoutes, registerOtherMatchRoutes, registerPieceCheckRoutes } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute, registerShapeRecognitionRoutes, registerOtherMatchRoutes, registerPieceCheckRoutes, registerHeartbeatRoutes, makeHeartbeat } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1679,6 +1679,8 @@ registerSquareConnectRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerTicketLinkDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerTicketMatchRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerPieceCheckRoutes(app, supabase, DEMO_STUDIO_ID, logger);
+registerHeartbeatRoutes(app, supabase, logger);
+const heartbeat = makeHeartbeat(supabase, logger);
 registerShelfSweepRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
 registerSquareAccessCheckRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerDriveBackupRoutes(app, supabase, DEMO_STUDIO_ID, logger, upload, fs);
@@ -1721,6 +1723,7 @@ app.listen(PORT, () => {
   // awake -- genuine real user traffic (or a manual trigger) keeps it
   // running, but this isn't a guaranteed-always-on external cron.
   const SELF_URL = `http://localhost:${PORT}`;
+  let catalogueTick = 0;
 
   // The takings sync was never on this schedule, only the bookings one, so
   // it ran whenever somebody remembered to press it -- which turned out to
@@ -1747,6 +1750,7 @@ app.listen(PORT, () => {
       const r = await fetch(`${SELF_URL}/api/spec/catalogue/refresh-from-square`, { method: 'POST' });
       const d = await r.json().catch(() => ({}));
       logger.info(`[catalogue-refresh] ${d.refreshed ? `${d.shapes} shapes, ${d.with_photo} with a photo` : 'failed: ' + (d.error || r.status)}`);
+      if (d.refreshed) await heartbeat.ok('catalogue-refresh'); else await heartbeat.fail('catalogue-refresh', d.error || r.status);
     } catch (err) {
       logger.error('[catalogue-refresh] could not run', err.message);
     }
@@ -1768,6 +1772,25 @@ app.listen(PORT, () => {
 
   setInterval(async () => {
     try {
+      // [5 Oct] The catalogue refresh ran ON BOOT ONLY. A stocktake done in
+      // Square therefore sat unseen until the next deploy -- Daisy did one
+      // this morning and the last refresh was 06:31, the previous deploy.
+      // Nothing looked broken, which is exactly the failure this and the
+      // heartbeat are both about. Every third tick is roughly a quarter of
+      // an hour, which is what the stock page already promised.
+      catalogueTick = (catalogueTick + 1) % 3;
+      if (catalogueTick === 0) {
+        try {
+          const cr = await fetch(`${SELF_URL}/api/spec/catalogue/refresh-from-square`, { method: 'POST' });
+          const cd = await cr.json().catch(() => ({}));
+          if (cd.refreshed) await heartbeat.ok('catalogue-refresh');
+          else await heartbeat.fail('catalogue-refresh', cd.error || cr.status);
+        } catch (err) {
+          await heartbeat.fail('catalogue-refresh', err.message);
+          logger.error('[auto-sync] catalogue refresh failed', err.message);
+        }
+      }
+
       // Takings, kept current. Only the last two days each tick -- the
       // heavy catch-up already ran on boot, and re-pulling 90 days every
       // five minutes would hammer Square for nothing.
@@ -1775,6 +1798,7 @@ app.listen(PORT, () => {
         const revRes = await fetch(`${SELF_URL}/api/spec/revenue/sync?daysBack=2`, { method: 'POST' });
         const revData = await revRes.json().catch(() => ({}));
         if (revData.rows_written) logger.info(`[auto-sync] ${revData.rows_written} takings row(s) updated`);
+        await heartbeat.ok('revenue-sync');
       } catch (err) {
         logger.error('[auto-sync] revenue sync failed', err.message);
       }
@@ -1810,6 +1834,7 @@ app.listen(PORT, () => {
       }
 
       const bookingRes = await fetch(`${SELF_URL}/api/bookings/sync`, { method: 'POST' });
+      if (bookingRes.ok) await heartbeat.ok('bookings-sync');
       const bookingData = await bookingRes.json().catch(() => ({}));
       if (bookingData.synced) logger.info(`[auto-sync] ${bookingData.synced} new booking(s) pulled from Square`);
 
