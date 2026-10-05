@@ -427,7 +427,6 @@ export default function DailyCardsPage() {
               {isNew && <p style={{ fontSize: 'var(--text-xs)', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
               {(() => {
                 const d = new Date(b.session_start);
-                const short = (x: Date) => `${x.getDate()}/${x.getMonth() + 1}`;
                 const longDate = (x: Date) =>
                   x.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
                 return (
@@ -459,23 +458,13 @@ export default function DailyCardsPage() {
                       fontSize: '0.72rem', letterSpacing: '.14em', textTransform: 'uppercase',
                       color: '#9B8C85', margin: 0, lineHeight: 1.9,
                     }}>
-                      Painted {longDate(d)}
+                      Painted {longDate(d)} · {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                     <p style={{
                       fontFamily: 'Georgia, "Times New Roman", serif',
                       fontSize: '1rem', color: 'var(--clay)', margin: '.15rem 0 0',
                     }}>
                       Ready {collectDate ? longDate(new Date(collectDate)) : 'in about three weeks'}
-                    </p>
-
-                    {/* Small, at the bottom, for us rather than them. The
-                        photo reads it; a customer need never notice it. */}
-                    <p style={{
-                      fontSize: '0.6rem', color: '#C4B8AD', margin: '1.1rem 0 0',
-                      letterSpacing: '.08em',
-                    }}>
-                      {short(d)} · {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                      {collectDate ? ` · ${short(new Date(collectDate))}` : ''}
                     </p>
                   </div>
                 );
@@ -495,19 +484,6 @@ export default function DailyCardsPage() {
                   </span>
                 )}
               </p>
-
-              {/* No printed table number or room. Daisy: "they get seated
-                  anyway. It's the photograph and the card that counts...
-                  all we need is the identification of the booking." The
-                  app never decided the table -- it was reprinting what
-                  Square said, which was often blank or just "Main Studio"
-                  and stale the moment anyone moved. A blank box the girls
-                  fill in by hand is both more accurate and less work than
-                  keeping two systems agreeing about it. */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.45rem' }}>
-                <span style={{ fontSize: 'var(--text-xs)', color: '#888', fontWeight: 600 }}>Table</span>
-                <span style={{ display: 'inline-block', width: 46, height: 26, border: '1.5px solid #bbb', borderRadius: 4 }} />
-              </div>
 
               {b.party_size && (
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
