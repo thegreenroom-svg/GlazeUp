@@ -83,7 +83,7 @@ export default function ReturnsPage() {
   const done = (rows || []).filter((r) => r.settled);
 
   return (
-    <PageShell title="Returns shelf" subtitle="Pieces sent back, and why">
+    <PageShell title="Returns shelf" subtitle="Unfinished pieces, waiting for their painter">
       {rows === null && (
         <p style={{ color: B.stone, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Loader size={15} className="animate-spin" /> Loading
@@ -94,7 +94,7 @@ export default function ReturnsPage() {
         <EmptyState
           icon={<RotateCcw size={22} />}
           title="Nothing on the returns shelf"
-          hint="Pieces marked as returning on the table photo, or at packing, show up here with the reason they went back."
+          hint="Pieces marked as returning on the table photo show up here until the customer comes back to finish them."
         />
       )}
 
@@ -127,10 +127,10 @@ export default function ReturnsPage() {
                   color: '#a8651a', fontSize: 'var(--text-xs)', fontWeight: 600,
                   marginTop: '0.25rem',
                 }}>
-                  {r.return_reason || 'No reason given'}
+                  {r.return_reason || 'Coming back to finish'}
                 </p>
                 <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.15rem' }}>
-                  Sent back {when(r.returned_at)}
+                  On the shelf since {when(r.returned_at)}
                   {r.returned_by ? ` by ${r.returned_by}` : ''}
                   {r.collection_date ? ` · was due ${new Date(r.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
                 </p>
@@ -173,7 +173,7 @@ export default function ReturnsPage() {
                   {r.customer_name || r.booking_id} — {r.piece_type || 'piece'}
                 </p>
                 <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>
-                  {r.return_reason || 'No reason given'} · {when(r.returned_at)}
+                  {r.return_reason || 'Coming back to finish'} · {when(r.returned_at)}
                 </p>
               </div>
             </div>

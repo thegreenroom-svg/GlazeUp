@@ -555,7 +555,7 @@ export default function DailyCardsPage() {
                           color: has ? '#A8651A' : '#C4B8AD',
                         }}>
                           {has
-                            ? 'On the returns shelf'
+                            ? `${r!.length} to finish, on the returns shelf`
                             : '\u2713 nothing on the returns shelf'}
                         </p>
                       );

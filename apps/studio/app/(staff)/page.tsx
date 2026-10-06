@@ -76,7 +76,7 @@ const STEPS = [
 // findable; a tile competing with sixteen others is not.
 const TOOLS = [
   { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
-  { key: 'returns',  label: 'Returns shelf',        detail: 'Sent back, and why',                  href: '/returns',  icon: RotateCcw, tint: '#A8651A' },
+  { key: 'returns',  label: 'Returns shelf',        detail: 'Coming back to finish',                  href: '/returns',  icon: RotateCcw, tint: '#A8651A' },
   { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
   { key: 'stickers',   label: 'Shelf stickers',       detail: 'QR labels for each collection date',   href: '/shelf-stickers', icon: QrCode, tint: '#6B7A5F' },
 ];

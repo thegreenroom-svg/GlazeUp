@@ -1771,10 +1771,9 @@ export default function FloorPage() {
                           })()}
                           {returning[p.index] !== undefined && (
                             <input
-                              autoFocus={savedReturns[p.index] === undefined}
                               value={returning[p.index]}
                               onChange={(e) => setReturning((r) => ({ ...r, [p.index]: e.target.value }))}
-                              placeholder="Why is it going back? (chipped, wrong colour...)"
+                              placeholder="Coming back to finish (add a date if you know it)"
                               style={{
                                 marginTop: '0.35rem', width: '100%', padding: '0.4rem 0.5rem',
                                 borderRadius: 'var(--radius-sm)', border: `1px solid ${B.clay}`,
@@ -1786,7 +1785,10 @@ export default function FloorPage() {
                         <button
                           onClick={() => setReturning((r) => {
                             const n = { ...r };
-                            if (n[p.index] !== undefined) delete n[p.index]; else n[p.index] = '';
+                            // Daisy: return means coming back to finish painting. Damaged
+                            // pieces are thrown out or fixed, never put on this shelf. So
+                            // one tap fills the usual reason; typing is only for extras.
+                            if (n[p.index] !== undefined) delete n[p.index]; else n[p.index] = 'Coming back to finish';
                             return n;
                           })}
                           style={{
