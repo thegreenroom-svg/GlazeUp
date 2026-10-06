@@ -5628,6 +5628,60 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 
+  // [6 Oct] The card's next step starts with "they're here". Toggle, so a
+  // mis-tap is undone by tapping again.
+  app.post('/api/spec/bookings/:code/arrived', async (req, res) => {
+    try {
+      const arrived = req.body?.arrived !== false;
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ arrived_at: arrived ? new Date().toISOString() : null })
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .select('booking_code, arrived_at')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Booking not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error('set arrived failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // [6 Oct] One search box on the cards: "I'm here to collect for Smith"
+  // without guessing which day they painted. Any day, by name, phone,
+  // email, table number or booking code. Newest first. (Separate from the
+  // Find page's /api/spec/bookings/search, which is name and date only and
+  // returns a different shape.)
+  app.get('/api/spec/cards/search', async (req, res) => {
+    try {
+      const q = String(req.query.q || '').trim().replace(/[%,()]/g, ' ').slice(0, 60);
+      if (q.length < 2) return res.json([]);
+      const like = `%${q}%`;
+      const digits = q.replace(/\D/g, '');
+      const ors = [
+        `customer_name.ilike.${like}`,
+        `customer_email.ilike.${like}`,
+        `booking_code.ilike.${like}`,
+        `table_number.eq.${q}`,
+      ];
+      if (digits.length >= 4) ors.push(`customer_phone.ilike.%${digits}%`);
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, table_number, party_size, collected_at')
+        .eq('studio_id', STUDIO_ID)
+        .or(ors.join(','))
+        .order('session_start', { ascending: false })
+        .limit(25);
+      if (error) throw error;
+      res.json(data || []);
+    } catch (err) {
+      logger.error('booking search failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // [6 Oct] Daisy: staff set the table number on the card itself (tap the
   // Table circle). Free text, same field the till matches handheld tickets
   // against, so setting it here also lets the till find the right ticket.

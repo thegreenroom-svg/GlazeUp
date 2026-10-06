@@ -28,7 +28,28 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   }
 }
 
+// [6 Oct] Every card says where the booking is and the one thing to do
+// next, so nobody needs to know the app's layout -- just the button.
+type NextStep = 'arrived' | 'photo' | 'handover' | null;
+function cardStatus(b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number }): { label: string; colour: string; next: NextStep } {
+  const today = new Date().toLocaleDateString('en-CA');
+  if (b.collected_at) return { label: 'Collected', colour: '#3d7a4a', next: null };
+  if (b.finished_at || (b.photo_count || 0) > 0) {
+    const due = !!b.collection_date && b.collection_date.slice(0, 10) <= today;
+    return due
+      ? { label: 'Ready to collect', colour: '#b8860b', next: 'handover' }
+      : { label: 'Photographed', colour: '#4a6a8a', next: null };
+  }
+  if (b.arrived_at) return { label: 'Painting', colour: 'var(--clay)', next: 'photo' };
+  return { label: 'Booked', colour: '#8a8178', next: 'arrived' };
+}
+
 interface Booking {
+  arrived_at?: string | null;
+  collected_at?: string | null;
+  collection_date?: string | null;
+  finished_at?: string | null;
+  session_end?: string | null;
   booking_code: string;
   customer_name: string;
   session_start: string;
@@ -70,6 +91,21 @@ function tableSetupFlags(notes: string | null): string[] {
 
 export default function DailyCardsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  // Every booking the feed returned, not just the chosen day's -- the
+  // Collecting view needs bookings painted on other days.
+  const [allBookings, setAllBookings] = useState<Booking[]>([]);
+  const [view, setView] = useState<'painting' | 'collecting'>('painting');
+  const [showEarlier, setShowEarlier] = useState(false);
+  const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (text: string, undo?: () => void) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ text, undo });
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
+  };
+  // Search, any day.
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<any[] | null>(null);
   // [6 Oct] Daisy: the cards are the interface. One card opens at a time,
   // full width, with its saved table photo; any picture goes full screen.
   const router = useRouter();
@@ -231,6 +267,7 @@ export default function DailyCardsPage() {
       const dateStr = cardDateRef.current;
       const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`);
       const data = res.ok ? await res.json() : [];
+      setAllBookings(Array.isArray(data) ? data : []);
       const dayStr = new Date(dateStr).toDateString();
       const today = (Array.isArray(data) ? data : [])
         .filter((b: Booking) => new Date(b.session_start).toDateString() === dayStr)
@@ -259,8 +296,11 @@ export default function DailyCardsPage() {
       // Small and top left, so it stays out of the way of the card until
       // somebody actually needs it.
       const urls: Record<string, string> = {};
+      const collectingToday = (Array.isArray(data) ? data : []).filter(
+        (b: Booking) => !b.collected_at && !!b.collection_date && b.collection_date.slice(0, 10) === dateStr
+      );
       await Promise.all(
-        today.map(async (b: Booking) => {
+        [...today, ...collectingToday].map(async (b: Booking) => {
           urls[b.booking_code] = await QRCode.toDataURL(
             `${window.location.origin}/floor?code=${encodeURIComponent(b.booking_code)}`,
             { margin: 0, width: 160 }
@@ -381,11 +421,77 @@ export default function DailyCardsPage() {
     return times.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   }, [bookings]);
 
-  const visibleBookings = useMemo(() => {
+  // Collecting: anything due to be picked up on the chosen day, whenever it
+  // was painted.
+  const collectingList = useMemo(
+    () => allBookings
+      .filter((b) => !b.collected_at && !!b.collection_date && b.collection_date.slice(0, 10) === cardDate)
+      .sort((a, b) => a.customer_name.localeCompare(b.customer_name)),
+    [allBookings, cardDate]
+  );
+
+  // Today opens at now: earlier sessions that are finished fold away.
+  // Anything from earlier still waiting for its table photo stays out,
+  // because that is work still to do.
+  const isToday = cardDate === new Date().toLocaleDateString('en-CA');
+  const isEarlierDone = (b: Booking) => {
+    const end = b.session_end ? new Date(b.session_end).getTime() : new Date(b.session_start).getTime() + 2 * 3600000;
+    return end < Date.now() && (!!b.finished_at || !!b.collected_at || (b.photo_count || 0) > 0);
+  };
+
+  const sessionFiltered = useMemo(() => {
     if (selectedSessionIdx === null) return bookings;
     const t = sessionTimes[selectedSessionIdx];
     return t ? bookings.filter((b) => b.session_start === t) : bookings;
   }, [bookings, sessionTimes, selectedSessionIdx]);
+  const earlierDone = isToday && selectedSessionIdx === null ? sessionFiltered.filter(isEarlierDone) : [];
+  const visibleBookings = useMemo(() => {
+    if (view === 'collecting') return collectingList;
+    if (showEarlier || !earlierDone.length) return sessionFiltered;
+    const hide = new Set(earlierDone.map((b) => b.booking_code));
+    return sessionFiltered.filter((b) => !hide.has(b.booking_code));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, collectingList, sessionFiltered, showEarlier, earlierDone.length]);
+
+  const markArrived = async (b: Booking, arrived: boolean) => {
+    const before = b.arrived_at ?? null;
+    const set = (v: string | null) => setBookings((bs) => bs.map((x) => (x.booking_code === b.booking_code ? { ...x, arrived_at: v } : x)));
+    set(arrived ? new Date().toISOString() : null);
+    try {
+      const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(b.booking_code)}/arrived`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arrived }),
+      });
+      if (!r.ok) throw new Error();
+      if (arrived) showToast(`${b.customer_name} arrived`, () => markArrived({ ...b, arrived_at: new Date().toISOString() }, false));
+    } catch {
+      set(before);
+      showToast("That didn't save. Try again.");
+    }
+  };
+
+  const goToCard = (code: string, sessionStart: string) => {
+    const date = new Date(sessionStart).toLocaleDateString('en-CA');
+    setQ(''); setResults(null); setView('painting'); setShowEarlier(true); setSelectedSessionIdx(null);
+    if (bookings.some((b) => b.booking_code === code)) {
+      if (openCode !== code) openCard(code);
+      setTimeout(() => document.getElementById(`card-${code}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+      return;
+    }
+    restoreCode.current = code;
+    setCardDate(date);
+  };
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) { setResults(null); return; }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/cards/search?q=${encodeURIComponent(term)}`);
+        setResults(r.ok ? await r.json() : []);
+      } catch { setResults([]); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
 
   const goToNextSession = () => {
     if (sessionTimes.length === 0) return;
@@ -435,7 +541,68 @@ export default function DailyCardsPage() {
           </button>
         </div>
 
-        {sessionTimes.length > 1 && (
+        {/* Any booking, any day: name, phone, email, table or code. */}
+        <div style={{ position: 'relative', marginBottom: '0.8rem' }}>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Find a booking: name, phone, table..."
+            style={{ width: '100%', padding: '0.75rem 0.9rem', fontSize: 'var(--text-md)', border: '1px solid #ddd', borderRadius: 8, background: 'white' }}
+          />
+          {results && (
+            <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: '100%', marginTop: 4, background: 'white', border: '1px solid #e5ddd2', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: '60vh', overflowY: 'auto' }}>
+              {results.length === 0 && <p style={{ padding: '0.8rem 1rem', color: '#888', fontSize: 'var(--text-sm)' }}>No bookings found.</p>}
+              {results.map((r) => (
+                <button
+                  key={r.booking_code}
+                  onClick={() => goToCard(r.booking_code, r.session_start)}
+                  style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', padding: '0.8rem 1rem', border: 'none', borderBottom: '1px solid #f1ece5', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <span style={{ fontWeight: 600 }}>{r.customer_name}</span>
+                  <span style={{ fontSize: 'var(--text-sm)', color: '#888', whiteSpace: 'nowrap' }}>
+                    {new Date(r.session_start).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {r.table_number ? ` · Table ${r.table_number}` : ''}
+                    {r.collected_at ? ' · Collected' : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Same cards, different pile. */}
+        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          {([
+            ['painting', `Painting${bookings.length ? ` (${bookings.length})` : ''}`],
+            ['collecting', `Collecting${collectingList.length ? ` (${collectingList.length})` : ''}`],
+          ] as const).map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{ padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid var(--clay)', background: view === v ? 'var(--clay)' : 'white', color: view === v ? 'white' : 'var(--clay)' }}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            onClick={() => router.push('/returns')}
+            style={{ padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid #d8cbbc', background: 'white', color: '#8a8178' }}
+          >
+            Returns shelf
+          </button>
+        </div>
+
+        {view === 'painting' && earlierDone.length > 0 && (
+          <button
+            onClick={() => setShowEarlier((x) => !x)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '1rem', padding: '0.5rem 0.9rem', borderRadius: 8, border: '1px dashed #d8cbbc', background: 'transparent', color: '#8a8178', fontSize: 'var(--text-sm)', fontWeight: 600 }}
+          >
+            {showEarlier ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            {showEarlier ? 'Hide' : 'Show'} earlier today, done ({earlierDone.length})
+          </button>
+        )}
+
+        {view === 'painting' && sessionTimes.length > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
             <button
               onClick={goToPrevSession}
@@ -579,7 +746,7 @@ export default function DailyCardsPage() {
                           not part of the card's face. */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
                         <span style={{
-                          fontSize: '0.58rem', letterSpacing: '.1em',
+                          fontSize: '0.68rem', letterSpacing: '.1em',
                           textTransform: 'uppercase', color: '#C4B8AD', fontWeight: 600,
                         }}>
                           Table
@@ -676,7 +843,7 @@ export default function DailyCardsPage() {
                         // only. Seats and setup flags still print, for
                         // whoever lays the table.
                         <p className="no-print" style={{
-                          fontSize: '0.62rem', margin: '.7rem 0 0',
+                          fontSize: '0.78rem', margin: '.7rem 0 0',
                           letterSpacing: '.04em', fontWeight: 600,
                           color: has ? '#A8651A' : '#C4B8AD',
                         }}>
@@ -767,6 +934,31 @@ export default function DailyCardsPage() {
               {/* Open the card: the saved table photo, every piece numbered,
                   and the next things to do. Screen only, never printed. */}
               <div className="no-print" style={{ padding: '0 1rem 1rem' }} onClick={(e) => e.stopPropagation()}>
+                {(() => {
+                  const st = cardStatus(b);
+                  const go = (path: string) => router.push(`${path}?code=${encodeURIComponent(b.booking_code)}&from=card`);
+                  return (
+                    <div style={{ marginTop: '0.8rem' }}>
+                      <span style={{ display: 'inline-block', padding: '0.2rem 0.65rem', borderRadius: 999, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'white', background: st.colour }}>
+                        {st.label}
+                      </span>
+                      {st.next && (
+                        <button
+                          onClick={() => {
+                            if (st.next === 'arrived') markArrived(b, true);
+                            if (st.next === 'photo') go('/floor');
+                            if (st.next === 'handover') go('/collection');
+                          }}
+                          style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.6rem', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-md)' }}
+                        >
+                          {st.next === 'arrived' && <>They&apos;re here</>}
+                          {st.next === 'photo' && <><Camera size={18} /> Photograph the table</>}
+                          {st.next === 'handover' && <>Hand over</>}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
                 <button
                   onClick={() => openCard(b.booking_code)}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', padding: '0.4rem 0.9rem', borderRadius: 999, border: '1px solid var(--clay)', background: openCode === b.booking_code ? 'var(--clay)' : 'transparent', color: openCode === b.booking_code ? 'white' : 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
@@ -850,6 +1042,16 @@ export default function DailyCardsPage() {
         })}
       </div>
 
+      {toast && (
+        <div className="no-print" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.2rem)', zIndex: 900, display: 'flex', alignItems: 'center', gap: '0.9rem', padding: '0.75rem 1rem', borderRadius: 10, background: '#2b2622', color: '#f6f1ea', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', fontSize: 'var(--text-sm)', maxWidth: '92vw' }}>
+          <span>{toast.text}</span>
+          {toast.undo && (
+            <button onClick={() => { toast.undo?.(); setToast(null); }} style={{ background: 'none', border: 'none', color: '#e8a23c', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+              Undo
+            </button>
+          )}
+        </div>
+      )}
       {viewer && <PieceViewer pieces={viewer.pieces} start={viewer.start} title={viewer.title} onClose={() => setViewer(null)} />}
 
       <style jsx global>{`
