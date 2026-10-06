@@ -326,6 +326,20 @@ export default function DailyCardsPage() {
     }
   };
 
+  // [6 Oct] Daisy: a print button on each card, so one can be printed off
+  // on its own without selecting and deselecting the rest. Only that card
+  // is marked for the print CSS until the print dialog closes.
+  const [printOnly, setPrintOnly] = useState<string | null>(null);
+  const printOne = (code: string) => {
+    setPrintOnly(code);
+    const done = () => setPrintOnly(null);
+    window.addEventListener('afterprint', done, { once: true });
+    // Let the marking render before the dialog opens.
+    setTimeout(() => window.print(), 80);
+    // Safety net if afterprint never fires (some iOS versions).
+    setTimeout(done, 60000);
+  };
+
   const handlePrintSelected = () => {
     if (selected.size === 0) {
       alert('Please select at least one card to print');
@@ -489,7 +503,7 @@ export default function DailyCardsPage() {
               key={b.booking_code}
               id={`card-${b.booking_code}`}
               className="print-card"
-              data-selected={isSelected ? "true" : "false"}
+              data-selected={(printOnly ? printOnly === b.booking_code : isSelected) ? "true" : "false"}
               style={{
                 padding: '0', 
                 borderRadius: '2px', 
@@ -704,6 +718,13 @@ export default function DailyCardsPage() {
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', padding: '0.4rem 0.9rem', borderRadius: 999, border: '1px solid var(--clay)', background: openCode === b.booking_code ? 'var(--clay)' : 'transparent', color: openCode === b.booking_code ? 'white' : 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
                 >
                   {openCode === b.booking_code ? <>Close <ChevronUp size={15} /></> : <>Open <ChevronDown size={15} /></>}
+                </button>
+                <button
+                  onClick={() => printOne(b.booking_code)}
+                  aria-label="Print this card"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', marginLeft: '0.4rem', padding: '0.4rem 0.9rem', borderRadius: 999, border: '1px solid var(--clay)', background: 'transparent', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
+                >
+                  <Printer size={14} /> Print
                 </button>
 
                 {openCode === b.booking_code && (() => {
