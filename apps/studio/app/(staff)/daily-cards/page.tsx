@@ -1,5 +1,6 @@
 'use client';
 import QRCode from 'qrcode';
+import { PieceThumb } from '@/components/PieceBoxes';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +39,12 @@ interface Booking {
   visit_number?: number;
   previous_visits?: number;
   last_visit?: string | null;
-  returns_waiting?: string[];
+  returns_waiting?: {
+    piece_type: string;
+    reason: string | null;
+    photo: string | null;
+    box: { top_pct: number; left_pct: number; right_pct: number; bottom_pct: number } | null;
+  }[];
 }
 
 
@@ -544,11 +550,35 @@ export default function DailyCardsPage() {
                           color: has ? '#A8651A' : '#C4B8AD',
                         }}>
                           {has
-                            ? `On the returns shelf: ${r!.join(', ')}`
+                            ? 'On the returns shelf'
                             : '\u2713 nothing on the returns shelf'}
                         </p>
                       );
                     })()}
+
+                    {/* The pieces themselves, as they looked the day they
+                        were painted. Stood at the shelf a name is not much
+                        help -- there are four white mugs on it. The picture
+                        is the only thing that identifies one. */}
+                    {!!(b.returns_waiting && b.returns_waiting.length) && (
+                      <div style={{
+                        display: 'flex', gap: '0.4rem', justifyContent: 'center',
+                        flexWrap: 'wrap', marginTop: '0.45rem',
+                      }}>
+                        {b.returns_waiting.map((r, i) => (
+                          <div key={i} style={{ textAlign: 'center', maxWidth: 62 }}>
+                            <PieceThumb url={r.photo} box={r.box} size={40} ring="#A8651A" />
+                            <p style={{
+                              fontSize: '0.52rem', color: '#A8651A', lineHeight: 1.25,
+                              margin: '0.15rem 0 0', fontWeight: 600,
+                            }}>
+                              {r.piece_type}
+                              {r.reason ? <><br /><span style={{ color: '#B9ADA0', fontWeight: 500 }}>{r.reason}</span></> : null}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -650,6 +680,16 @@ export default function DailyCardsPage() {
              the corner, so on paper it was blowing up to 2.2in and landing
              on top of the table circle. Sized to match the screen instead. */
           .print-card img { width: 0.42in !important; height: 0.42in !important; margin: 0 !important; display: block !important; }
+
+          /* The return thumbnails crop with a background-image rather than
+             an <img>, which is why the rule above does not squash them --
+             but browsers drop background images when printing unless told
+             otherwise. Without this the pieces print as empty boxes, which
+             is worse than not printing them at all. */
+          .print-card * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           .print-card p { margin: 0 0 0.1in !important; line-height: 1.3; }
         }
       `}</style>

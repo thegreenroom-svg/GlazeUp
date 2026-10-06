@@ -252,7 +252,7 @@ app.get('/api/demo/bookings', async (req, res) => {
       // before they sit down, not after they ask.
       const { data: returns } = await supabase
         .from('pottery_pieces')
-        .select('booking_id, piece_type, return_reason')
+        .select('booking_id, piece_type, return_reason, reference_photo_url, photo_box')
         .eq('studio_id', DEMO_STUDIO_ID)
         .not('returned_at', 'is', null)
         .neq('status', 'collected')
@@ -263,7 +263,15 @@ app.get('/api/demo/bookings', async (req, res) => {
       for (const r of returns || []) {
         const k = codeToName[r.booking_id];
         if (!k) continue;
-        (waiting[k] = waiting[k] || []).push(r.piece_type || 'a piece');
+        // The photo from the day they painted it, cropped to the piece.
+        // A name tells staff something is waiting; the picture tells them
+        // WHICH one, which is what they actually need stood at the shelf.
+        (waiting[k] = waiting[k] || []).push({
+          piece_type: r.piece_type || 'a piece',
+          reason: r.return_reason || null,
+          photo: r.reference_photo_url || null,
+          box: r.photo_box || null,
+        });
       }
     }
 
