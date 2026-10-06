@@ -476,10 +476,22 @@ export default function DailyCardsPage() {
                           style={{ width: 38, height: 38, flexShrink: 0, opacity: .72 }}
                         />
                       ) : <span style={{ width: 38 }} />}
-                      <div style={{
-                        width: 46, height: 46, flexShrink: 0,
-                        border: '1px solid #D8CBBC', borderRadius: '50%',
-                      }} />
+                      {/* The word next to the circle, so nobody has to
+                          work out what the empty ring is for. Printed
+                          small and pale -- it is an instruction to staff,
+                          not part of the card's face. */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: '0.58rem', letterSpacing: '.1em',
+                          textTransform: 'uppercase', color: '#C4B8AD', fontWeight: 600,
+                        }}>
+                          Table
+                        </span>
+                        <div style={{
+                          width: 46, height: 46, flexShrink: 0,
+                          border: '1px solid #D8CBBC', borderRadius: '50%',
+                        }} />
+                      </div>
                     </div>
 
                     <p style={{
