@@ -31,14 +31,30 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 // [6 Oct] Every card says where the booking is and the one thing to do
 // next, so nobody needs to know the app's layout -- just the button.
 type NextStep = 'arrived' | 'photo' | 'handover' | null;
-function cardStatus(b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number }): { label: string; colour: string; next: NextStep } {
+// A card with no button always says what happens next instead, so nobody
+// is left looking at a card wondering where to go.
+// fallbackDate is the date the card itself prints as "Ready", used when
+// the booking has none of its own saved.
+function cardStatus(
+  b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[] },
+  fallbackDate?: string | null
+): { label: string; colour: string; next: NextStep; hint?: string } {
   const today = new Date().toLocaleDateString('en-CA');
-  if (b.collected_at) return { label: 'Collected', colour: '#3d7a4a', next: null };
-  if (b.finished_at || (b.photo_count || 0) > 0) {
-    const due = !!b.collection_date && b.collection_date.slice(0, 10) <= today;
-    return due
-      ? { label: 'Ready to collect', colour: '#b8860b', next: 'handover' }
-      : { label: 'Photographed', colour: '#4a6a8a', next: null };
+  if (b.collected_at) return { label: 'Collected', colour: '#3d7a4a', next: null, hint: 'All done.' };
+  const photos = b.photo_count || 0;
+  if (b.finished_at || photos > 0) {
+    // Every piece is coming back to finish: nothing to fire, nothing to hand over.
+    if (photos > 0 && (b.returns_waiting?.length || 0) >= photos) {
+      return { label: 'Coming back to finish', colour: '#A8651A', next: null, hint: 'Nothing to fire. Their pieces wait on the returns shelf until they come back.' };
+    }
+    const date = (b.collection_date || fallbackDate || '').slice(0, 10);
+    if (date && date <= today) return { label: 'Ready to collect', colour: '#b8860b', next: 'handover' };
+    return {
+      label: 'Photographed', colour: '#4a6a8a', next: null,
+      hint: date
+        ? `Next: the kiln. Back here to hand over from ${new Date(date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}.`
+        : 'Next: the kiln. Back here to hand over once it is ready.',
+    };
   }
   if (b.arrived_at) return { label: 'Painting', colour: 'var(--clay)', next: 'photo' };
   return { label: 'Booked', colour: '#8a8178', next: 'arrived' };
@@ -847,7 +863,7 @@ export default function DailyCardsPage() {
                       fontFamily: 'Georgia, "Times New Roman", serif',
                       fontSize: '1rem', color: 'var(--clay)', margin: '.15rem 0 0',
                     }}>
-                      Ready {collectDate ? longDate(new Date(collectDate)) : 'in about three weeks'}
+                      Ready {(b.collection_date || collectDate) ? longDate(new Date((b.collection_date || collectDate) as string)) : 'in about three weeks'}
                     </p>
 
                     {/* Said to the customer, not about them. A number on its
@@ -974,12 +990,15 @@ export default function DailyCardsPage() {
                   and the next things to do. Screen only, never printed. */}
               <div className="no-print" style={{ padding: '0 1rem 1rem' }} onClick={(e) => e.stopPropagation()}>
                 {(() => {
-                  const st = cardStatus(b);
+                  const st = cardStatus(b, collectDate);
                   return (
                     <div style={{ marginTop: '0.8rem' }}>
                       <span style={{ display: 'inline-block', padding: '0.2rem 0.65rem', borderRadius: 999, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'white', background: st.colour }}>
                         {st.label}
                       </span>
+                      {!st.next && st.hint && (
+                        <p style={{ marginTop: '0.45rem', fontSize: 'var(--text-sm)', color: '#6b625a', lineHeight: 1.35 }}>{st.hint}</p>
+                      )}
                       {st.next && (
                         <button
                           onClick={() => {
