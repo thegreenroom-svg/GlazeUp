@@ -120,7 +120,7 @@ export default function DailyCardsPage() {
   const showToast = (text: string, undo?: () => void) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ text, undo });
-    toastTimer.current = setTimeout(() => setToast(null), 6000);
+    toastTimer.current = setTimeout(() => setToast(null), 10000);
   };
   // Search, any day.
   const [q, setQ] = useState('');
@@ -484,6 +484,33 @@ export default function DailyCardsPage() {
       if (arrived) showToast(`${b.customer_name} arrived`, () => markArrived({ ...b, arrived_at: new Date().toISOString() }, false));
     } catch {
       set(before);
+      showToast("That didn't save. Try again.");
+    }
+  };
+
+  // [6 Oct] Daisy: persistent undo where needed. The toast's Undo only
+  // lasts seconds; each card also keeps an undo for its last step for as
+  // long as that step stands, so a mistake found later is still one tap.
+  const markCollected = async (b: Booking, collected: boolean) => {
+    try {
+      const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/collect`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_code: b.booking_code, uncollect: !collected }),
+      });
+      if (!r.ok) throw new Error();
+      refreshCard(b.booking_code);
+      showToast(collected ? `${b.customer_name} collected` : `${b.customer_name} not collected after all`, () => markCollected(b, !collected));
+    } catch {
+      showToast("That didn't save. Try again.");
+    }
+  };
+  const undoReturn = async (b: Booking, pieceId: string, label: string) => {
+    try {
+      const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/returns/${pieceId}/undo`, { method: 'POST' });
+      if (!r.ok) throw new Error();
+      refreshCard(b.booking_code);
+      showToast(`${label} taken off the returns shelf`);
+    } catch {
       showToast("That didn't save. Try again.");
     }
   };
@@ -999,6 +1026,13 @@ export default function DailyCardsPage() {
                       {!st.next && st.hint && (
                         <p style={{ marginTop: '0.45rem', fontSize: 'var(--text-sm)', color: '#6b625a', lineHeight: 1.35 }}>{st.hint}</p>
                       )}
+                      {/* The undo for this card's last step, for as long as it stands. */}
+                      {st.label === 'Painting' && (
+                        <button onClick={() => markArrived(b, false)} style={undoLink}>Not here yet? Undo arrival</button>
+                      )}
+                      {st.label === 'Collected' && (
+                        <button onClick={() => markCollected(b, false)} style={undoLink}>Undo collected</button>
+                      )}
                       {st.next && (
                         <button
                           onClick={() => {
@@ -1074,6 +1108,15 @@ export default function DailyCardsPage() {
                               <PieceThumb url={p.reference_photo_url} box={p.photo_box} size={72} ring={p.returned_at ? '#A8651A' : undefined} />
                               <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.2rem', color: 'var(--charcoal)', textTransform: 'capitalize' }}>{k + 1}. {p.piece_type || 'Piece'}</span>
                               {p.stage && <span style={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.25, color: p.returned_at ? '#A8651A' : 'var(--stone)', fontWeight: 600 }}>{p.returned_at ? 'to finish' : p.stage}</span>}
+                              {p.returned_at && (
+                                <span
+                                  role="button"
+                                  onClick={(e) => { e.stopPropagation(); undoReturn(b, p.id, p.piece_type || 'Piece'); }}
+                                  style={{ ...undoLink, display: 'block', marginTop: '0.15rem', fontSize: '0.7rem' }}
+                                >
+                                  Undo return
+                                </span>
+                              )}
                             </button>
                           ))}
                         </div>
@@ -1207,3 +1250,10 @@ function actionBtn(primary: boolean): React.CSSProperties {
     color: primary ? 'white' : 'var(--clay)',
   };
 }
+
+// Small and quiet, but always there while the step it undoes stands.
+const undoLink: React.CSSProperties = {
+  display: 'block', margin: '0.45rem auto 0', background: 'none', border: 'none',
+  padding: '0.3rem 0.4rem', color: '#8a8178', fontSize: 'var(--text-xs)', fontWeight: 600,
+  textDecoration: 'underline', cursor: 'pointer',
+};

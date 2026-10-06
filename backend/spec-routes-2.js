@@ -8061,12 +8061,16 @@ export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
         .eq('booking_code', booking_code);
       if (bErr) throw bErr;
 
+      // [6 Oct] Pieces on the returns shelf are not part of a collection
+      // either way: collecting must not mark them collected, and undoing a
+      // collection must not knock them off the shelf back to 'queued'.
       const { data: pieces, error: pErr } = await supabase
         .from('pottery_pieces')
         .update({ status: uncollect ? 'queued' : 'collected' })
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', booking_code)
         .neq('archived', true)
+        .is('returned_at', null)
         .select('id');
       if (pErr) throw pErr;
 
