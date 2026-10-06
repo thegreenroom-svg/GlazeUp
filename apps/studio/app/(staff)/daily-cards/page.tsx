@@ -624,8 +624,9 @@ export default function DailyCardsPage() {
                       const has = !!(r && r.length);
                       return (
                         // [6 Oct] Daisy: the printed card is the customer's.
-                        // Returns, seats, setup flags and notes are for
-                        // studio staff, so they show on screen only.
+                        // Returns and notes are for studio staff, screen
+                        // only. Seats and setup flags still print, for
+                        // whoever lays the table.
                         <p className="no-print" style={{
                           fontSize: '0.62rem', margin: '.7rem 0 0',
                           letterSpacing: '.04em', fontWeight: 600,
@@ -692,12 +693,14 @@ export default function DailyCardsPage() {
               </p>
 
               {b.party_size && (
-                <p className="no-print" style={{ fontSize: 'var(--text-sm)', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
+                // Printed: whoever lays the table needs the seat count.
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
                   {b.party_size} seat{b.party_size === 1 ? '' : 's'}
                 </p>
               )}
               {setupFlags.length > 0 && (
-                <div className="no-print" style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                // Printed: pram, wheelchair and the like, for laying the table.
+                <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
                   {setupFlags.map((flag) => (
                     <span
                       key={flag}
