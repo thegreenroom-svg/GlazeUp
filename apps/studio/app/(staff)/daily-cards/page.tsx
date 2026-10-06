@@ -623,7 +623,10 @@ export default function DailyCardsPage() {
                       const r = b.returns_waiting;
                       const has = !!(r && r.length);
                       return (
-                        <p style={{
+                        // [6 Oct] Daisy: the printed card is the customer's.
+                        // Returns, seats, setup flags and notes are for
+                        // studio staff, so they show on screen only.
+                        <p className="no-print" style={{
                           fontSize: '0.62rem', margin: '.7rem 0 0',
                           letterSpacing: '.04em', fontWeight: 600,
                           color: has ? '#A8651A' : '#C4B8AD',
@@ -640,7 +643,7 @@ export default function DailyCardsPage() {
                         help -- there are four white mugs on it. The picture
                         is the only thing that identifies one. */}
                     {!!(b.returns_waiting && b.returns_waiting.length) && (
-                      <div style={{
+                      <div className="no-print" style={{
                         display: 'flex', gap: '0.4rem', justifyContent: 'center',
                         flexWrap: 'wrap', marginTop: '0.45rem',
                       }}>
@@ -689,12 +692,12 @@ export default function DailyCardsPage() {
               </p>
 
               {b.party_size && (
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
+                <p className="no-print" style={{ fontSize: 'var(--text-sm)', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
                   {b.party_size} seat{b.party_size === 1 ? '' : 's'}
                 </p>
               )}
               {setupFlags.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                <div className="no-print" style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
                   {setupFlags.map((flag) => (
                     <span
                       key={flag}
@@ -706,7 +709,7 @@ export default function DailyCardsPage() {
                 </div>
               )}
               {b.notes && (
-                <p style={{ fontSize: 'var(--text-xs)', color: '#8a5a00', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: 'var(--radius-sm)', padding: '0.35rem 0.5rem', marginTop: '0.4rem', textAlign: 'left' }}>
+                <p className="no-print" style={{ fontSize: 'var(--text-xs)', color: '#8a5a00', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: 'var(--radius-sm)', padding: '0.35rem 0.5rem', marginTop: '0.4rem', textAlign: 'left' }}>
                   {b.notes}
                 </p>
               )}
