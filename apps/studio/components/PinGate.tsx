@@ -1,4 +1,5 @@
 'use client';
+import SaveWatch from '@/components/SaveWatch';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -567,6 +568,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
           <span style={{ fontSize: 'var(--text-lg)', fontWeight: 800, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {shift.name || 'Signed in'}
           </span>
+          <SaveWatch />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
           {isAdmin && (

@@ -96,8 +96,24 @@ const BACKROOM = [
 ];
 
 
+// [6 Oct] Owner-only screens: the money, the job monitor and the data
+// fixes. Hidden from staff PINs so the menu is just their work. This only
+// hides tiles -- the pages themselves are not locked, so it is tidiness,
+// not security. Roles match PinGate's ADMIN_ROLES.
+const OWNER_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
+const OWNER_ONLY = new Set(['owner', 'heartbeat', 'other-items', 'backfill', 'piece-check']);
+
 export default function StudioHome() {
   const [showBackroom, setShowBackroom] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('glazeup_shift');
+      const role = raw ? JSON.parse(raw)?.role : null;
+      setIsOwner(!!role && OWNER_ROLES.includes(role));
+    } catch { /* leave everything showing */ }
+  }, []);
+  const backroom = BACKROOM.filter((t) => isOwner || !OWNER_ONLY.has(t.key));
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
   // From the app review: the tiles said what each step IS but nothing
@@ -232,7 +248,7 @@ export default function StudioHome() {
       </button>
       {showBackroom && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {BACKROOM.map((tool) => {
+        {backroom.map((tool) => {
           const Icon = tool.icon;
           return (
             <motion.button
