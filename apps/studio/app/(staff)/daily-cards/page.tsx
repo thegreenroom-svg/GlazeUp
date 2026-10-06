@@ -444,7 +444,13 @@ export default function DailyCardsPage() {
                 checked={isSelected}
                 onChange={() => toggleSelect(b.booking_code)}
                 onClick={(e) => e.stopPropagation()}
-                style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', cursor: 'pointer', width: '18px', height: '18px' }}
+                className="no-print"
+                /* [5 Oct] This sat at top right, which is exactly where the
+                   table circle now goes -- a square checkbox landing on the
+                   circle. Moved to top LEFT, over the QR, which is itself
+                   only a fallback and does not need to be legible while you
+                   are picking which cards to print. */
+                style={{ position: 'absolute', top: '0.8rem', left: '0.8rem', cursor: 'pointer', width: '18px', height: '18px', zIndex: 2 }}
               />
               {isNew && <p style={{ fontSize: 'var(--text-xs)', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
               {(() => {
@@ -523,14 +529,26 @@ export default function DailyCardsPage() {
                     {/* For whoever seats them. Printed small, but printed:
                         finding out at collection that something of theirs is
                         on the returns shelf is the worst time to find out. */}
-                    {!!(b.returns_waiting && b.returns_waiting.length) && (
-                      <p style={{
-                        fontSize: '0.62rem', color: '#A8651A', margin: '.7rem 0 0',
-                        letterSpacing: '.04em', fontWeight: 600,
-                      }}>
-                        On the returns shelf: {b.returns_waiting.join(', ')}
-                      </p>
-                    )}
+                    {/* Always printed, either way. A line that only appears
+                        when there is something to say is ambiguous: staff
+                        cannot tell a clean booking from one the check never
+                        ran on. Explicitly saying "none" is the whole value
+                        of a check. */}
+                    {(() => {
+                      const r = b.returns_waiting;
+                      const has = !!(r && r.length);
+                      return (
+                        <p style={{
+                          fontSize: '0.62rem', margin: '.7rem 0 0',
+                          letterSpacing: '.04em', fontWeight: 600,
+                          color: has ? '#A8651A' : '#C4B8AD',
+                        }}>
+                          {has
+                            ? `On the returns shelf: ${r!.join(', ')}`
+                            : '\u2713 nothing on the returns shelf'}
+                        </p>
+                      );
+                    })()}
                   </div>
                 );
               })()}
