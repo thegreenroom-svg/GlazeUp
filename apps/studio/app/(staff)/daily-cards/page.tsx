@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams } from 'next/navigation';
-import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, Camera, Loader } from 'lucide-react';
+import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Camera, Loader, LayoutGrid } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { EmptyState } from '@/components/EmptyState';
 
@@ -75,7 +75,7 @@ export default function DailyCardsPage() {
   const router = useRouter();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ pieces: ViewerPiece[]; start: number; title: string } | null>(null);
-  const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[] } | 'loading' | 'error'>>({});
+  const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[]; booking: any } | 'loading' | 'error'>>({});
   const openCard = async (code: string) => {
     if (openCode === code) { setOpenCode(null); return; }
     setOpenCode(code);
@@ -83,7 +83,7 @@ export default function DailyCardsPage() {
     try {
       const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(code)}/table-pieces`);
       const d = r.ok ? await r.json() : null;
-      setTablePieces((t) => ({ ...t, [code]: d ? { photo_url: d.photo_url || null, pieces: Array.isArray(d.pieces) ? d.pieces : [] } : 'error' }));
+      setTablePieces((t) => ({ ...t, [code]: d ? { photo_url: d.photo_url || null, pieces: Array.isArray(d.pieces) ? d.pieces : [], booking: d.booking || null } : 'error' }));
     } catch {
       setTablePieces((t) => ({ ...t, [code]: 'error' }));
     }
@@ -319,19 +319,17 @@ export default function DailyCardsPage() {
   };
 
   return (
-    <PageShell title="Print Booking Cards">
+    <PageShell title={new Date(cardDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}>
       <div className="no-print">
-        
-        <p style={{ color: '#666', fontSize: 'var(--text-md)', marginBottom: '1rem' }}>
-          One card per booking. Go forward or back to print ahead for a party or a busy day.
-        </p>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        {/* [6 Oct] This is the main screen now. Kept to the day, the
+            sessions and the cards; everything else is behind Menu. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() - 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-md)', color: '#333' }}
+            aria-label="Previous day"
+            style={{ padding: '0.5rem 0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#333', display: 'flex' }}
           >
-            ← Prev day
+            <ChevronLeft size={18} />
           </button>
           <input
             type="date"
@@ -341,9 +339,10 @@ export default function DailyCardsPage() {
           />
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-md)', color: '#333' }}
+            aria-label="Next day"
+            style={{ padding: '0.5rem 0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#333', display: 'flex' }}
           >
-            Next day →
+            <ChevronRight size={18} />
           </button>
           <button
             onClick={() => setCardDate(new Date().toISOString().slice(0, 10))}
@@ -352,10 +351,10 @@ export default function DailyCardsPage() {
             Today
           </button>
           <button
-            onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 7 * 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-base)', color: '#333' }}
+            onClick={() => router.push('/menu')}
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 0.8rem', backgroundColor: 'white', border: '1px solid var(--clay)', borderRadius: '6px', cursor: 'pointer', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
           >
-            +1 week
+            <LayoutGrid size={15} /> Menu
           </button>
         </div>
 
@@ -413,32 +412,29 @@ export default function DailyCardsPage() {
         )}
 
         {bookings.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={handlePrintSelected}
               disabled={selected.size === 0}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: selected.size === 0 ? '#ccc' : 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: 'var(--text-md)', fontWeight: 600 }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.8rem', backgroundColor: selected.size === 0 ? '#ddd' : 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}
             >
-              <Printer size={16} /> Print selected {selected.size > 0 ? `(${selected.size})` : ''}
+              <Printer size={14} /> Print{selected.size > 0 ? ` (${selected.size})` : ''}
             </button>
             <button
               onClick={selectAll}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-base)' }}
+              style={{ padding: '0.45rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
             >
-              {selected.size === visibleBookings.length ? '✓ Deselect all' : '◯ Select all'}
+              {selected.size === visibleBookings.length ? 'Deselect all' : 'Select all'}
             </button>
             <button
               onClick={handleManualSync}
               disabled={syncing}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: syncing ? '#e0e0e0' : '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', fontSize: 'var(--text-md)', opacity: syncing ? 0.6 : 1 }}
+              aria-label="Check for new bookings"
+              title={lastSyncTime ? `Last checked ${lastSyncTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}` : 'Check for new bookings'}
+              style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', padding: '0.45rem 0.6rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', opacity: syncing ? 0.6 : 1 }}
             >
-              <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> {syncing ? 'Checking...' : 'Check for new bookings now'}
+              <RefreshCw size={15} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
             </button>
-            {lastSyncTime && (
-              <div style={{ fontSize: 'var(--text-xs)', color: '#999', alignSelf: 'center' }}>
-                Last checked: {lastSyncTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -680,11 +676,19 @@ export default function DailyCardsPage() {
                     box: p.photo_box || null,
                     piece_type: p.piece_type,
                     description: p.description,
-                    note: p.returned_at ? (p.return_reason || 'Coming back to finish') : null,
+                    note: p.returned_at ? (p.return_reason || 'Coming back to finish') : (p.stage || null),
                   }));
                   const show = (k: number) => setViewer({ title: b.customer_name, start: k, pieces: viewerPieces });
+                  const bk = tp.booking;
                   return (
                     <div style={{ marginTop: '0.9rem', textAlign: 'left' }}>
+                      {bk && (bk.collected_at || bk.collection_date) && (
+                        <p style={{ textAlign: 'center', fontSize: 'var(--text-sm)', fontWeight: 600, color: bk.collected_at ? '#3d7a4a' : 'var(--clay)', marginBottom: '0.6rem' }}>
+                          {bk.collected_at
+                            ? 'Collected'
+                            : `${bk.fulfilment_method === 'postal' ? 'Posting' : 'Collecting'} ${new Date(bk.collection_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`}
+                        </p>
+                      )}
                       {tp.photo_url ? (
                         <div style={{ borderRadius: 6, overflow: 'hidden', maxWidth: 640, margin: '0 auto' }}>
                           <PhotoWithBoxes
@@ -702,7 +706,7 @@ export default function DailyCardsPage() {
                             <button key={p.id} onClick={() => show(k)} style={{ background: 'none', border: 'none', padding: 0, width: 84, textAlign: 'center', cursor: 'zoom-in' }}>
                               <PieceThumb url={p.reference_photo_url} box={p.photo_box} size={72} ring={p.returned_at ? '#A8651A' : undefined} />
                               <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.2rem', color: 'var(--charcoal)', textTransform: 'capitalize' }}>{k + 1}. {p.piece_type || 'Piece'}</span>
-                              {p.returned_at && <span style={{ display: 'block', fontSize: '0.65rem', color: '#A8651A', fontWeight: 600 }}>to finish</span>}
+                              {p.stage && <span style={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.25, color: p.returned_at ? '#A8651A' : 'var(--stone)', fontWeight: 600 }}>{p.returned_at ? 'to finish' : p.stage}</span>}
                             </button>
                           ))}
                         </div>

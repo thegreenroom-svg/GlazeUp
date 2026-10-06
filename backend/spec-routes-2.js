@@ -5637,7 +5637,7 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
     try {
       const { data, error } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description, photo_box, reference_photo_url, returned_at, return_reason, created_at')
+        .select('id, piece_type, description, photo_box, reference_photo_url, returned_at, return_reason, created_at, status, packed_at, shelf_id')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', req.params.code)
         .not('archived', 'is', true)
@@ -5645,12 +5645,35 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
         .order('id', { ascending: true });
       if (error) throw error;
       const pieces = data || [];
+
+      // [6 Oct] Where each piece is, for the open card -- the card is the
+      // booking's one place now. Same lifecycle as the kiln shelf routes:
+      // photographed -> out of the kiln on a shelf -> packed -> collected.
+      const { data: bk } = await supabase
+        .from('bookings')
+        .select('collected_at, collection_date, fulfilment_method')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .maybeSingle();
+      const shelfIds = [...new Set(pieces.map((p) => p.shelf_id).filter(Boolean))];
+      const shelfLabel = {};
+      if (shelfIds.length) {
+        const { data: sh } = await supabase.from('kiln_shelves').select('id, label').in('id', shelfIds);
+        (sh || []).forEach((x) => { shelfLabel[x.id] = x.label; });
+      }
+      pieces.forEach((p) => {
+        if (p.returned_at) p.stage = 'To finish, on the returns shelf';
+        else if (bk?.collected_at) p.stage = 'Collected';
+        else if (p.status === 'collected' || p.packed_at) p.stage = 'Packed, ready to go';
+        else if (p.status === 'ready' || p.shelf_id) p.stage = p.shelf_id && shelfLabel[p.shelf_id] ? `Out of the kiln, on ${shelfLabel[p.shelf_id]}` : 'Out of the kiln';
+        else p.stage = 'Painted, waiting for the kiln';
+      });
       // The photo the most pieces were taken from. Boxes are only drawn for
       // pieces from that photo, since a box means nothing on another image.
       const tally = {};
       pieces.forEach((p) => { if (p.reference_photo_url) tally[p.reference_photo_url] = (tally[p.reference_photo_url] || 0) + 1; });
       const photo_url = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0] || null;
-      res.json({ photo_url, pieces });
+      res.json({ photo_url, pieces, booking: bk || null });
     } catch (err) {
       logger.error('table-pieces failed', err.message);
       res.status(500).json({ error: err.message });
