@@ -79,6 +79,9 @@ interface Booking {
   previous_visits?: number;
   last_visit?: string | null;
   returns_waiting?: {
+    id?: string;
+    own?: boolean;
+    from_booking?: string;
     piece_type: string;
     reason: string | null;
     photo: string | null;
@@ -504,6 +507,20 @@ export default function DailyCardsPage() {
       showToast("That didn't save. Try again.");
     }
   };
+  const fetchReturns = async (b: Booking, ids: string[], undo = false) => {
+    try {
+      const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/returns/fetch${undo ? '/undo' : ''}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_code: b.booking_code, piece_ids: ids }),
+      });
+      if (!r.ok) throw new Error();
+      load(true);
+      if (!undo) showToast(`Off the shelf for ${b.customer_name}. They go in today's table photo.`, () => fetchReturns(b, ids, true));
+    } catch {
+      showToast("That didn't save. Try again.");
+    }
+  };
+
   const undoReturn = async (b: Booking, pieceId: string, label: string) => {
     try {
       const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/returns/${pieceId}/undo`, { method: 'POST' });
@@ -666,12 +683,17 @@ export default function DailyCardsPage() {
               {label}
             </button>
           ))}
-          <button
-            onClick={() => router.push('/returns')}
-            style={{ padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid #d8cbbc', background: 'white', color: '#8a8178' }}
-          >
-            Returns shelf
-          </button>
+          {/* Daisy: need to get to packing etc. The other daily steps, one
+              tap from the cards rather than via Menu. */}
+          {([['/returns', 'Returns shelf'], ['/out-of-kiln', 'Out of the kiln'], ['/packing', 'Packing']] as const).map(([href, label]) => (
+            <button
+              key={href}
+              onClick={() => router.push(href)}
+              style={{ padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid #d8cbbc', background: 'white', color: '#8a8178' }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {view === 'painting' && earlierDone.length > 0 && (
@@ -970,6 +992,21 @@ export default function DailyCardsPage() {
                         ))}
                       </div>
                     )}
+                    {(() => {
+                      // Pieces from an earlier visit (not this booking's own):
+                      // staff fetch them off the shelf and say so here.
+                      const theirs = (b.returns_waiting || []).filter((r) => !r.own && r.id);
+                      if (!theirs.length) return null;
+                      return (
+                        <button
+                          className="no-print"
+                          onClick={(e) => { e.stopPropagation(); fetchReturns(b, theirs.map((r) => r.id as string)); }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', padding: '0.5rem 1rem', borderRadius: 999, border: 'none', background: '#A8651A', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)' }}
+                        >
+                          Got {theirs.length === 1 ? 'it' : 'them'} out
+                        </button>
+                      );
+                    })()}
                   </div>
                 );
               })()}

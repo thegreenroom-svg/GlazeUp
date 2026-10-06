@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { returnsWaitingFor } from './returns-match.js';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
@@ -248,32 +249,12 @@ app.get('/api/demo/bookings', async (req, res) => {
         (history[k] = history[k] || []).push(row);
       }
 
-      // Anything of theirs sent back and not yet dealt with. Worth knowing
-      // before they sit down, not after they ask.
-      const { data: returns } = await supabase
-        .from('pottery_pieces')
-        .select('booking_id, piece_type, return_reason, reference_photo_url, photo_box')
-        .eq('studio_id', DEMO_STUDIO_ID)
-        .not('returned_at', 'is', null)
-        .neq('status', 'collected')
-        .neq('archived', true)
-        .limit(500);
-      const codeToName = {};
-      for (const row of past || []) codeToName[row.booking_code] = (row.customer_name || '').trim().toLowerCase();
-      for (const r of returns || []) {
-        const k = codeToName[r.booking_id];
-        if (!k) continue;
-        // The photo from the day they painted it, cropped to the piece.
-        // A name tells staff something is waiting; the picture tells them
-        // WHICH one, which is what they actually need stood at the shelf.
-        (waiting[k] = waiting[k] || []).push({
-          piece_type: r.piece_type || 'a piece',
-          reason: r.return_reason || null,
-          photo: r.reference_photo_url || null,
-          box: r.photo_box || null,
-        });
-      }
+      // (returns-shelf matching moved below, by email or name)
     }
+
+    // Pieces of theirs on the returns shelf: matched on email or name, see
+    // returns-match.js.
+    const waitingByCode = await returnsWaitingFor(supabase, DEMO_STUDIO_ID, data);
 
     const merged = data.map((b) => ({
       ...b,
@@ -290,7 +271,7 @@ app.get('/api/demo/bookings', async (req, res) => {
           visit_number: before.length + 1,
           previous_visits: before.length,
           last_visit: last,
-          returns_waiting: (waiting[k] || []).slice(0, 3),
+          returns_waiting: (waitingByCode[b.booking_code] || []).slice(0, 8),
         };
       })(),
       piece_count: pieceCounts[b.booking_code]?.pieces || 0,

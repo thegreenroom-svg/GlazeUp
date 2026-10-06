@@ -67,6 +67,14 @@ export default function ReturnsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // [6 Oct] Coming in soon with pieces waiting: get them out before the
+  // customer arrives, not only if someone opens the right card.
+  const [due, setDue] = useState<any[] | null>(null);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/returns/due?days=2`, { cache: 'no-store' })
+      .then((r) => r.json()).then((d) => setDue(d.due || [])).catch(() => setDue([]));
+  }, []);
+
   // Marked by mistake on a busy floor. One tap to reverse, or people stop
   // trusting the button and mark nothing at all.
   const undo = async (id: string) => {
@@ -88,6 +96,29 @@ export default function ReturnsPage() {
         <p style={{ color: B.stone, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Loader size={15} className="animate-spin" /> Loading
         </p>
+      )}
+
+      {!!due?.length && (
+        <div style={{ marginBottom: '1.5rem', padding: '0.9rem 1rem', borderRadius: 10, background: '#fdf3e4', border: '1px solid #e8c48a' }}>
+          <p style={{ fontWeight: 700, color: '#8a5200', marginBottom: '0.6rem' }}>Get these out: coming in soon</p>
+          {due.map((d) => (
+            <div key={d.booking_code} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.5rem 0', borderTop: '1px solid #f0dcb8' }}>
+              <div style={{ display: 'flex', gap: '0.3rem', flexShrink: 0 }}>
+                {d.pieces.slice(0, 4).map((p: any) => (
+                  <PieceThumb key={p.id} url={p.photo} box={p.box} size={40} ring="#A8651A" />
+                ))}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontWeight: 600 }}>{d.customer_name}</p>
+                <p style={{ fontSize: 'var(--text-sm)', color: '#7a6a58' }}>
+                  {new Date(d.session_start).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}{' '}
+                  {new Date(d.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                  {' · '}{d.pieces.length} piece{d.pieces.length === 1 ? '' : 's'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {rows !== null && rows.length === 0 && (

@@ -1,3 +1,4 @@
+import { returnsWaitingFor } from './returns-match.js';
 // ============================================================================
 // SPEC ROUTES PART 2 — COMMERCIAL + CUSTOMER-FACING
 // ----------------------------------------------------------------------------
@@ -5557,7 +5558,8 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
           ...p,
           customer_name: names[p.booking_id]?.customer_name || null,
           collection_date: names[p.booking_id]?.collection_date || null,
-          settled: String(p.status || '').toLowerCase() === 'collected',
+          // Fetched off the shelf for a later visit counts as dealt with too.
+          settled: ['collected', 'back_painting'].includes(String(p.status || '').toLowerCase()),
         })),
       });
     } catch (err) {
@@ -5624,6 +5626,87 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
       res.json({ ok: true });
     } catch (err) {
       logger.error('undo return failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // [6 Oct] RETURNS LOOP. A customer with pieces on the returns shelf
+  // books again; their new card flags the pieces; staff fetch them and
+  // tap "Got them out". The pieces come off the shelf as 'back_painting'
+  // -- NOT moved onto the new booking, because the new booking's table
+  // photo then captures them fresh with the rest of the table, and moving
+  // them would make the table photo screen open on the old photo.
+  // Logged in piece_returns so it can be undone and traced.
+  app.post('/api/spec/returns/fetch', async (req, res) => {
+    try {
+      const { booking_code, piece_ids, fetched_by } = req.body || {};
+      const ids = Array.isArray(piece_ids) ? piece_ids.filter(Boolean) : [];
+      if (!booking_code || !ids.length) return res.status(400).json({ error: 'booking_code and piece_ids are required' });
+      const { data: bk } = await supabase.from('bookings').select('id').eq('studio_id', STUDIO_ID).eq('booking_code', booking_code).maybeSingle();
+      if (!bk) return res.status(404).json({ error: 'Booking not found' });
+      const { data: moved, error } = await supabase
+        .from('pottery_pieces')
+        .update({ status: 'back_painting', updated_at: new Date().toISOString() })
+        .eq('studio_id', STUDIO_ID)
+        .in('id', ids)
+        .not('returned_at', 'is', null)
+        .select('id');
+      if (error) throw error;
+      const rows = (moved || []).map((p) => ({ studio_id: STUDIO_ID, piece_id: p.id, booking_id: bk.id, reason: 'fetched', note: `fetched_for:${booking_code}`, returned_by: fetched_by || null }));
+      if (rows.length) {
+        const { error: hErr } = await supabase.from('piece_returns').insert(rows);
+        if (hErr) logger.warn('returns fetch history insert failed', hErr.message);
+      }
+      res.json({ fetched: (moved || []).length });
+    } catch (err) {
+      logger.error('returns fetch failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Undo "Got them out": back on the shelf.
+  app.post('/api/spec/returns/fetch/undo', async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.piece_ids) ? req.body.piece_ids.filter(Boolean) : [];
+      if (!ids.length) return res.status(400).json({ error: 'piece_ids is required' });
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ status: 'returned', updated_at: new Date().toISOString() })
+        .eq('studio_id', STUDIO_ID)
+        .in('id', ids)
+        .eq('status', 'back_painting')
+        .select('id');
+      if (error) throw error;
+      res.json({ put_back: (data || []).length });
+    } catch (err) {
+      logger.error('returns fetch undo failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Bookings coming in soon with pieces waiting for them, so whoever opens
+  // up can get them out before the customer arrives -- not only seen if
+  // someone happens to open the right card.
+  app.get('/api/spec/returns/due', async (req, res) => {
+    try {
+      const days = Math.min(Math.max(parseInt(String(req.query.days || '2'), 10) || 2, 0), 14);
+      const from = new Date(); from.setHours(0, 0, 0, 0);
+      const to = new Date(from.getTime() + (days + 1) * 86400000);
+      const { data: bks, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, customer_email, session_start, table_number')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', from.toISOString())
+        .lt('session_start', to.toISOString())
+        .order('session_start', { ascending: true });
+      if (error) throw error;
+      const waiting = await returnsWaitingFor(supabase, STUDIO_ID, bks || []);
+      const due = (bks || [])
+        .map((b) => ({ booking_code: b.booking_code, customer_name: b.customer_name, session_start: b.session_start, table_number: b.table_number, pieces: (waiting[b.booking_code] || []).filter((p) => !p.own) }))
+        .filter((b) => b.pieces.length);
+      res.json({ due });
+    } catch (err) {
+      logger.error('returns due failed', err.message);
       res.status(500).json({ error: err.message });
     }
   });
@@ -5739,7 +5822,8 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
         (sh || []).forEach((x) => { shelfLabel[x.id] = x.label; });
       }
       pieces.forEach((p) => {
-        if (p.returned_at) p.stage = 'To finish, on the returns shelf';
+        if (p.returned_at && p.status === 'back_painting') p.stage = 'Fetched off the shelf, being finished';
+        else if (p.returned_at) p.stage = 'To finish, on the returns shelf';
         else if (bk?.collected_at) p.stage = 'Collected';
         else if (p.status === 'collected' || p.packed_at) p.stage = 'Packed, ready to go';
         else if (p.status === 'ready' || p.shelf_id) p.stage = p.shelf_id && shelfLabel[p.shelf_id] ? `Out of the kiln, on ${shelfLabel[p.shelf_id]}` : 'Out of the kiln';
