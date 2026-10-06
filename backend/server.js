@@ -226,10 +226,65 @@ app.get('/api/demo/bookings', async (req, res) => {
       });
     }
 
+    // Daisy: put on the card whether they have been before, and whether
+    // anything of theirs is sitting on the returns shelf.
+    //
+    // Matched on name, which is imperfect -- two Sarah Joneses become one
+    // regular -- but it is what the booking carries, and the cost of
+    // getting it wrong is a card that says 4th visit to someone on their
+    // third. A wrong QR code loses pottery; a wrong visit count does not.
+    const history = {};
+    const waiting = {};
+    const names = [...new Set(data.map((b) => (b.customer_name || '').trim().toLowerCase()).filter(Boolean))];
+    if (names.length) {
+      const { data: past } = await supabase
+        .from('bookings')
+        .select('customer_name, session_start, booking_code')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .limit(5000);
+      for (const row of past || []) {
+        const k = (row.customer_name || '').trim().toLowerCase();
+        if (!k || !names.includes(k)) continue;
+        (history[k] = history[k] || []).push(row);
+      }
+
+      // Anything of theirs sent back and not yet dealt with. Worth knowing
+      // before they sit down, not after they ask.
+      const { data: returns } = await supabase
+        .from('pottery_pieces')
+        .select('booking_id, piece_type, return_reason')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .not('returned_at', 'is', null)
+        .neq('status', 'collected')
+        .neq('archived', true)
+        .limit(500);
+      const codeToName = {};
+      for (const row of past || []) codeToName[row.booking_code] = (row.customer_name || '').trim().toLowerCase();
+      for (const r of returns || []) {
+        const k = codeToName[r.booking_id];
+        if (!k) continue;
+        (waiting[k] = waiting[k] || []).push(r.piece_type || 'a piece');
+      }
+    }
+
     const merged = data.map((b) => ({
       ...b,
       collection_date: collectionDates[b.booking_code] || null,
       finished_at: finishedAt[b.booking_code] || null,
+      ...(() => {
+        const k = (b.customer_name || '').trim().toLowerCase();
+        const all = history[k] || [];
+        // Only sessions BEFORE this one count as previous visits, so a
+        // card printed for today does not count today.
+        const before = all.filter((x) => x.session_start && b.session_start && x.session_start < b.session_start);
+        const last = before.map((x) => x.session_start).sort().pop() || null;
+        return {
+          visit_number: before.length + 1,
+          previous_visits: before.length,
+          last_visit: last,
+          returns_waiting: (waiting[k] || []).slice(0, 3),
+        };
+      })(),
       piece_count: pieceCounts[b.booking_code]?.pieces || 0,
       photo_count: pieceCounts[b.booking_code]?.with_photo || 0,
     }));

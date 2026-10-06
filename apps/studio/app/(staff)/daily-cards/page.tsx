@@ -34,6 +34,10 @@ interface Booking {
   notes: string | null;
   piece_count?: number;
   photo_count?: number;
+  visit_number?: number;
+  previous_visits?: number;
+  last_visit?: string | null;
+  returns_waiting?: string[];
 }
 
 
@@ -466,6 +470,33 @@ export default function DailyCardsPage() {
                     }}>
                       Ready {collectDate ? longDate(new Date(collectDate)) : 'in about three weeks'}
                     </p>
+
+                    {/* Said to the customer, not about them. A number on its
+                        own ("visit 7") reads like a loyalty scheme; this
+                        reads like somebody noticed. */}
+                    <p style={{
+                      fontFamily: 'Georgia, "Times New Roman", serif',
+                      fontSize: '0.85rem', fontStyle: 'italic', color: '#8A7F74',
+                      margin: '1.1rem 0 0', lineHeight: 1.5,
+                    }}>
+                      {(b.previous_visits || 0) === 0
+                        ? 'Welcome to The Kiln Cafe. Enjoy your painting.'
+                        : (b.previous_visits || 0) >= 5
+                          ? `Lovely to see you again \u2014 that\u2019s visit number ${b.visit_number}.`
+                          : 'Welcome back. Enjoy your painting.'}
+                    </p>
+
+                    {/* For whoever seats them. Printed small, but printed:
+                        finding out at collection that something of theirs is
+                        on the returns shelf is the worst time to find out. */}
+                    {!!(b.returns_waiting && b.returns_waiting.length) && (
+                      <p style={{
+                        fontSize: '0.62rem', color: '#A8651A', margin: '.7rem 0 0',
+                        letterSpacing: '.04em', fontWeight: 600,
+                      }}>
+                        On the returns shelf: {b.returns_waiting.join(', ')}
+                      </p>
+                    )}
                   </div>
                 );
               })()}
