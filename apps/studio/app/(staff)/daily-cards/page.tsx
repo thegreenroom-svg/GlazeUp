@@ -76,9 +76,19 @@ export default function DailyCardsPage() {
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ pieces: ViewerPiece[]; start: number; title: string } | null>(null);
   const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[]; booking: any } | 'loading' | 'error'>>({});
+  // [6 Oct] Daisy: leave a card to do something (table photo, returns,
+  // collection card) and coming back should land on that same card, open,
+  // not the top of the day or the menu. Remembered for this tab only, and
+  // only for a couple of hours so tomorrow does not reopen today's card.
+  const OPEN_KEY = 'glazeup_open_card';
   const openCard = async (code: string) => {
-    if (openCode === code) { setOpenCode(null); return; }
+    if (openCode === code) {
+      setOpenCode(null);
+      try { sessionStorage.removeItem(OPEN_KEY); } catch { /* private mode */ }
+      return;
+    }
     setOpenCode(code);
+    try { sessionStorage.setItem(OPEN_KEY, JSON.stringify({ code, date: cardDateRef.current, at: Date.now() })); } catch { /* private mode */ }
     setTablePieces((t) => ({ ...t, [code]: 'loading' }));
     try {
       const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(code)}/table-pieces`);
@@ -138,6 +148,36 @@ export default function DailyCardsPage() {
   const [selectedSessionIdx, setSelectedSessionIdx] = useState<number | null>(null);
 
   useEffect(() => { cardDateRef.current = cardDate; }, [cardDate]);
+
+  // Coming back: reopen the card that was open, on its day, scrolled to.
+  const restoreCode = useRef<string | null>(null);
+  useEffect(() => {
+    if (linkedCode) return;
+    try {
+      const raw = sessionStorage.getItem('glazeup_open_card');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved?.code || Date.now() - (saved.at || 0) > 2 * 60 * 60 * 1000) {
+        sessionStorage.removeItem('glazeup_open_card');
+        return;
+      }
+      restoreCode.current = saved.code;
+      if (saved.date && saved.date !== cardDateRef.current) setCardDate(saved.date);
+    } catch { /* nothing remembered */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const code = restoreCode.current;
+    if (!code || !bookings.some((b) => b.booking_code === code)) return;
+    restoreCode.current = null;
+    openCard(code);
+    // After the open card has laid out, bring it into view.
+    setTimeout(() => {
+      document.getElementById(`card-${code}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
+
   const preselected = useRef(false);
   useEffect(() => {
     if (!linkedCode || preselected.current || !bookings.length) return;
@@ -447,6 +487,7 @@ export default function DailyCardsPage() {
           return (
             <div
               key={b.booking_code}
+              id={`card-${b.booking_code}`}
               className="print-card"
               data-selected={isSelected ? "true" : "false"}
               style={{
@@ -465,6 +506,8 @@ export default function DailyCardsPage() {
                 transition: 'all 0.2s ease',
                 position: 'relative',
                 gridColumn: openCode === b.booking_code ? '1 / -1' : undefined,
+                // Clears the dark header bar when scrolled back to.
+                scrollMarginTop: 90,
               }}
               onClick={() => toggleSelect(b.booking_code)}
             >
@@ -712,10 +755,10 @@ export default function DailyCardsPage() {
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                        <button onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}`)} style={actionBtn(true)}>
+                        <button onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}&from=card`)} style={actionBtn(true)}>
                           <Camera size={16} /> {tp.photo_url ? 'Table photo & returns' : 'Photograph the table'}
                         </button>
-                        <button onClick={() => router.push(`/collection?code=${encodeURIComponent(b.booking_code)}`)} style={actionBtn(false)}>
+                        <button onClick={() => router.push(`/collection?code=${encodeURIComponent(b.booking_code)}&from=card`)} style={actionBtn(false)}>
                           <Printer size={16} /> Collection card
                         </button>
                       </div>

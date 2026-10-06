@@ -1974,9 +1974,17 @@ export default function FloorPage() {
           <button onClick={() => { if (current) router.push(`/collection?code=${encodeURIComponent(current.booking_code)}`); }} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: B.stone, color: B.textOnLight }}>
             <Printer size={18} /> Print collection card
           </button>
-          <button onClick={nextBooking} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>
-            Next Booking <ChevronRight size={20} />
-          </button>
+          {/* Opened from a card: finishing goes back to that card, which
+              reopens itself, rather than on to a list of other bookings. */}
+          {searchParams.get('from') === 'card' ? (
+            <button onClick={() => router.push('/')} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>
+              Back to the card <ChevronRight size={20} />
+            </button>
+          ) : (
+            <button onClick={nextBooking} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>
+              Next Booking <ChevronRight size={20} />
+            </button>
+          )}
         </div>
       </div>
       <NudgeCard id="floor_handoff" />
