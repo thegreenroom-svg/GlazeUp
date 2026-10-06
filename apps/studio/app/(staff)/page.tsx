@@ -62,26 +62,42 @@ const STEPS = [
 // order, then the tools you reach for when something needs finding or
 // fixing. Same destinations, no invented ordering, and the tools are
 // visibly secondary rather than competing with the work.
+// [5 Oct] Daisy: "whole thing is now too just busy."
+//
+// Seventeen tiles, four of them added today. The pitch was five steps,
+// and five steps is still true -- but the Anytime list had grown into a
+// wall that made the five read as merely the top of a list of seventeen.
+//
+// Anytime is now only the four a member of staff on the floor actually
+// goes to. Everything else is back of house and sits behind one line.
+//
+// Nothing is removed. Hiding things people need is how we got here, when
+// I kept burying entry points inside other screens. A labelled line is
+// findable; a tile competing with sixteen others is not.
 const TOOLS = [
+  { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
+  { key: 'returns',  label: 'Returns shelf',        detail: 'Sent back, and why',                  href: '/returns',  icon: RotateCcw, tint: '#A8651A' },
+  { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
+  { key: 'stickers',   label: 'Shelf stickers',       detail: 'QR labels for each collection date',   href: '/shelf-stickers', icon: QrCode, tint: '#6B7A5F' },
+];
+
+// Back of house. Real work, but not floor work -- nobody reaches for
+// the takings or the job monitor between tables.
+const BACKROOM = [
   { key: 'total',    label: 'Table total',          detail: 'Photograph the table, see what everyone owes', href: '/table-total', icon: Calculator, tint: '#2E7D6B' },
   { key: 'stock',    label: 'Stock',                detail: 'Every shape, price and how many are in', href: '/stock', icon: Tags, tint: '#B87946' },
   { key: 'shapes',   label: 'Shape recognition',    detail: 'Which shape each painted piece is', href: '/recognition', icon: ScanSearch, tint: '#5B6E8C' },
-  { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
-  { key: 'returns',  label: 'Returns shelf',        detail: 'Sent back, and why',                  href: '/returns',  icon: RotateCcw, tint: '#A8651A' },
   { key: 'owner',    label: 'The numbers',          detail: 'Takings, records and where it comes from', href: '/owner', icon: TrendingUp, tint: '#2E7D6B' },
   { key: 'piece-check', label: 'All accounted for?',   detail: 'Paid for, against photographed',        href: '/piece-check', icon: AlertTriangle, tint: '#E0A23C' },
   { key: 'heartbeat',  label: 'Is everything running?', detail: 'The jobs that keep the numbers honest', href: '/heartbeat', icon: Activity, tint: '#3D7A4A' },
   { key: 'other-items', label: 'Unknown items',       detail: 'Deleted from Square, waiting to be named', href: '/other-items', icon: HelpCircle, tint: '#A8651A' },
-  { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
-  // The sticker that goes on a greenware shelf before dipping. Sits
-  // with the tools rather than in the numbered day: it happens once per
-  // batch, not once per session.
-  { key: 'stickers',   label: 'Shelf stickers',       detail: 'QR labels for each collection date',   href: '/shelf-stickers', icon: QrCode, tint: '#6B7A5F' },
   { key: 'backfill', label: 'Backfill from photos', detail: 'Tables photographed outside the app', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
+
 ];
 
 
 export default function StudioHome() {
+  const [showBackroom, setShowBackroom] = useState(false);
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
   // From the app review: the tiles said what each step IS but nothing
@@ -199,6 +215,53 @@ export default function StudioHome() {
           );
         })}
       </div>
+
+      {/* One line, not eight tiles. Everything here is still one tap away,
+          it has just stopped shouting over the work. */}
+      <button
+        onClick={() => setShowBackroom((v) => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%',
+          background: 'none', border: 'none', padding: '1.5rem 0 0.6rem',
+          cursor: 'pointer', color: '#999', fontSize: 'var(--text-xs)',
+          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+        }}
+      >
+        Back of house
+        <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>{showBackroom ? '\u2212' : '+'}</span>
+      </button>
+      {showBackroom && (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {BACKROOM.map((tool) => {
+          const Icon = tool.icon;
+          return (
+            <motion.button
+              key={tool.key}
+              onClick={() => open(tool)}
+              disabled={!!opening}
+              animate={opening === tool.key ? { scale: 1.03, opacity: 0.92 } : { scale: 1, opacity: opening ? 0.35 : 1 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+              whileTap={{ scale: 0.985 }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%',
+                padding: '0.8rem 0.9rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid #ece5db', background: 'white', color: 'var(--charcoal)',
+                cursor: opening ? 'default' : 'pointer', textAlign: 'left',
+              }}
+            >
+              <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 'var(--radius-md)', background: tool.tint, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={17} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--text-base)', fontWeight: 700 }}>{tool.label}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: '#777' }}>{tool.detail}</div>
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+      )}
+
 
       <button
         onClick={() => router.push('/test-card')}
