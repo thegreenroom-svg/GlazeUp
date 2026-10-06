@@ -9,6 +9,7 @@ import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw, Mail, Ca
 import { NudgeCard } from '@/components/NudgeSystem';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { setLeaveGuard } from '@/lib/leaveGuard';
+import { isEmbedded, tellCard } from '@/lib/embed';
 import { QrScanner } from '@/components/QrScanner';
 
 // Same fix already applied in PinGate.tsx and daily-cards/page.tsx: a
@@ -1977,7 +1978,7 @@ export default function FloorPage() {
           {/* Opened from a card: finishing goes back to that card, which
               reopens itself, rather than on to a list of other bookings. */}
           {searchParams.get('from') === 'card' ? (
-            <button onClick={() => router.push('/')} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>
+            <button onClick={() => (isEmbedded() ? tellCard({ type: 'glazeup:done' }) : router.push('/'))} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>
               Back to the card <ChevronRight size={20} />
             </button>
           ) : (

@@ -97,6 +97,9 @@ export default function DailyCardsPage() {
   const [view, setView] = useState<'painting' | 'collecting'>('painting');
   const [showEarlier, setShowEarlier] = useState(false);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  // The table photo and collection screens open in a sheet over the card.
+  const [sheet, setSheet] = useState<{ code: string; src: string; title: string } | null>(null);
+  const sheetGuard = useRef<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = (text: string, undo?: () => void) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -480,6 +483,42 @@ export default function DailyCardsPage() {
     restoreCode.current = code;
     setCardDate(date);
   };
+
+  const openSheet = (b: Booking, path: '/floor' | '/collection') => {
+    sheetGuard.current = null;
+    // Opening a card's screen remembers the card, as if it were opened.
+    try { sessionStorage.setItem('glazeup_open_card', JSON.stringify({ code: b.booking_code, date: cardDateRef.current, at: Date.now() })); } catch { /* private mode */ }
+    setSheet({
+      code: b.booking_code,
+      src: `${path}?code=${encodeURIComponent(b.booking_code)}&from=card`,
+      title: `${b.customer_name} · ${path === '/floor' ? 'Table photo' : 'Collection'}`,
+    });
+  };
+  const refreshCard = (code: string) => {
+    load(true);
+    if (openCode === code) {
+      setOpenCode(null);
+      setTimeout(() => openCard(code), 0);
+    }
+  };
+  const closeSheet = (force = false) => {
+    if (!sheet) return;
+    if (!force && sheetGuard.current && !window.confirm(sheetGuard.current)) return;
+    const code = sheet.code;
+    setSheet(null);
+    sheetGuard.current = null;
+    refreshCard(code);
+    setTimeout(() => document.getElementById(`card-${code}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+  };
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || !e.data?.type) return;
+      if (e.data.type === 'glazeup:guard') sheetGuard.current = e.data.message || null;
+      if (e.data.type === 'glazeup:done') closeSheet(true);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  });
 
   useEffect(() => {
     const term = q.trim();
@@ -936,7 +975,6 @@ export default function DailyCardsPage() {
               <div className="no-print" style={{ padding: '0 1rem 1rem' }} onClick={(e) => e.stopPropagation()}>
                 {(() => {
                   const st = cardStatus(b);
-                  const go = (path: string) => router.push(`${path}?code=${encodeURIComponent(b.booking_code)}&from=card`);
                   return (
                     <div style={{ marginTop: '0.8rem' }}>
                       <span style={{ display: 'inline-block', padding: '0.2rem 0.65rem', borderRadius: 999, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'white', background: st.colour }}>
@@ -946,8 +984,8 @@ export default function DailyCardsPage() {
                         <button
                           onClick={() => {
                             if (st.next === 'arrived') markArrived(b, true);
-                            if (st.next === 'photo') go('/floor');
-                            if (st.next === 'handover') go('/collection');
+                            if (st.next === 'photo') openSheet(b, '/floor');
+                            if (st.next === 'handover') openSheet(b, '/collection');
                           }}
                           style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.6rem', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-md)' }}
                         >
@@ -1022,10 +1060,10 @@ export default function DailyCardsPage() {
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                        <button onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}&from=card`)} style={actionBtn(true)}>
+                        <button onClick={() => openSheet(b, '/floor')} style={actionBtn(true)}>
                           <Camera size={16} /> {tp.photo_url ? 'Table photo & returns' : 'Photograph the table'}
                         </button>
-                        <button onClick={() => router.push(`/collection?code=${encodeURIComponent(b.booking_code)}&from=card`)} style={actionBtn(false)}>
+                        <button onClick={() => openSheet(b, '/collection')} style={actionBtn(false)}>
                           <Printer size={16} /> Collection card
                         </button>
                       </div>
@@ -1042,6 +1080,24 @@ export default function DailyCardsPage() {
         })}
       </div>
 
+      {sheet && (
+        <div className="no-print" style={{ position: 'fixed', inset: 0, zIndex: 950, background: 'rgba(20,16,12,0.5)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ marginTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)', flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--ivory, #f6f1ea)', borderRadius: '14px 14px 0 0', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.6rem 0.9rem', background: 'var(--charcoal)', color: 'var(--ivory)' }}>
+              <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sheet.title}</span>
+              <button onClick={() => closeSheet()} style={{ flexShrink: 0, padding: '0.45rem 0.9rem', borderRadius: 8, border: 'none', background: 'rgba(255,255,255,0.15)', color: 'inherit', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                Back to the card
+              </button>
+            </div>
+            <iframe
+              src={sheet.src}
+              title={sheet.title}
+              allow="camera"
+              style={{ flex: 1, width: '100%', border: 'none', background: 'white' }}
+            />
+          </div>
+        </div>
+      )}
       {toast && (
         <div className="no-print" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.2rem)', zIndex: 900, display: 'flex', alignItems: 'center', gap: '0.9rem', padding: '0.75rem 1rem', borderRadius: 10, background: '#2b2622', color: '#f6f1ea', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', fontSize: 'var(--text-sm)', maxWidth: '92vw' }}>
           <span>{toast.text}</span>

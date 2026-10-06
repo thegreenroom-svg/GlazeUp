@@ -6,6 +6,7 @@ import { Home } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeContext';
 import { NudgeProvider, HelpPanel, NudgeSettingsPanel } from '@/components/NudgeSystem';
 import { confirmLeaveIfGuarded } from '@/lib/leaveGuard';
+import { isEmbedded } from '@/lib/embed';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,7 +14,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
+  // In a sheet over a card: hide the header bar and Home button (CSS in
+  // globals keyed off this attribute), and no swipe-back.
+  const [embedded, setEmbedded] = useState(false);
   useEffect(() => {
+    if (isEmbedded()) { setEmbedded(true); document.documentElement.dataset.embedded = '1'; }
+  }, []);
+
+  useEffect(() => {
+    if (isEmbedded()) return;
     // Swipe-back: a rightward swipe starting near the left edge navigates back,
     // matching the brief's 'swipe-back gesture everywhere'.
     const handleTouchStart = (e: TouchEvent) => {
@@ -59,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             to the tiles. No lateral menu, no drawer, nothing else. */}
         <div className="flex" style={{ height: '100dvh' }}>
           <main className="flex-1 overflow-auto" style={{ position: 'relative' }}>
-            {pathname !== '/' && (
+            {pathname !== '/' && !embedded && (
               <button
                 onClick={() => { if (confirmLeaveIfGuarded()) router.push('/'); }}
                 aria-label="Return to home"

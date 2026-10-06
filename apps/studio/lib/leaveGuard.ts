@@ -1,3 +1,4 @@
+import { tellCard } from './embed';
 // From the app review: tapping Home mid-session on Floor -- photo taken,
 // booking not yet finished -- silently threw the whole session's state
 // away, with nothing telling you the QR re-scan would get you back. Both
@@ -12,6 +13,8 @@ let guardMessage: string | null = null;
 
 export function setLeaveGuard(message: string | null) {
   guardMessage = message;
+  // In a sheet over a card, the card's close button needs to know too.
+  tellCard({ type: 'glazeup:guard', message });
 }
 
 export function confirmLeaveIfGuarded(): boolean {

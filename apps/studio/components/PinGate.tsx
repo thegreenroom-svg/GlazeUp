@@ -551,7 +551,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
           that's readable across a room, with "Switch user" as its own
           named action rather than hidden behind the word "sign out". */}
       <div
-        className="no-print"
+        className="no-print shift-bar"
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
           padding: '0.6rem 0.9rem', background: 'var(--charcoal)', color: 'var(--ivory)',

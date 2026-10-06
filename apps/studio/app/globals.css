@@ -269,3 +269,7 @@ tbody tr {
   }
 }
 
+
+/* [6 Oct] Screens opened in a sheet over a card: the card already shows
+   who is signed in and has its own close, so the app chrome is hidden. */
+html[data-embedded] .shift-bar { display: none !important; }
