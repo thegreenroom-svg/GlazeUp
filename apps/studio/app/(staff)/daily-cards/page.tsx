@@ -461,17 +461,18 @@ export default function DailyCardsPage() {
                         with the name. */}
                     <div style={{
                       display: 'flex', alignItems: 'flex-start',
-                      justifyContent: 'space-between', marginBottom: '1.1rem',
+                      justifyContent: 'space-between', gap: '0.8rem',
+                      marginBottom: '1.1rem',
                     }}>
                       {qrUrls[b.booking_code] ? (
                         <img
                           src={qrUrls[b.booking_code]}
                           alt=""
-                          style={{ width: 38, height: 38, opacity: .72 }}
+                          style={{ width: 38, height: 38, flexShrink: 0, opacity: .72 }}
                         />
                       ) : <span style={{ width: 38 }} />}
                       <div style={{
-                        width: 46, height: 46,
+                        width: 46, height: 46, flexShrink: 0,
                         border: '1px solid #D8CBBC', borderRadius: '50%',
                       }} />
                     </div>
@@ -626,7 +627,11 @@ export default function DailyCardsPage() {
             text-align: center !important;
             padding: 0.2in !important;
           }
-          .print-card img { width: 2.2in !important; height: 2.2in !important; margin: 0 auto 0.25in !important; display: block !important; }
+          /* [5 Oct] This forced EVERY image on the card to 2.2in, from when
+             the QR was the centrepiece. The QR is now a 38px fallback in
+             the corner, so on paper it was blowing up to 2.2in and landing
+             on top of the table circle. Sized to match the screen instead. */
+          .print-card img { width: 0.42in !important; height: 0.42in !important; margin: 0 !important; display: block !important; }
           .print-card p { margin: 0 0 0.1in !important; line-height: 1.3; }
         }
       `}</style>
