@@ -5628,6 +5628,29 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 
+  // [6 Oct] Daisy: staff set the table number on the card itself (tap the
+  // Table circle). Free text, same field the till matches handheld tickets
+  // against, so setting it here also lets the till find the right ticket.
+  app.post('/api/spec/bookings/:code/table-number', async (req, res) => {
+    try {
+      const raw = req.body?.table_number;
+      const table_number = raw == null ? null : String(raw).trim().slice(0, 12) || null;
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ table_number })
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .select('booking_code, table_number')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Booking not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error('set table number failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // What is already saved for a booking's table, so the table photo screen
   // can open on it instead of a blank camera. Daisy opened the Sandbox,
   // which already had three photographed pieces, and was shown an empty

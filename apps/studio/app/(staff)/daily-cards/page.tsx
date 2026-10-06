@@ -330,6 +330,29 @@ export default function DailyCardsPage() {
   // on its own without selecting and deselecting the rest. Only that card
   // is marked for the print CSS until the print dialog closes.
   const [printOnly, setPrintOnly] = useState<string | null>(null);
+
+  // [6 Oct] Table number, set by staff by tapping the circle on a card.
+  const [editingTable, setEditingTable] = useState<string | null>(null);
+  const [tableErr, setTableErr] = useState<string | null>(null);
+  const saveTable = async (code: string, value: string) => {
+    setEditingTable(null);
+    const v = value.trim();
+    const before = bookings.find((x) => x.booking_code === code)?.table_number ?? null;
+    if ((before || '') === v) return;
+    setBookings((bs) => bs.map((x) => (x.booking_code === code ? { ...x, table_number: v || null } : x)));
+    try {
+      const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(code)}/table-number`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_number: v || null }),
+      });
+      if (!r.ok) throw new Error();
+      setTableErr(null);
+    } catch {
+      setBookings((bs) => bs.map((x) => (x.booking_code === code ? { ...x, table_number: before } : x)));
+      setTableErr(code);
+    }
+  };
   const printOne = (code: string) => {
     setPrintOnly(code);
     const done = () => setPrintOnly(null);
@@ -561,10 +584,35 @@ export default function DailyCardsPage() {
                         }}>
                           Table
                         </span>
-                        <div style={{
-                          width: 46, height: 46, flexShrink: 0,
-                          border: '1px solid #D8CBBC', borderRadius: '50%',
-                        }} />
+                        {/* Tap to set the table number. Prints with the
+                            number in it, or empty for a pen if not set. */}
+                        <div
+                          onClick={(e) => { e.stopPropagation(); setEditingTable(b.booking_code); }}
+                          title="Tap to set the table number"
+                          style={{
+                            width: 46, height: 46, flexShrink: 0,
+                            border: `1px solid ${tableErr === b.booking_code ? '#c0392b' : b.table_number ? 'var(--clay)' : '#D8CBBC'}`,
+                            borderRadius: '50%', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '1.25rem',
+                            color: 'var(--charcoal)', overflow: 'hidden',
+                          }}
+                        >
+                          {editingTable === b.booking_code ? (
+                            <input
+                              autoFocus
+                              inputMode="numeric"
+                              defaultValue={b.table_number || ''}
+                              onClick={(e) => e.stopPropagation()}
+                              onBlur={(e) => saveTable(b.booking_code, e.currentTarget.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.currentTarget.blur();
+                                if (e.key === 'Escape') setEditingTable(null);
+                              }}
+                              style={{ width: 40, border: 'none', outline: 'none', background: 'transparent', textAlign: 'center', font: 'inherit', color: 'inherit' }}
+                            />
+                          ) : (b.table_number || '')}
+                        </div>
                       </div>
                     </div>
 
