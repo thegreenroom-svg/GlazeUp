@@ -1,13 +1,15 @@
 'use client';
 import QRCode from 'qrcode';
-import { PieceThumb } from '@/components/PieceBoxes';
+import { PieceThumb, PhotoWithBoxes } from '@/components/PieceBoxes';
+import { PieceViewer, ViewerPiece } from '@/components/PieceViewer';
 
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams } from 'next/navigation';
-import { Printer, RefreshCw, AlertCircle, CalendarDays } from 'lucide-react';
+import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, Camera, Loader } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { EmptyState } from '@/components/EmptyState';
 
 // Same fix as PinGate.tsx: a plain fetch() has no timeout of its own. This
@@ -68,6 +70,24 @@ function tableSetupFlags(notes: string | null): string[] {
 
 export default function DailyCardsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  // [6 Oct] Daisy: the cards are the interface. One card opens at a time,
+  // full width, with its saved table photo; any picture goes full screen.
+  const router = useRouter();
+  const [openCode, setOpenCode] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ pieces: ViewerPiece[]; start: number; title: string } | null>(null);
+  const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[] } | 'loading' | 'error'>>({});
+  const openCard = async (code: string) => {
+    if (openCode === code) { setOpenCode(null); return; }
+    setOpenCode(code);
+    setTablePieces((t) => ({ ...t, [code]: 'loading' }));
+    try {
+      const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(code)}/table-pieces`);
+      const d = r.ok ? await r.json() : null;
+      setTablePieces((t) => ({ ...t, [code]: d ? { photo_url: d.photo_url || null, pieces: Array.isArray(d.pieces) ? d.pieces : [] } : 'error' }));
+    } catch {
+      setTablePieces((t) => ({ ...t, [code]: 'error' }));
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -447,7 +467,8 @@ export default function DailyCardsPage() {
                 border: isNew ? '2px solid #e0a020' : isSelected ? '2px solid var(--clay)' : '1px solid #ddd',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                position: 'relative'
+                position: 'relative',
+                gridColumn: openCode === b.booking_code ? '1 / -1' : undefined,
               }}
               onClick={() => toggleSelect(b.booking_code)}
             >
@@ -571,7 +592,18 @@ export default function DailyCardsPage() {
                         flexWrap: 'wrap', marginTop: '0.45rem',
                       }}>
                         {b.returns_waiting.map((r, i) => (
-                          <div key={i} style={{ textAlign: 'center', maxWidth: 62 }}>
+                          <div
+                            key={i}
+                            style={{ textAlign: 'center', maxWidth: 62, cursor: 'zoom-in' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewer({
+                                title: `${b.customer_name} · returns shelf`,
+                                start: i,
+                                pieces: (b.returns_waiting || []).map((x) => ({ photo: x.photo, box: x.box, piece_type: x.piece_type, note: x.reason })),
+                              });
+                            }}
+                          >
                             <PieceThumb url={r.photo} box={r.box} size={40} ring="#A8651A" />
                             <p style={{
                               fontSize: '0.52rem', color: '#A8651A', lineHeight: 1.25,
@@ -625,6 +657,69 @@ export default function DailyCardsPage() {
                   {b.notes}
                 </p>
               )}
+              {/* Open the card: the saved table photo, every piece numbered,
+                  and the next things to do. Screen only, never printed. */}
+              <div className="no-print" style={{ padding: '0 1rem 1rem' }} onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => openCard(b.booking_code)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', padding: '0.4rem 0.9rem', borderRadius: 999, border: '1px solid var(--clay)', background: openCode === b.booking_code ? 'var(--clay)' : 'transparent', color: openCode === b.booking_code ? 'white' : 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
+                >
+                  {openCode === b.booking_code ? <>Close <ChevronUp size={15} /></> : <>Open <ChevronDown size={15} /></>}
+                </button>
+
+                {openCode === b.booking_code && (() => {
+                  const tp = tablePieces[b.booking_code];
+                  if (tp === 'loading' || tp === undefined) {
+                    return <p style={{ marginTop: '0.8rem', color: 'var(--stone)', fontSize: 'var(--text-sm)', display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}><Loader size={14} className="animate-spin" /> Loading the table</p>;
+                  }
+                  if (tp === 'error') {
+                    return <p style={{ marginTop: '0.8rem', color: '#c0392b', fontSize: 'var(--text-sm)' }}>Could not load this table. Close and open again.</p>;
+                  }
+                  const viewerPieces: ViewerPiece[] = tp.pieces.map((p: any) => ({
+                    photo: p.reference_photo_url || null,
+                    box: p.photo_box || null,
+                    piece_type: p.piece_type,
+                    description: p.description,
+                    note: p.returned_at ? (p.return_reason || 'Coming back to finish') : null,
+                  }));
+                  const show = (k: number) => setViewer({ title: b.customer_name, start: k, pieces: viewerPieces });
+                  return (
+                    <div style={{ marginTop: '0.9rem', textAlign: 'left' }}>
+                      {tp.photo_url ? (
+                        <div style={{ borderRadius: 6, overflow: 'hidden', maxWidth: 640, margin: '0 auto' }}>
+                          <PhotoWithBoxes
+                            src={tp.photo_url}
+                            pieces={tp.pieces.map((p: any, k: number) => ({ index: k + 1, piece_type: p.piece_type, box: p.reference_photo_url === tp.photo_url ? p.photo_box : null }))}
+                            onPick={show}
+                          />
+                        </div>
+                      ) : (
+                        <p style={{ color: 'var(--stone)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>Not photographed yet.</p>
+                      )}
+                      {tp.pieces.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem', justifyContent: 'center' }}>
+                          {tp.pieces.map((p: any, k: number) => (
+                            <button key={p.id} onClick={() => show(k)} style={{ background: 'none', border: 'none', padding: 0, width: 84, textAlign: 'center', cursor: 'zoom-in' }}>
+                              <PieceThumb url={p.reference_photo_url} box={p.photo_box} size={72} ring={p.returned_at ? '#A8651A' : undefined} />
+                              <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.2rem', color: 'var(--charcoal)', textTransform: 'capitalize' }}>{k + 1}. {p.piece_type || 'Piece'}</span>
+                              {p.returned_at && <span style={{ display: 'block', fontSize: '0.65rem', color: '#A8651A', fontWeight: 600 }}>to finish</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}`)} style={actionBtn(true)}>
+                          <Camera size={16} /> {tp.photo_url ? 'Table photo & returns' : 'Photograph the table'}
+                        </button>
+                        <button onClick={() => router.push(`/collection?code=${encodeURIComponent(b.booking_code)}`)} style={actionBtn(false)}>
+                          <Printer size={16} /> Collection card
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
               {/* The reference is for us, not for them. A plain card has
                   nothing on it a customer would not want on their table. */}
 
@@ -632,6 +727,8 @@ export default function DailyCardsPage() {
           );
         })}
       </div>
+
+      {viewer && <PieceViewer pieces={viewer.pieces} start={viewer.start} title={viewer.title} onClose={() => setViewer(null)} />}
 
       <style jsx global>{`
         @keyframes spin {
@@ -699,4 +796,15 @@ export default function DailyCardsPage() {
       `}</style>
     </PageShell>
   );
+}
+
+function actionBtn(primary: boolean): React.CSSProperties {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+    padding: '0.6rem 1rem', borderRadius: 'var(--radius-md)', fontWeight: 700,
+    fontSize: 'var(--text-sm)',
+    border: primary ? 'none' : '1px solid var(--clay)',
+    background: primary ? 'var(--clay)' : 'white',
+    color: primary ? 'white' : 'var(--clay)',
+  };
 }
