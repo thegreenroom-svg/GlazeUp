@@ -1,4 +1,5 @@
 'use client';
+import QRCode from 'qrcode';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,6 +77,7 @@ export default function DailyCardsPage() {
   // rate up rather than cost anything.
   //
   // Nothing machine readable on it. The board was never scanned either.
+  const [qrUrls, setQrUrls] = useState<Record<string, string>>({});
   const [collectDate, setCollectDate] = useState<string | null>(null);
   // The chalk tag carries the collection date, so the printed card has to
   // as well -- otherwise it is a prettier card that does less.
@@ -182,8 +184,24 @@ export default function DailyCardsPage() {
         setBookings(today);
       }
 
-      // Real, scannable QR per booking -- same payload every other QR in the
-      // app uses, so any of these cards works with the same /customer route.
+      // [5 Oct] The QR is back, but doing a different job. It is no longer
+      // the way the card is read -- the printed name and dates are, and the
+      // photo reads those. This is the fallback for when the OCR cannot,
+      // and the quick way in at the shelf and the kiln where there is no
+      // table photo to read at all.
+      //
+      // Small and top left, so it stays out of the way of the card until
+      // somebody actually needs it.
+      const urls: Record<string, string> = {};
+      await Promise.all(
+        today.map(async (b: Booking) => {
+          urls[b.booking_code] = await QRCode.toDataURL(
+            `${window.location.origin}/floor?code=${encodeURIComponent(b.booking_code)}`,
+            { margin: 0, width: 160 }
+          );
+        })
+      );
+      setQrUrls((prev) => ({ ...prev, ...urls }));
     } catch (e) {
       console.error('Load error:', e);
       setError('Could not load bookings for that day.');
@@ -438,10 +456,25 @@ export default function DailyCardsPage() {
                     {/* The table box sits on its own at the top, out of the
                         way of everything. It was crowding the ready date
                         before, which is the one line a customer reads. */}
+                    {/* Code left, table circle right, name below both.
+                        Neither one is in the middle, so neither competes
+                        with the name. */}
                     <div style={{
-                      width: 46, height: 46, margin: '0 auto 1.1rem',
-                      border: '1px solid #D8CBBC', borderRadius: '50%',
-                    }} />
+                      display: 'flex', alignItems: 'flex-start',
+                      justifyContent: 'space-between', marginBottom: '1.1rem',
+                    }}>
+                      {qrUrls[b.booking_code] ? (
+                        <img
+                          src={qrUrls[b.booking_code]}
+                          alt=""
+                          style={{ width: 38, height: 38, opacity: .72 }}
+                        />
+                      ) : <span style={{ width: 38 }} />}
+                      <div style={{
+                        width: 46, height: 46,
+                        border: '1px solid #D8CBBC', borderRadius: '50%',
+                      }} />
+                    </div>
 
                     <p style={{
                       fontFamily: 'Georgia, "Times New Roman", serif',
