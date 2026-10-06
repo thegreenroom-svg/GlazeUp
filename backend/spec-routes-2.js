@@ -5628,6 +5628,35 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 
+  // What is already saved for a booking's table, so the table photo screen
+  // can open on it instead of a blank camera. Daisy opened the Sandbox,
+  // which already had three photographed pieces, and was shown an empty
+  // camera -- so she took a new photo whose pieces were then silently
+  // dropped. The saved photo, its boxes and any returns come back here.
+  app.get('/api/spec/bookings/:code/table-pieces', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, piece_type, description, photo_box, reference_photo_url, returned_at, return_reason, created_at')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', req.params.code)
+        .not('archived', 'is', true)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true });
+      if (error) throw error;
+      const pieces = data || [];
+      // The photo the most pieces were taken from. Boxes are only drawn for
+      // pieces from that photo, since a box means nothing on another image.
+      const tally = {};
+      pieces.forEach((p) => { if (p.reference_photo_url) tally[p.reference_photo_url] = (tally[p.reference_photo_url] || 0) + 1; });
+      const photo_url = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0] || null;
+      res.json({ photo_url, pieces });
+    } catch (err) {
+      logger.error('table-pieces failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ---- OWNER DASHBOARD --------------------------------------------------
   // Daisy: "something to look at every day."
   //

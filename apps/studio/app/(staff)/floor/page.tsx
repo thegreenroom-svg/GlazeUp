@@ -149,6 +149,23 @@ export default function FloorPage() {
   // Daisy: a piece can be marked as returning right here on the table photo,
   // which takes it off this collection date and puts it on the returns shelf.
   const [returning, setReturning] = useState<Record<number, string>>({});
+  // [6 Oct] A booking that has already been photographed opens on that
+  // photo and its pieces, not a blank camera. savedIds maps the on-screen
+  // number to the real piece, savedReturns is what was already returned
+  // when it loaded, so finishing only sends what actually changed.
+  const [savedIds, setSavedIds] = useState<Record<number, string>>({});
+  const [savedReturns, setSavedReturns] = useState<Record<number, string>>({});
+  const [replaceSaved, setReplaceSaved] = useState(false);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  // Said out loud on the hand-off screen when something did not save,
+  // rather than a green tick over nothing.
+  const [saveNote, setSaveNote] = useState<string | null>(null);
+  const [savedOk, setSavedOk] = useState(false);
+  // Guards the saved-pieces load, which is not awaited: if staff move to
+  // another booking or take a new photo before it lands, it must not
+  // overwrite what is now on screen.
+  const openCodeRef = useRef<string | null>(null);
+  const freshPhotoRef = useRef(false);
   // Daisy: the table photo should tell you what they owe as well as what
   // they made. Same photo, same recognition -- the only thing missing was
   // the prices, so pull those too rather than making staff shoot it twice
@@ -315,9 +332,60 @@ export default function FloorPage() {
   // set yet. Re-checks the live Square match afterwards since that match
   // depends entirely on table_number.
 
+  const loadSavedPieces = async (code: string) => {
+    setLoadingSaved(true);
+    try {
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(code)}/table-pieces`);
+      const d = res.ok ? await res.json() : null;
+      const pieces = Array.isArray(d?.pieces) ? d.pieces : [];
+      if (!pieces.length) return;
+      if (openCodeRef.current !== code || freshPhotoRef.current) return;
+      const ids: Record<number, string> = {};
+      const rets: Record<number, string> = {};
+      const shown = pieces.map((p: any, i: number) => {
+        const index = i + 1;
+        ids[index] = p.id;
+        if (p.returned_at) rets[index] = p.return_reason || '';
+        return {
+          index,
+          piece_type: p.piece_type || 'Piece',
+          description: p.description || '',
+          // A box only means something on the photo it was drawn on.
+          box: p.photo_box && p.reference_photo_url === d.photo_url ? p.photo_box : null,
+        };
+      });
+      setSavedIds(ids);
+      setSavedReturns(rets);
+      setReturning({ ...rets });
+      setIdentifiedPieces(shown);
+      setPieceCount(shown.length);
+      if (d.photo_url) setPhotoPreview(d.photo_url);
+    } catch {
+      /* nothing saved, or offline -- falls back to the camera as before */
+    } finally {
+      setLoadingSaved(false);
+    }
+  };
+
   const selectBooking = async (b: Booking) => {
     setCurrent(b);
     setPieceCount(0);  // Start at 0 - will be populated from Phase 2 photo (or show unfinished pieces if returning customer)
+    // Clear the last booking's photo and pieces -- these used to carry
+    // over to the next booking until a new photo replaced them.
+    setPhoto(null);
+    setPhotoPreview(null);
+    setIdentifiedPieces(null);
+    setReturning({});
+    setPriced(null);
+    setIdentifyError(null);
+    setSavedIds({});
+    setSavedReturns({});
+    setReplaceSaved(false);
+    setSaveNote(null);
+    setSavedOk(false);
+    openCodeRef.current = b.booking_code;
+    freshPhotoRef.current = false;
+    loadSavedPieces(b.booking_code);
     setTillItems([]);
     setFinished(false);
     setActiveGroup(null);
@@ -532,6 +600,17 @@ export default function FloorPage() {
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    // Retaking over pieces that are already saved replaces them. Asked
+    // once, plainly, because the old pieces are archived when it finishes.
+    const savedCount = Object.keys(savedIds).length;
+    if (savedCount) {
+      const ok = window.confirm(`This booking already has ${savedCount} piece${savedCount === 1 ? '' : 's'} saved. The new photo will replace ${savedCount === 1 ? 'it' : 'them'} when you finish. Carry on?`);
+      if (!ok) { e.target.value = ''; return; }
+      setReplaceSaved(true);
+      setSavedIds({});
+      setSavedReturns({});
+    }
+    freshPhotoRef.current = true;
     setPhoto(f);
     setPhotoPreview(URL.createObjectURL(f));
     // Real AI identification of each piece on the table -- per Daisy:
@@ -683,7 +762,22 @@ export default function FloorPage() {
         if (shiftName) {
           formData.append('photo_taken_by', shiftName);
         }
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: formData });
+        if (replaceSaved) formData.append('replace_existing', 'true');
+        // Read the answer. This used to be ignored, so a photo whose pieces
+        // were never saved still showed "Photo confirmed to booking".
+        try {
+          const cr = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: formData });
+          const cd = await cr.json().catch(() => null);
+          if (!cr.ok) {
+            setSaveNote('The photo did not save. Go back and finish again.');
+          } else if (cd && cd.already_had > 0 && !cd.pieces_created) {
+            setSaveNote(`Nothing new saved: this booking already had ${cd.already_had} piece${cd.already_had === 1 ? '' : 's'}.`);
+          } else {
+            setSavedOk(true);
+          }
+        } catch {
+          setSaveNote('The photo did not save. Check the connection and finish again.');
+        }
 
         // Archival safety copy, entirely separate from the save above --
         // Daisy: "for the safety of storage on the iPhone... this app
@@ -694,18 +788,45 @@ export default function FloorPage() {
         // compressed AI copy -- this is a backup, not a thumbnail.
         // Saved to the booking AND remembered as the studio default in one
         // call -- that is exactly how it's used at the counter.
-        if (collectionDate) {
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/set-date`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ booking_code: current.booking_code, collection_date: collectionDate }),
-          }).catch(() => { /* best-effort; the photo save is what must not fail */ });
-        }
 
         const backupData = new FormData();
         backupData.append('photo', photo);
         backupData.append('booking_code', current.booking_code);
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/drive/backup-photo`, { method: 'POST', body: backupData }).catch(() => { /* best-effort; already logged server-side if it fails */ });
+      } else if (Object.keys(savedIds).length) {
+        // No new photo: the saved pieces stay, and only the returns that
+        // changed on this screen are sent, onto those same pieces.
+        let failed = 0;
+        let changed = 0;
+        for (const [k, pieceId] of Object.entries(savedIds)) {
+          const i = Number(k);
+          const was = savedReturns[i] !== undefined;
+          const now = returning[i] !== undefined;
+          if (now === was) continue;
+          changed++;
+          try {
+            const r = now
+              ? await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/returns/${pieceId}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ reason: returning[i] || null, returned_by: shiftName || null }),
+                })
+              : await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/returns/${pieceId}/undo`, { method: 'POST' });
+            if (!r.ok) failed++;
+          } catch { failed++; }
+        }
+        if (failed) setSaveNote(`${failed} return${failed === 1 ? '' : 's'} did not save. Go back and finish again.`);
+        else if (changed) setSavedOk(true);
+      }
+
+      // Saved to the booking AND remembered as the studio default in one
+      // call. Now runs with or without a new photo.
+      if (collectionDate) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/set-date`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ booking_code: current.booking_code, collection_date: collectionDate }),
+        }).catch(() => { /* best-effort; the photo save is what must not fail */ });
       }
 
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${current.booking_code}/finish`, {
@@ -1611,6 +1732,11 @@ export default function FloorPage() {
                   ))}
                 </div>
 
+                {loadingSaved && !identifying && (
+                  <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Loader size={14} className="animate-spin" /> Loading saved pieces...
+                  </p>
+                )}
                 {identifying && (
                   <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Loader size={14} className="animate-spin" /> Identifying pieces...
@@ -1620,7 +1746,9 @@ export default function FloorPage() {
                 {identifiedPieces && identifiedPieces.length > 0 && (
                   <div style={{ marginBottom: '1rem' }}>
                     <p style={{ color: B.ivory, fontSize: 'var(--text-base)', fontWeight: 700, marginBottom: '0.5rem' }}>
-                      {identifiedPieces.length} piece{identifiedPieces.length === 1 ? '' : 's'} identified — check before finishing
+                      {Object.keys(savedIds).length
+                        ? `${identifiedPieces.length} piece${identifiedPieces.length === 1 ? '' : 's'} already saved — mark any returns`
+                        : `${identifiedPieces.length} piece${identifiedPieces.length === 1 ? '' : 's'} identified — check before finishing`}
                     </p>
                     {identifiedPieces.map((p, i) => (
                       <div key={p.index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', padding: '0.4rem 0' }}>
@@ -1643,7 +1771,7 @@ export default function FloorPage() {
                           })()}
                           {returning[p.index] !== undefined && (
                             <input
-                              autoFocus
+                              autoFocus={savedReturns[p.index] === undefined}
                               value={returning[p.index]}
                               onChange={(e) => setReturning((r) => ({ ...r, [p.index]: e.target.value }))}
                               placeholder="Why is it going back? (chipped, wrong colour...)"
@@ -1674,7 +1802,9 @@ export default function FloorPage() {
                       </div>
                     ))}
                     <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.4rem' }}>
-                      Wrong count? Tap the photo to retake it.
+                      {Object.keys(savedIds).length
+                        ? 'Tap the photo to retake. A new photo replaces these pieces.'
+                        : 'Wrong count? Tap the photo to retake it.'}
                     </p>
                     {pricing && !priced && (
                       <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.35rem' }}>
@@ -1815,7 +1945,11 @@ export default function FloorPage() {
                     : 'Studio pickup'}
                 </p>
               )}
-              {photo && <p style={{ color: '#7ec98a' }} className="text-xs mt-1 flex items-center gap-1"><Check size={12} /> Photo confirmed to booking</p>}
+              {saveNote && <p style={{ color: '#c0392b' }} className="text-xs mt-1 font-semibold">{saveNote}</p>}
+              {!saveNote && savedOk && <p style={{ color: '#7ec98a' }} className="text-xs mt-1 flex items-center gap-1"><Check size={12} /> {photo ? 'Photo confirmed to booking' : 'Returns saved'}</p>}
+              {Object.keys(returning).length > 0 && !saveNote && (
+                <p style={{ color: '#c77a0a' }} className="text-xs mt-1 font-semibold">{Object.keys(returning).length} on the returns shelf</p>
+              )}
 
               {/* A count alone doesn't confirm anything -- the actual
                   descriptions are what let someone catch a wrong

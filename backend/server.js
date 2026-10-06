@@ -1074,6 +1074,7 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
       ? identified.length
       : parseInt(req.body.piece_count, 10);
     let piecesCreated = 0;
+    let alreadyHad = 0;
     if (Number.isFinite(pieceCount) && pieceCount > 0) {
       // [6 Sep] BACKFILL. Pieces read from the iPad library screenshots
       // exist with descriptions but no photo and no box, which makes
@@ -1097,11 +1098,38 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
         if ((gone || []).length) logger.info(`[photo-match/confirm] replaced ${gone.length} photo-less piece(s) for ${booking_code}`);
       }
 
+      // [6 Oct] RETAKE. Daisy opened the Sandbox, took a new table photo,
+      // marked a mug as returning and finished -- and nothing saved,
+      // because the booking already had three pieces and the check below
+      // quietly kept the old ones. The table screen now shows the saved
+      // photo first, so a new photo is only ever taken on purpose, after
+      // a "this will replace" confirm. When it is, the old pieces are
+      // archived (never deleted -- archive is reversible) and the new
+      // photo's pieces take their place.
+      if (req.body.replace_existing === 'true') {
+        const { data: archivedRows, error: archErr } = await supabase
+          .from('pottery_pieces')
+          .update({ archived: true })
+          .eq('studio_id', DEMO_STUDIO_ID)
+          .eq('booking_id', booking_code)
+          .not('archived', 'is', true)
+          .select('id');
+        if (archErr) logger.error('[photo-match/confirm] archiving old pieces failed', archErr);
+        else if ((archivedRows || []).length) logger.info(`[photo-match/confirm] retake: archived ${archivedRows.length} old piece(s) for ${booking_code}`);
+      }
+
+      // Archived pieces no longer count -- otherwise an archived piece
+      // would block a booking from ever getting its real pieces.
       const { count: existing } = await supabase
         .from('pottery_pieces')
         .select('id', { count: 'exact', head: true })
         .eq('studio_id', DEMO_STUDIO_ID)
-        .eq('booking_id', booking_code);
+        .eq('booking_id', booking_code)
+        .not('archived', 'is', true);
+      alreadyHad = existing || 0;
+      if (alreadyHad) {
+        logger.warn(`[photo-match/confirm] ${booking_code} already has ${alreadyHad} piece(s); new photo's pieces NOT saved (no replace_existing)`);
+      }
       if (!existing) {
         const rows = Array.from({ length: pieceCount }, (_, i) => {
           const info = Array.isArray(identified) ? identified[i] : null;
@@ -1163,7 +1191,9 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
       }
     }
 
-    res.json({ ...inserted, pieces_created: piecesCreated });
+    // already_had tells the screen when a photo's pieces were NOT saved, so
+    // it can say so instead of looking like it worked.
+    res.json({ ...inserted, pieces_created: piecesCreated, already_had: alreadyHad });
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
