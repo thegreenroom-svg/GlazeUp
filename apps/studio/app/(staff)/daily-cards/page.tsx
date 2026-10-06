@@ -436,6 +436,12 @@ export default function DailyCardsPage() {
               style={{
                 padding: '0', 
                 borderRadius: '2px', 
+                /* [5 Oct] The checkbox is gone. The whole card has always
+                   been clickable, and a selected card already turns clay
+                   bordered and tinted -- the box was belt and braces on
+                   something that already said it clearly, and it had
+                   nowhere left to sit without landing on the QR or the
+                   table circle. */
                 backgroundColor: isSelected ? 'var(--clay-light, #f5e6d3)' : 'white', 
                 textAlign: 'center',
                 border: isNew ? '2px solid #e0a020' : isSelected ? '2px solid var(--clay)' : '1px solid #ddd',
@@ -445,19 +451,6 @@ export default function DailyCardsPage() {
               }}
               onClick={() => toggleSelect(b.booking_code)}
             >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => toggleSelect(b.booking_code)}
-                onClick={(e) => e.stopPropagation()}
-                className="no-print"
-                /* [5 Oct] This sat at top right, which is exactly where the
-                   table circle now goes -- a square checkbox landing on the
-                   circle. Moved to top LEFT, over the QR, which is itself
-                   only a fallback and does not need to be legible while you
-                   are picking which cards to print. */
-                style={{ position: 'absolute', top: '0.8rem', left: '0.8rem', cursor: 'pointer', width: '18px', height: '18px', zIndex: 2 }}
-              />
               {isNew && <p style={{ fontSize: 'var(--text-xs)', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
               {(() => {
                 const d = new Date(b.session_start);
@@ -643,7 +636,6 @@ export default function DailyCardsPage() {
              genuinely global rather than page-scoped -- see the fix
              there for why (AppShell/PinGate chrome wasn't being hidden
              at all). Kept here: only what's specific to this page. */
-          input[type="checkbox"] { display: none !important; }
           
           /* Hide unselected cards during print */
           .card-grid > div:not([data-selected="true"]) {
