@@ -230,6 +230,9 @@ export function PieceThumb({
   return (
     <span
       style={{
+        // inline-block, or a plain span ignores width and height outside a
+        // flex row -- on the table cards it collapsed to a thin bar.
+        display: 'inline-block', verticalAlign: 'middle', boxSizing: 'border-box',
         flexShrink: 0, width: size, height: size, borderRadius: 'var(--radius-sm)',
         border: ring ? `2px solid ${ring}` : '1px solid #ece5db',
         ...pieceCropStyle(url, box),
