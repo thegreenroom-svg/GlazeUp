@@ -10177,17 +10177,86 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
   // ---- the matching itself: crops in, shapes out --------------------------
   // crops: [{ key, img (jpeg buffer), piece_type, description }]
   // Returns Map key -> { shortlist: [shape], chosen: shape|null, confidence }
+  // ---- contact sheets of the stock photos ------------------------------
+  // [7 Oct] Daisy: "I thought the recognition would find from stock
+  // photos." It did, but only for four candidates chosen from the NAMES,
+  // so a shape with an unhelpful Square name (Kate Laws's pumpkin planter)
+  // never had its photo looked at. Now the shortlist step also sees every
+  // stock photo, as numbered contact sheets, and picks by look as well.
+  //
+  // Built once in the background (600-odd photos take a minute to fetch)
+  // and rebuilt when the catalogue changes. Until ready, matching works by
+  // name exactly as before.
+  const SHEET_COLS = 8, SHEET_ROWS = 6, TILE = 112, GAP = 4;
+  let sheets = { sig: '', built: [], building: null };
+  const catSig = (rows) => rows.map((r) => `${r.square_item_id}:${r.image_url || ''}`).join('|');
+  function contactSheets(shapes) {
+    const sig = catSig(shapes);
+    if (sheets.sig === sig && sheets.built.length) return sheets.built;
+    if (!sheets.building || sheets.buildingSig !== sig) {
+      sheets.buildingSig = sig;
+      sheets.building = buildSheets(shapes)
+        .then((built) => { if (sheets.buildingSig === sig) sheets = { sig, built, building: null }; logger.info(`[shapes] ${built.length} stock contact sheets ready`); })
+        .catch((e) => { logger.warn('[shapes] contact sheets failed', e.message); sheets.building = null; });
+    }
+    // Stale sheets would number the wrong shapes, so none until rebuilt.
+    return sheets.sig === sig ? sheets.built : [];
+  }
+  async function buildSheets(shapes) {
+    const withPhoto = shapes.map((s, i) => ({ n: i + 1, url: s.image_url })).filter((x) => x.url);
+    const tiles = new Map();
+    let next = 0;
+    const worker = async () => {
+      while (next < withPhoto.length) {
+        const x = withPhoto[next++];
+        try {
+          tiles.set(x.n, await sharp(await fetchBuf(x.url)).rotate()
+            .resize(TILE, TILE, { fit: 'contain', background: { r: 255, g: 255, b: 255 } }).jpeg({ quality: 70 }).toBuffer());
+        } catch { /* a missing photo just leaves the shape to its name */ }
+      }
+    };
+    await Promise.all(Array.from({ length: 10 }, worker));
+    const usable = withPhoto.filter((x) => tiles.has(x.n));
+    const per = SHEET_COLS * SHEET_ROWS;
+    const out = [];
+    for (let i = 0; i < usable.length; i += per) {
+      const chunk = usable.slice(i, i + per);
+      const W = SHEET_COLS * (TILE + GAP) + GAP, H = Math.ceil(chunk.length / SHEET_COLS) * (TILE + GAP) + GAP;
+      const img = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 60, g: 60, b: 60 } } })
+        .composite(chunk.map((x, k) => ({ input: tiles.get(x.n), left: GAP + (k % SHEET_COLS) * (TILE + GAP), top: GAP + Math.floor(k / SHEET_COLS) * (TILE + GAP) })))
+        .jpeg({ quality: 72 }).toBuffer();
+      // Which shape is at each position, said in words, so no text has to
+      // be drawn on the image (fonts on the server are not guaranteed).
+      const map = [];
+      for (let r = 0; r * SHEET_COLS < chunk.length; r++) {
+        map.push(`row ${r + 1}: ` + chunk.slice(r * SHEET_COLS, (r + 1) * SHEET_COLS).map((x) => x.n).join(', '));
+      }
+      out.push({ img, map: map.join('; ') });
+    }
+    return out;
+  }
+
+  // Start building the sheets soon after boot, so the first table photo of
+  // the day already gets them. Free-tier Render sleeps, so this reruns on
+  // every wake; it is a minute of fetching, in the background.
+  setTimeout(() => { if (KEY()) catalogue().then(contactSheets).catch(() => {}); }, 20000);
+
   async function matchCrops(crops) {
     const shapes = await catalogue();
     const out = new Map();
     if (!shapes.length || !crops.length) return out;
+    const sheetsNow = contactSheets(shapes);
 
-    // Pass 1: shortlist from names.
+    // Pass 1: shortlist from names AND, once built, the stock photos.
     const list = shapes.map((s, i) => `${i + 1}. ${s.name} (${catLabel(s.category)})`).join('\n');
     const in1 = [{
       type: 'text',
-      text: `These are painted pottery pieces from a paint-your-own pottery studio. Every piece started as a plain white bisque shape from the studio's range, listed below by number.\n\nFor each piece, pick up to FOUR shapes from the list that it could be, best first, judging by FORM only: overall silhouette, proportions, handles, spouts, lids, feet, sculpted or moulded details, and any letter or number it forms. Ignore the paint completely -- colours and painted designs are the customer's, not part of the shape.\n\nIf the piece is clearly not from this range (wheel-thrown, hand-built, or nothing listed is close), return an empty list for it rather than forcing a match.\n\nSHAPES:\n${list}`,
+      text: `These are painted pottery pieces from a paint-your-own pottery studio. Every piece started as a plain white bisque shape from the studio's range, listed below by number.\n\nFor each piece, pick up to FOUR shapes from the list that it could be, best first, judging by FORM only: overall silhouette, proportions, handles, spouts, lids, feet, sculpted or moulded details, and any letter or number it forms. Ignore the paint completely -- colours and painted designs are the customer's, not part of the shape.${sheetsNow.length ? `\n\nNames can be unhelpful, so STOCK PHOTO SHEETS follow the list: grids of the plain bisque shapes, 8 per row, with the shape number at each position given in words under each sheet. Look through the photos as well as the names -- a shape whose photo matches the piece belongs on the shortlist even if its name does not suggest it.` : ''}\n\nIf the piece is clearly not from this range (wheel-thrown, hand-built, or nothing listed is close), return an empty list for it rather than forcing a match.\n\nSHAPES:\n${list}`,
     }];
+    sheetsNow.forEach((sh, i) => {
+      in1.push({ type: 'text', text: `STOCK PHOTO SHEET ${i + 1} of ${sheetsNow.length}. Shape numbers by position -- ${sh.map}` });
+      in1.push({ type: 'image', data: sh.img.toString('base64'), mime_type: 'image/jpeg' });
+    });
     crops.forEach((c, i) => {
       in1.push({ type: 'text', text: `PIECE ${i + 1}: ${c.piece_type || ''}${c.description ? ' -- ' + c.description : ''}` });
       in1.push({ type: 'image', data: c.img.toString('base64'), mime_type: 'image/jpeg' });
