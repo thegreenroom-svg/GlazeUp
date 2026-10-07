@@ -171,7 +171,10 @@ export default function FloorPage() {
   // they made. Same photo, same recognition -- the only thing missing was
   // the prices, so pull those too rather than making staff shoot it twice
   // on a different screen.
-  const [priced, setPriced] = useState<{ index: number; name: string | null; price_cents: number | null; confidence: string }[] | null>(null);
+  const [priced, setPriced] = useState<{ index: number; name: string | null; price_cents: number | null; confidence: string; guess?: { name: string; price_cents: number } | null }[] | null>(null);
+  // [7 Oct] Daisy, on Kate Laws's table: 'Prices' -- the line just was not
+  // there. Pricing failing or being unsure now says so instead of vanishing.
+  const [priceErr, setPriceErr] = useState<string | null>(null);
   const [pricing, setPricing] = useState(false);
   const [identifiedPieces, setIdentifiedPieces] = useState<{ index: number; piece_type: string; description: string; box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[] | null>(null);
   const [identifying, setIdentifying] = useState(false);
@@ -378,6 +381,7 @@ export default function FloorPage() {
     setIdentifiedPieces(null);
     setReturning({});
     setPriced(null);
+    setPriceErr(null);
     setIdentifyError(null);
     setSavedIds({});
     setSavedReturns({});
@@ -625,6 +629,7 @@ export default function FloorPage() {
     setIdentifiedPieces(null);
     setReturning({});
     setPriced(null);
+    setPriceErr(null);
     setIdentifyError(null); // clear any error from a previous attempt
     // Captured now, not read from `current` later -- by the time this
     // resolves, staff may already have finished this booking and moved to
@@ -668,15 +673,23 @@ export default function FloorPage() {
               const pr = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/table-total/price`, { method: 'POST', body: fd2 }, 70000);
               const pd = await pr.json();
               if (pr.ok && Array.isArray(pd.pieces)) {
-                setPriced(pd.pieces.map((x: { index: number; shape: { name?: string; price_cents?: number } | null; confidence: string }) => ({
-                  index: x.index,
-                  name: x.shape?.name || null,
-                  price_cents: typeof x.shape?.price_cents === 'number' ? x.shape.price_cents : null,
-                  confidence: x.confidence,
-                })));
+                setPriceErr(null);
+                setPriced(pd.pieces.map((x: { index: number; shape: { name?: string; price_cents?: number } | null; confidence: string; candidates?: { name?: string; price_cents?: number }[] }) => {
+                  const c = (x.candidates || []).find((k) => typeof k?.price_cents === 'number' && k.price_cents > 0);
+                  return {
+                    index: x.index,
+                    name: x.shape?.name || null,
+                    price_cents: typeof x.shape?.price_cents === 'number' ? x.shape.price_cents : null,
+                    confidence: x.confidence,
+                    guess: c ? { name: String(c.name || '').trim(), price_cents: c.price_cents as number } : null,
+                  };
+                }));
+              } else {
+                setPriceErr(pd?.error ? `Could not work out prices: ${pd.error}` : 'Could not work out prices this time.');
               }
             } catch {
-              /* a price is a nicety here; the table still finishes without it */
+              // The table still finishes without it -- but say so.
+              setPriceErr('Could not work out prices this time (no answer in time).');
             } finally {
               setPricing(false);
             }
@@ -1814,6 +1827,11 @@ export default function FloorPage() {
                         Working out what they owe...
                       </p>
                     )}
+                    {priceErr && !priced && (
+                      <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.4rem' }}>
+                        {priceErr} Ring it up on the till as usual.
+                      </p>
+                    )}
                     {priced && (() => {
                       // Only the pieces actually recognised are counted, and
                       // the rest are named, because a total that quietly
@@ -1821,7 +1839,26 @@ export default function FloorPage() {
                       const got = priced.filter((x) => x.price_cents != null && !(returning[x.index] !== undefined));
                       const missing = priced.length - got.length - Object.keys(returning).length;
                       const total = got.reduce((a, x) => a + (x.price_cents || 0), 0);
-                      if (!got.length) return null;
+                      // Not sure enough to total: show its best guesses,
+                      // marked as guesses, rather than nothing at all.
+                      const unsure = priced.filter((x) => x.price_cents == null && returning[x.index] === undefined);
+                      const guessLines = unsure.map((x) => {
+                        const piece = identifiedPieces?.find((q) => q.index === x.index);
+                        return { n: x.index, what: piece?.piece_type || 'Piece', guess: x.guess };
+                      });
+                      if (!got.length) {
+                        return (
+                          <div style={{ marginTop: '0.5rem', paddingTop: '0.45rem', borderTop: `1px solid ${B.stone}33` }}>
+                            <p style={{ color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 700 }}>Not sure of the prices</p>
+                            {guessLines.map((g) => (
+                              <p key={g.n} style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.15rem' }}>
+                                {g.n}. {g.what}: {g.guess ? `maybe ${g.guess.name}, £${(g.guess.price_cents / 100).toFixed(2)}?` : 'no match in the stock list'}
+                              </p>
+                            ))}
+                            <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.25rem' }}>Check on the till. Nothing is charged here.</p>
+                          </div>
+                        );
+                      }
                       return (
                         <div style={{ marginTop: '0.5rem', paddingTop: '0.45rem', borderTop: `1px solid ${B.stone}33` }}>
                           <p style={{ color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 700 }}>
@@ -1829,7 +1866,7 @@ export default function FloorPage() {
                           </p>
                           <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.15rem', lineHeight: 1.45 }}>
                             {got.length} of {priced.length} priced
-                            {missing > 0 ? `, ${missing} not recognised` : ''}.
+                            {missing > 0 ? `, ${missing} not sure${guessLines.some((g) => g.guess) ? ` (${guessLines.filter((g) => g.guess).map((g) => `${g.n}: maybe ${g.guess!.name} £${(g.guess!.price_cents / 100).toFixed(2)}`).join('; ')})` : ''}` : ''}.
                             Drinks and cake are not in this. Nothing is charged here —
                             ring it up on the till as usual.
                           </p>
