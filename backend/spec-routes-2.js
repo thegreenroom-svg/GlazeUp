@@ -1,3 +1,4 @@
+import multer from 'multer';
 import { returnsWaitingFor } from './returns-match.js';
 // ============================================================================
 // SPEC ROUTES PART 2 — COMMERCIAL + CUSTOMER-FACING
@@ -9241,8 +9242,20 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
     }
   });
 
-  app.post('/api/spec/backfill/ingest', upload.single('photo'), async (req, res) => {
-    const cleanup = () => { try { if (req.file?.path) fs.unlinkSync(req.file.path); } catch { /* temp file */ } };
+  // [8 Oct] The iPad Shortcut got a bare "Internal Server Error": the
+  // shared upload only accepts a field called exactly "photo" with an
+  // image/* type, and threw before this handler ran when Shortcuts sent
+  // anything else. Now any file field and any type is accepted (the
+  // contents are checked below), and a failure says what went wrong.
+  const ingestUpload = multer({ dest: 'uploads', limits: { fileSize: 50 * 1024 * 1024 } }).any();
+  app.post('/api/spec/backfill/ingest', (req, res, next) => {
+    ingestUpload(req, res, (err) => {
+      if (err) return res.status(400).json({ error: `Photo could not be read: ${err.message}` });
+      req.file = (req.files || []).find((f) => f.fieldname === 'photo') || (req.files || [])[0];
+      next();
+    });
+  }, async (req, res) => {
+    const cleanup = () => { try { for (const f of req.files || []) fs.unlinkSync(f.path); } catch { /* temp file */ } };
     try {
       const sent = String(req.body?.token || req.get('x-studio-key') || '');
       const token = await ingestKey(false);
