@@ -271,6 +271,11 @@ export default function DailyCardsPage() {
   const [cardDate, setCardDate] = useState(() => linkedDate || new Date().toISOString().slice(0, 10));
   const cardDateRef = useRef(cardDate);
   const knownCodes = useRef<Set<string>>(new Set());
+  // [9 Oct] Whether knownCodes holds the day's bookings yet. The photo
+  // banner reloads the cards as soon as the page opens, and when that
+  // reload finished before the first one, every booking of the day was
+  // announced as "new since you loaded this page".
+  const knownReady = useRef(false);
   const firstLoadDone = useRef(false);
   const [selectedSessionIdx, setSelectedSessionIdx] = useState<number | null>(null);
 
@@ -390,15 +395,19 @@ export default function DailyCardsPage() {
       // Fetch bookings for the selected date
       const dateStr = cardDateRef.current;
       const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`);
-      const data = res.ok ? await res.json() : [];
+      // A failed fetch keeps the cards already on screen rather than
+      // emptying them (and then calling everything "new" next minute).
+      if (!res.ok) throw new Error(`bookings HTTP ${res.status}`);
+      const data = await res.json();
       setAllBookings(Array.isArray(data) ? data : []);
       const dayStr = new Date(dateStr).toDateString();
       const today = (Array.isArray(data) ? data : [])
         .filter((b: Booking) => new Date(b.session_start).toDateString() === dayStr)
         .sort((a: Booking, b: Booking) => new Date(a.session_start).getTime() - new Date(b.session_start).getTime());
 
-      if (isFirstLoad) {
+      if (isFirstLoad || !knownReady.current) {
         knownCodes.current = new Set(today.map((b: Booking) => b.booking_code));
+        knownReady.current = true;
         setBookings(today);
       } else {
         const fresh = today.filter((b: Booking) => !knownCodes.current.has(b.booking_code));
@@ -495,6 +504,7 @@ export default function DailyCardsPage() {
 
   useEffect(() => {
     setNewSinceLoad([]);
+    knownReady.current = false;
     setLoading(true);
     load(true);
     firstLoadDone.current = true;
