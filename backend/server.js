@@ -1931,7 +1931,9 @@ app.listen(PORT, () => {
       const ticketRes = await fetch(`${SELF_URL}/api/spec/bookings/match-tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: 1 }),
+        // [9 Oct] Three days, not one: a table photo can arrive the next
+        // morning, and the ticket it identifies must still be in range.
+        body: JSON.stringify({ days: 3 }),
       });
       const ticketData = await ticketRes.json().catch(() => ({}));
       if (ticketData.bookings_matched) logger.info(`[auto-sync] ${ticketData.tickets_matched} till ticket(s) attached to ${ticketData.bookings_matched} booking(s)`);

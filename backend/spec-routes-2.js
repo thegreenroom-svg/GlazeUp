@@ -6593,7 +6593,6 @@ export function registerPieceCheckRoutes(app, supabase, STUDIO_ID, logger) {
 // drinks, named with the table ("T6A") and often a first name ("T8 Kate",
 // "Kelly"). Read-only from Square, that ticket tells us:
 //   - they have ARRIVED (the first ticket's time), without anyone tapping;
-//   - which TABLE they are at (filled onto the card when it was blank);
 //   - what POTTERY was rung up -- real catalogue items, so a second,
 //     independent answer to "what shape is this piece", and a check that
 //     nothing on the table photo went unbilled.
@@ -6605,11 +6604,6 @@ export function registerPieceCheckRoutes(app, supabase, STUDIO_ID, logger) {
 const normTable = (s) => {
   const m = String(s || '').toUpperCase().match(/^\s*(?:T|L|TABLE)?\s*(\d{1,2})\s*([A-Z])?\b/);
   return m ? { num: parseInt(m[1], 10), letter: m[2] || '' } : null;
-};
-const tablesAgree = (a, b) => {
-  const x = normTable(a), y = normTable(b);
-  if (!x || !y || x.num !== y.num) return false;
-  return !x.letter || !y.letter || x.letter === y.letter;
 };
 
 export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axios) {
@@ -6690,10 +6684,6 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       till_pottery: ls.length ? pottery : null,
     };
     if (ls.length && !b.arrived_at) upd.arrived_at = ls[0].order_created_at;
-    if (!b.table_number) {
-      const withTable = ls.find((l) => normTable(l.ticket_name));
-      if (withTable) upd.table_number = String(withTable.ticket_name).trim().split(/\s|-/)[0].toUpperCase();
-    }
     await supabase.from('bookings').update(upd).eq('studio_id', STUDIO_ID).eq('booking_code', code);
     if (pottery.length) await reconcile(code, pottery);
   }
@@ -6806,19 +6796,22 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       }
       // Can every pottery line on the ticket be pinned to a different piece
       // in this booking's photo? Small enough to try greedily, rarest first.
+      // Returns how many lines it could pin. A fit is every line, or all
+      // but one when there are at least three -- recognition sometimes calls
+      // a Country Jug a Pitcher, and one miss should not lose the table.
       const explains = (pottery, code) => {
         const pieces = (piecesBy.get(code) || []).map((ids) => ({ ids, used: false }));
         const want = [];
         pottery.forEach((p) => { for (let q = 0; q < p.qty; q++) want.push(p.square_item_id); });
-        if (!want.length || want.length > pieces.length) return false;
+        if (!want.length || !pieces.length) return false;
         want.sort((a, b) => pieces.filter((x) => x.ids.includes(a)).length - pieces.filter((x) => x.ids.includes(b)).length);
+        let hit = 0;
         for (const sid of want) {
           const pc = pieces.filter((x) => !x.used && x.ids.includes(sid))
             .sort((x, y) => x.ids.length - y.ids.length)[0];
-          if (!pc) return false;
-          pc.used = true;
+          if (pc) { pc.used = true; hit++; }
         }
-        return true;
+        return hit === want.length || (want.length >= 3 && hit >= want.length - 1);
       };
 
       // A ticket opened up to an hour before or ninety minutes after the
@@ -6837,17 +6830,17 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
           let score = 0; const basis = [];
           if (b.first && parsed.words.includes(b.first)) { score += 12; basis.push('first name'); }
           if (b.last && b.last.length >= 3 && parsed.words.includes(b.last)) { score += 14; basis.push('surname'); }
-          if (b.table_number && tablesAgree(x.name, b.table_number)) { score += 10; basis.push('table'); }
+          // [9 Oct] No tables. Daisy: "table numbers are kind of irrelevant
+          // ... it's only for the till point. We know the booking names." A
+          // card saying T2 took the T2A ticket that belonged to the next
+          // table. Names and the pottery against the photo only.
+          if (x.pottery.length && created >= b.start - EARLY && created <= b.end + LATE && explains(x.pottery, b.booking_code)) {
+            score += 9; basis.push('pottery matches photo');
+          }
           if (!score) continue;
           scored.push({ b, score, gap: Math.abs(created - b.start), basis: basis.join(' + ') });
         }
         scored.sort((p, q) => (q.score - p.score) || (p.gap - q.gap));
-        // Nothing by name or table: try the pottery against the table photos
-        // of every booking in that session. Exactly one must fit.
-        if (!scored.length && x.pottery.length) {
-          const fits = prepared.filter((b) => created >= b.start - EARLY && created <= b.end + LATE && explains(x.pottery, b.booking_code));
-          if (fits.length === 1) scored.push({ b: fits[0], score: 9, gap: 0, basis: 'pottery matches photo' });
-        }
         // Two bookings equally good is a guess, so it waits for a person.
         if (!scored.length || (scored[1] && scored[1].score === scored[0].score)) {
           unmatched.push(x);
