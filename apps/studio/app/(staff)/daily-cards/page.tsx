@@ -116,7 +116,9 @@ export default function DailyCardsPage() {
   // Collecting view needs bookings painted on other days.
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [view, setView] = useState<'painting' | 'collecting'>('painting');
-  const [showEarlier, setShowEarlier] = useState(false);
+  // Every booking for the day shows as a card by default; finished
+  // sessions can still be folded away with the button.
+  const [showEarlier, setShowEarlier] = useState(true);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   // The table photo and collection screens open in a sheet over the card.
   const [sheet, setSheet] = useState<{ code: string; src: string; title: string } | null>(null);
@@ -811,7 +813,7 @@ export default function DailyCardsPage() {
             style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '1rem', padding: '0.5rem 0.9rem', borderRadius: 8, border: '1px dashed #d8cbbc', background: 'transparent', color: '#8a8178', fontSize: 'var(--text-sm)', fontWeight: 600 }}
           >
             {showEarlier ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            {showEarlier ? 'Hide' : 'Show'} earlier today, done ({earlierDone.length})
+            {showEarlier ? 'Hide' : 'Show'} finished sessions ({earlierDone.length})
           </button>
         )}
 
