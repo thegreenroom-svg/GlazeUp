@@ -6783,6 +6783,44 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
             end: b.session_end ? new Date(b.session_end).getTime() : start + 2 * 60 * 60 * 1000 };
         });
 
+      // [9 Oct] The pottery as a fingerprint. Most tickets carry only a
+      // table code nobody has put on a card ("T2A"), but a ticket with a
+      // Sitting Elephant and a Sushi Server, in the same session as a table
+      // photo showing exactly those, is that table. Each booking's pieces
+      // (recognised shape, or the shortlist when unsure) are loaded once.
+      const piecesBy = new Map();
+      {
+        const codes = prepared.map((b) => b.booking_code);
+        for (let i = 0; i < codes.length; i += 200) {
+          const { data: ps } = await supabase.from('pottery_pieces')
+            .select('booking_id, square_item_id, shape_candidates')
+            .eq('studio_id', STUDIO_ID).not('archived', 'is', true)
+            .in('booking_id', codes.slice(i, i + 200));
+          for (const p of ps || []) {
+            const ids = p.square_item_id ? [p.square_item_id]
+              : (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).map((c) => c?.square_item_id).filter(Boolean);
+            if (!piecesBy.has(p.booking_id)) piecesBy.set(p.booking_id, []);
+            piecesBy.get(p.booking_id).push(ids);
+          }
+        }
+      }
+      // Can every pottery line on the ticket be pinned to a different piece
+      // in this booking's photo? Small enough to try greedily, rarest first.
+      const explains = (pottery, code) => {
+        const pieces = (piecesBy.get(code) || []).map((ids) => ({ ids, used: false }));
+        const want = [];
+        pottery.forEach((p) => { for (let q = 0; q < p.qty; q++) want.push(p.square_item_id); });
+        if (!want.length || want.length > pieces.length) return false;
+        want.sort((a, b) => pieces.filter((x) => x.ids.includes(a)).length - pieces.filter((x) => x.ids.includes(b)).length);
+        for (const sid of want) {
+          const pc = pieces.filter((x) => !x.used && x.ids.includes(sid))
+            .sort((x, y) => x.ids.length - y.ids.length)[0];
+          if (!pc) return false;
+          pc.used = true;
+        }
+        return true;
+      };
+
       // A ticket opened up to an hour before or ninety minutes after the
       // session belongs to it. Time only ever ranks; a match needs a name or
       // the table on the card.
@@ -6804,6 +6842,12 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
           scored.push({ b, score, gap: Math.abs(created - b.start), basis: basis.join(' + ') });
         }
         scored.sort((p, q) => (q.score - p.score) || (p.gap - q.gap));
+        // Nothing by name or table: try the pottery against the table photos
+        // of every booking in that session. Exactly one must fit.
+        if (!scored.length && x.pottery.length) {
+          const fits = prepared.filter((b) => created >= b.start - EARLY && created <= b.end + LATE && explains(x.pottery, b.booking_code));
+          if (fits.length === 1) scored.push({ b: fits[0], score: 9, gap: 0, basis: 'pottery matches photo' });
+        }
         // Two bookings equally good is a guess, so it waits for a person.
         if (!scored.length || (scored[1] && scored[1].score === scored[0].score)) {
           unmatched.push(x);
