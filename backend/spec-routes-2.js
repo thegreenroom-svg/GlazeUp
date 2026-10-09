@@ -1599,8 +1599,12 @@ export function registerAiCostRoute(app, supabase, STUDIO_ID, logger) {
 export function registerRecentPhotosRoute(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/photos/recent', async (req, res) => {
     try {
+      // [9 Oct] The stamp is used exactly as given. Rounding it through a JS
+      // Date cut the microseconds off ("...01.429751" became "...01.429"),
+      // so the photo the screen had just said "Got it" to was still newer
+      // than the cut-off and Layla Batstone's photo kept coming back.
       const since = req.query.since && !Number.isNaN(Date.parse(req.query.since))
-        ? new Date(req.query.since).toISOString()
+        ? String(req.query.since)
         : new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase.from('backfill_photos')
         .select('id, status, tag_name, booking_code, pieces_created, error_message, created_at, processed_at')
