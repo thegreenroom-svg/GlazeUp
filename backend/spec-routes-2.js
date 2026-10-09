@@ -1,5 +1,6 @@
 import multer from 'multer';
 import { returnsWaitingFor } from './returns-match.js';
+import { photoTakenAt } from './photo-time.js';
 // ============================================================================
 // SPEC ROUTES PART 2 — COMMERCIAL + CUSTOMER-FACING
 // ----------------------------------------------------------------------------
@@ -5938,7 +5939,7 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
       const ids = new Set();
       pieces.forEach((p) => {
         if (p.square_item_id) ids.add(p.square_item_id);
-        (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 3).forEach((c) => c?.square_item_id && ids.add(c.square_item_id));
+        (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 4).forEach((c) => c?.square_item_id && ids.add(c.square_item_id));
       });
       const shapes = {};
       if (ids.size) {
@@ -5958,12 +5959,24 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
       pieces.forEach((p) => {
         p.shape = p.square_item_id ? shapeOf(p.square_item_id) : null;
         p.options = !p.shape
-          ? (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 3).map((c) => shapeOf(c?.square_item_id, c?.name)).filter(Boolean)
+          ? (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 4).map((c) => shapeOf(c?.square_item_id, c?.name)).filter(Boolean)
           : [];
         if (p.shape?.price_cents) { total += p.shape.price_min_cents || p.shape.price_cents; priced++; } else unsure++;
         delete p.shape_candidates;
       });
-      const pricing = { total_cents: total, priced, unsure };
+      // [9 Oct] Price gaps. A piece still to check counts at the cheapest to
+      // dearest of its options, so the card gives a range rather than
+      // leaving it out. A shape priced at the till (variable pricing in
+      // Square, like the Round Hammered Pumpkin) is said so, not left blank.
+      let low = 0, high = 0, atTill = 0;
+      pieces.forEach((p) => {
+        if (p.archived) return;
+        if (p.shape?.price_cents) { low += p.shape.price_min_cents || p.shape.price_cents; high += p.shape.price_cents; return; }
+        if (p.shape) { atTill++; return; }
+        const ps = (p.options || []).map((o) => o.price_cents).filter((x) => x > 0);
+        if (ps.length) { low += Math.min(...ps); high += Math.max(...ps); }
+      });
+      const pricing = { total_cents: total, priced, unsure, low_cents: low, high_cents: high, at_till: atTill };
 
       // [9 Oct] The till's side. What was rung up for this booking, and
       // where it and the table photo disagree: pottery on the bill with no
@@ -9753,7 +9766,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // Stored as JPEG. iPads shoot HEIC; the Shortcut converts, but if
       // one slips through, try here before giving up.
       if (!(buf[0] === 0xff && buf[1] === 0xd8)) {
-        try { buf = await sharp(buf).rotate().jpeg({ quality: 88 }).toBuffer(); }
+        try { buf = await sharp(buf).rotate().withMetadata().jpeg({ quality: 88 }).toBuffer(); }
         catch { return res.status(415).json({ error: 'Not a JPEG and could not be converted. Add "Convert Image to JPEG" before sending in the Shortcut.' }); }
       }
 
@@ -9762,8 +9775,12 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
         .eq('studio_id', STUDIO_ID).eq('content_hash', hash).maybeSingle();
       if (seen) return res.json({ ok: true, duplicate: true, status: seen.status });
 
+      // [9 Oct] The real time the photo was taken: the camera's own stamp
+      // inside the photo, else the Shortcut's date text, else now. Before
+      // this every photo carried its upload time. See photo-time.js.
       const takenRaw = String(req.body?.taken_at || '').trim();
-      const taken = takenRaw && !isNaN(Date.parse(takenRaw)) ? new Date(takenRaw) : new Date();
+      const { at: taken, from: takenFrom } = photoTakenAt(buf, takenRaw);
+      if (takenFrom === 'upload') logger.info('[ipad-ingest] no usable taken time', JSON.stringify(takenRaw).slice(0, 80));
       const day = taken.toLocaleDateString('en-CA', { timeZone: 'Europe/London' }); // YYYY-MM-DD
       const filename = `ipad/${day}/${hash.slice(0, 16)}.jpg`;
       const storage_path = `backfill/${STUDIO_ID}/${filename}`;
@@ -9950,7 +9967,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             description: pc.description,
             status: 'queued',
             reference_photo_url: urlData.publicUrl,
-            reference_photo_taken_at: new Date().toISOString(),
+            reference_photo_taken_at: row.taken_at || new Date().toISOString(),
             photo_box: boxFromGemini(pc.box_2d) || pc.box || null,
             photo_taken_by: 'backfill',
             parts: Math.max(1, Math.min(4, parseInt(pc.parts, 10) || 1)),
@@ -10133,7 +10150,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             description: pc.description,
             status: 'queued',
             reference_photo_url: urlData.publicUrl,
-            reference_photo_taken_at: new Date().toISOString(),
+            reference_photo_taken_at: row.taken_at || new Date().toISOString(),
             photo_box: boxFromGemini(pc.box_2d) || null,
             photo_taken_by: 'backfill',
             parts: Math.max(1, Math.min(4, parseInt(pc.parts, 10) || 1)),
@@ -10841,9 +10858,9 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     // newest one is shown next to the stock photo. The more tables that get
     // confirmed, the better the comparison gets -- sizes especially.
     const examples = new Map();
-    try {
-      const want = [...new Set(todo.flatMap((c) => (shortlist.get(c.key) || []).map((s) => s.square_item_id)))];
-      const skip = new Set(crops.map((c) => c.key));
+    const skip = new Set(crops.map((c) => c.key));
+    const loadExamples = async (todo, shortlist) => { try {
+      const want = [...new Set(todo.flatMap((c) => (shortlist.get(c.key) || []).map((s) => s.square_item_id)))].filter((id) => !examples.has(id));
       for (let i = 0; i < want.length; i += 100) {
         const { data: ex } = await supabase.from('pottery_pieces')
           .select('id, square_item_id, reference_photo_url, photo_box')
@@ -10853,7 +10870,7 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
           .order('updated_at', { ascending: false }).limit(300);
         for (const e of ex || []) if (!skip.has(e.id) && !examples.has(e.square_item_id)) examples.set(e.square_item_id, e);
       }
-    } catch (e) { logger.warn('[shapes] examples unavailable', e.message); }
+    } catch (e) { logger.warn('[shapes] examples unavailable', e.message); } };
     const exampleImg = new Map();
     const exampleFor = async (sid) => {
       const e = examples.get(sid);
@@ -10864,6 +10881,8 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       }
       return exampleImg.get(e.id);
     };
+    const compare = async (todo, shortlist) => {
+    await loadExamples(todo, shortlist);
     for (let i = 0; i < todo.length; i += 4) {
       const batch = todo.slice(i, i + 4);
       const in2 = [{
@@ -10919,6 +10938,51 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
         results.set(c.key, { chosen, confidence: chosen ? r.confidence : 'none' });
       }
     }
+    };
+    await compare(todo, shortlist);
+
+    // [9 Oct] SECOND LOOK. When none of the first four was right, the
+    // shortlist was usually wrong rather than the piece being unknown --
+    // Toby's two mugs were only offered tumblers. Try again with the
+    // shapes whose name or category says what the piece is (a mug against
+    // the mugs), leaving out the ones already ruled out. Only the misses
+    // pay for this.
+    const nouns = (t) => String(t || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length > 2).map((w) => w.replace(/(es|s)$/, ''));
+    const firstGo = new Map(results);
+    const missed = crops.filter((c) => { const r = results.get(c.key); return !r?.chosen || r.confidence === 'low'; });
+    const second = new Map();
+    for (const c of missed) {
+      const kind = nouns(c.piece_type);
+      if (!kind.length) continue;
+      const tried = new Set((shortlist.get(c.key) || []).map((s) => s.square_item_id));
+      const desc = new Set(nouns(c.description));
+      const alts = shapes
+        .filter((s) => !tried.has(s.square_item_id))
+        .map((s) => {
+          const words = new Set(nouns(`${s.name} ${catLabel(s.category)}`));
+          const hit = kind.some((k) => words.has(k));
+          const extra = [...desc].filter((w) => words.has(w)).length;
+          return { s, score: hit ? 10 + extra + (examples.has(s.square_item_id) ? 1 : 0) : 0 };
+        })
+        .filter((x) => x.score > 0)
+        .sort((x, y) => y.score - x.score)
+        .slice(0, 4)
+        .map((x) => x.s);
+      if (alts.length) second.set(c.key, alts);
+    }
+    if (second.size) {
+      const before = new Map([...second.keys()].map((k) => [k, shortlist.get(k) || []]));
+      await compare(missed.filter((c) => second.has(c.key)), second);
+      // A second look that found nothing better keeps the first answer.
+      const rank = { high: 3, medium: 2, low: 1 };
+      for (const k of second.keys()) {
+        const a = firstGo.get(k), b2 = results.get(k);
+        if (a?.chosen && (!b2?.chosen || (rank[b2.confidence] || 0) <= (rank[a.confidence] || 0))) results.set(k, a);
+      }
+      // Keep both lists as the options to tap, the second look's first.
+      for (const [k, alts] of second) shortlist.set(k, [...alts, ...before.get(k)].slice(0, 6));
+    }
+
     for (const c of crops) {
       const cands = shortlist.get(c.key) || [];
       const r = results.get(c.key) || { chosen: null, confidence: cands.length ? 'unsure' : 'none' };

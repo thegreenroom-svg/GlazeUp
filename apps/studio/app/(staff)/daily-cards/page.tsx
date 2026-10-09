@@ -36,12 +36,19 @@ type NextStep = 'arrived' | 'photo' | 'handover' | null;
 // fallbackDate is the date the card itself prints as "Ready", used when
 // the booking has none of its own saved.
 function cardStatus(
-  b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[] },
+  b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[]; is_wheel?: boolean; session_start?: string; session_end?: string | null; status?: string | null },
   fallbackDate?: string | null
 ): { label: string; colour: string; next: NextStep; hint?: string } {
   const today = new Date().toLocaleDateString('en-CA');
   if (b.collected_at) return { label: 'Collected', colour: '#3d7a4a', next: null, hint: 'All done.' };
   const photos = b.photo_count || 0;
+  if (b.status === 'no_show' && !photos) return { label: 'No show', colour: '#8a8178', next: null, hint: 'Marked as a no-show in Square.' };
+  // [9 Oct] Wheel hire and throwing: nothing painted on a table, so no
+  // table photo to wait for.
+  if (b.is_wheel && !photos && !b.finished_at) {
+    if (b.arrived_at) return { label: 'On the wheel', colour: '#6a5a8a', next: null, hint: 'Wheel session. No table photo needed.' };
+    return { label: 'Wheel booked', colour: '#8a8178', next: 'arrived' };
+  }
   if (b.finished_at || photos > 0) {
     // Every piece is coming back to finish: nothing to fire, nothing to hand over.
     if (photos > 0 && (b.returns_waiting?.length || 0) >= photos) {
@@ -56,8 +63,27 @@ function cardStatus(
         : 'Next: the kiln. Back here to hand over once it is ready.',
     };
   }
+  // [9 Oct] The session is over and there is still no photo: the one
+  // status that needs chasing, so it is red.
+  const end = b.session_end ? new Date(b.session_end).getTime() : b.session_start ? new Date(b.session_start).getTime() + 2 * 3600000 : 0;
+  if (end && end < Date.now()) {
+    return { label: 'No photo yet', colour: '#b03a2e', next: 'photo', hint: b.arrived_at ? undefined : 'Session over. If they came, photograph the table; the iPad photos may still be on the way.' };
+  }
   if (b.arrived_at) return { label: 'Painting', colour: 'var(--clay)', next: 'photo' };
   return { label: 'Booked', colour: '#8a8178', next: 'arrived' };
+}
+
+// [9 Oct] Which room, in a word, from the Square service name.
+function roomOf(space?: string | null): string | null {
+  const s = space || '';
+  if (/wheel|throwing/i.test(s)) return 'Wheel';
+  if (/lounge/i.test(s)) return 'Lounge';
+  if (/vault/i.test(s)) return 'Vault';
+  if (/party/i.test(s)) return 'Party';
+  if (/evening/i.test(s)) return 'Evening';
+  if (/thursday|take your time/i.test(s)) return 'Take your time';
+  if (/main studio/i.test(s)) return 'Main studio';
+  return null;
 }
 
 interface Booking {
@@ -73,8 +99,12 @@ interface Booking {
   party_size: number | null;
   space_name: string | null;
   notes: string | null;
+  status?: string | null;
   piece_count?: number;
   photo_count?: number;
+  pottery_cents?: number;
+  to_check?: number;
+  is_wheel?: boolean;
   visit_number?: number;
   previous_visits?: number;
   last_visit?: string | null;
@@ -140,7 +170,21 @@ export default function DailyCardsPage() {
   const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[]; booking: any; pricing?: { total_cents: number; priced: number; unsure: number } | null; till?: any } | 'loading' | 'error'>>({});
   // [9 Oct] Prices on the card. A shape with several sizes shows its range.
   const money = (c: number) => `£${(c / 100).toFixed(c % 100 ? 2 : 0)}`;
-  const priceText = (sh: any) => !sh || !sh.price_cents ? '' : (sh.price_min_cents && sh.price_min_cents < sh.price_cents ? `${money(sh.price_min_cents)}–${money(sh.price_cents)}` : money(sh.price_cents));
+  const priceText = (sh: any) => !sh || !sh.price_cents ? '' : (sh.price_min_cents && sh.price_min_cents < sh.price_cents ? `${money(sh.price_min_cents)} to ${money(sh.price_cents)}` : money(sh.price_cents));
+  const rangeText = (lo: number, hi: number) => (lo === hi ? money(lo) : `${money(lo)} to ${money(hi)}`);
+  // Low and high for a whole table: a priced shape at its size range, a
+  // piece still to check at its cheapest to dearest option.
+  const tableRange = (pieces: any[]) => {
+    let lo = 0, hi = 0, atTill = 0, check = 0;
+    pieces.forEach((p: any) => {
+      if (p.shape?.price_cents) { lo += p.shape.price_min_cents || p.shape.price_cents; hi += p.shape.price_cents; return; }
+      if (p.shape) { atTill++; return; }
+      check++;
+      const ps = (p.options || []).map((o: any) => o.price_cents).filter((x: number) => x > 0);
+      if (ps.length) { lo += Math.min(...ps); hi += Math.max(...ps); }
+    });
+    return { lo, hi, atTill, check };
+  };
   // Tapping one of the options confirms it, the same as the Recognition
   // page does, and the card updates straight away.
   const confirmShape = async (code: string, pieceId: string, shape: any | null) => {
@@ -569,7 +613,7 @@ export default function DailyCardsPage() {
   const isToday = cardDate === new Date().toLocaleDateString('en-CA');
   const isEarlierDone = (b: Booking) => {
     const end = b.session_end ? new Date(b.session_end).getTime() : new Date(b.session_start).getTime() + 2 * 3600000;
-    return end < Date.now() && (!!b.finished_at || !!b.collected_at || (b.photo_count || 0) > 0);
+    return end < Date.now() && (!!b.finished_at || !!b.collected_at || (b.photo_count || 0) > 0 || !!b.is_wheel);
   };
 
   const sessionFiltered = useMemo(() => {
@@ -993,6 +1037,28 @@ export default function DailyCardsPage() {
               onClick={() => toggleSelect(b.booking_code)}
             >
               {isNew && <p style={{ fontSize: 'var(--text-xs)', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
+              {/* [9 Oct] Daisy: "just want to see actual tickets and
+                  photographed". Where the booking stands, in one band
+                  across the top: the status, the pieces and what they
+                  come to, and the room. Screen only. */}
+              {(() => {
+                const st = cardStatus(b, collectDate);
+                const photos = b.photo_count || 0;
+                const bits: string[] = [];
+                if (photos) bits.push(`${photos} piece${photos === 1 ? '' : 's'}`);
+                if (b.pottery_cents) bits.push(`${b.to_check ? 'from ' : ''}${money(b.pottery_cents)}`);
+                if (b.to_check) bits.push(`${b.to_check} to check`);
+                const room = roomOf(b.space_name);
+                return (
+                  <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.8rem', background: st.colour, color: 'white', textAlign: 'left' }}>
+                    <span style={{ fontWeight: 800, fontSize: 'var(--text-sm)', letterSpacing: '.03em', textTransform: 'uppercase' }}>
+                      {st.label}
+                      {bits.length > 0 && <span style={{ fontWeight: 600, textTransform: 'none', letterSpacing: 0, opacity: .92 }}> · {bits.join(' · ')}</span>}
+                    </span>
+                    {room && <span style={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: 999, background: 'rgba(255,255,255,.22)' }}>{room}</span>}
+                  </div>
+                );
+              })()}
               {(() => {
                 const d = new Date(b.session_start);
                 const longDate = (x: Date) =>
@@ -1269,10 +1335,7 @@ export default function DailyCardsPage() {
                   const st = cardStatus(b, collectDate);
                   return (
                     <div style={{ marginTop: '0.8rem' }}>
-                      <span style={{ display: 'inline-block', padding: '0.2rem 0.65rem', borderRadius: 999, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'white', background: st.colour }}>
-                        {st.label}
-                      </span>
-                      {!st.next && st.hint && (
+                      {st.hint && (
                         <p style={{ marginTop: '0.45rem', fontSize: 'var(--text-sm)', color: '#6b625a', lineHeight: 1.35 }}>{st.hint}</p>
                       )}
                       {/* The undo for this card's last step, for as long as it stands. */}
@@ -1378,11 +1441,17 @@ export default function DailyCardsPage() {
                               {p.shape ? (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                                   <span style={{ color: 'var(--charcoal)' }}>{k + 1}. {p.shape.name}</span>
-                                  <span style={{ fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{priceText(p.shape) || 'no price'}</span>
+                                  <span style={{ fontWeight: priceText(p.shape) ? 700 : 500, color: priceText(p.shape) ? 'var(--charcoal)' : 'var(--stone)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{priceText(p.shape) || 'priced at the till'}</span>
                                 </div>
                               ) : (
                                 <div>
-                                  <span style={{ color: 'var(--stone)' }}>{k + 1}. {p.piece_type || 'Piece'}: {p.options?.length ? 'which is it?' : 'not recognised'}</span>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                                    <span style={{ color: 'var(--stone)' }}>{k + 1}. {p.piece_type || 'Piece'}: {p.options?.length ? 'which is it? Tap one' : 'not recognised'}</span>
+                                    {(() => {
+                                      const ps = (p.options || []).map((o: any) => o.price_cents).filter((x: number) => x > 0);
+                                      return ps.length ? <span style={{ color: 'var(--stone)', fontWeight: 600, whiteSpace: 'nowrap' }}>{rangeText(Math.min(...ps), Math.max(...ps))}</span> : null;
+                                    })()}
+                                  </div>
                                   {p.options?.length > 0 && (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.3rem' }}>
                                       {p.options.map((o: any) => (
@@ -1400,12 +1469,17 @@ export default function DailyCardsPage() {
                               )}
                             </div>
                           ))}
-                          {tp.pricing && tp.pricing.priced > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--sand, #e8dccb)', marginTop: '0.4rem', paddingTop: '0.5rem', fontWeight: 700, color: 'var(--charcoal)' }}>
-                              <span>Pottery{tp.pricing.unsure ? ` (${tp.pricing.unsure} still to check)` : ''}</span>
-                              <span>{tp.pieces.some((p: any) => p.shape?.price_min_cents && p.shape.price_min_cents < p.shape.price_cents) ? 'from ' : ''}{money(tp.pricing.total_cents)}</span>
-                            </div>
-                          )}
+                          {(() => {
+                            const r = tableRange(tp.pieces);
+                            if (!r.hi) return null;
+                            const notes = [r.check ? `${r.check} to check` : '', r.atTill ? `${r.atTill} priced at the till` : ''].filter(Boolean).join(', ');
+                            return (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--sand, #e8dccb)', marginTop: '0.4rem', paddingTop: '0.5rem', fontWeight: 700, color: 'var(--charcoal)' }}>
+                                <span>Pottery{notes ? <span style={{ fontWeight: 500, color: 'var(--stone)' }}> ({notes})</span> : null}</span>
+                                <span>{r.atTill ? 'from ' : ''}{rangeText(r.lo, r.hi)}</span>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                       {SHOW_TILL && tp.till && (

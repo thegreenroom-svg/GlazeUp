@@ -219,14 +219,26 @@ app.get('/api/demo/bookings', async (req, res) => {
     if (codes.length) {
       const { data: pieceRows } = await supabase
         .from('pottery_pieces')
-        .select('booking_id, reference_photo_url')
+        .select('booking_id, reference_photo_url, square_item_id')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', codes)
         .neq('archived', true);
+      // [9 Oct] The card's status line says what the pottery comes to, so
+      // the price is visible without opening every card.
+      const sids = [...new Set((pieceRows || []).map((p) => p.square_item_id).filter(Boolean))];
+      const priceOf = {};
+      for (let i = 0; i < sids.length; i += 200) {
+        const { data: cat } = await supabase.from('piece_catalogue').select('square_item_id, price_cents, price_min_cents')
+          .eq('studio_id', DEMO_STUDIO_ID).in('square_item_id', sids.slice(i, i + 200));
+        (cat || []).forEach((c) => { priceOf[c.square_item_id] = c.price_min_cents || c.price_cents || 0; });
+      }
       (pieceRows || []).forEach((p) => {
-        if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0 };
-        pieceCounts[p.booking_id].pieces++;
-        if (p.reference_photo_url) pieceCounts[p.booking_id].with_photo++;
+        if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0, cents: 0, to_check: 0 };
+        const pc = pieceCounts[p.booking_id];
+        pc.pieces++;
+        if (p.reference_photo_url) pc.with_photo++;
+        if (p.square_item_id && priceOf[p.square_item_id]) pc.cents += priceOf[p.square_item_id];
+        else if (!p.square_item_id) pc.to_check++;
       });
     }
 
@@ -293,6 +305,11 @@ app.get('/api/demo/bookings', async (req, res) => {
       })(),
       piece_count: pieceCounts[b.booking_code]?.pieces || 0,
       photo_count: pieceCounts[b.booking_code]?.with_photo || 0,
+      pottery_cents: pieceCounts[b.booking_code]?.cents || 0,
+      to_check: pieceCounts[b.booking_code]?.to_check || 0,
+      // [9 Oct] Wheel hire and throwing sessions: no painted table, so no
+      // table photo to wait for.
+      is_wheel: /wheel|throwing/i.test(b.space_name || ''),
       // [9 Oct] Daisy: the girls always know who is coming back to finish
       // a piece, because it is in the booking notes ("coming to finish some
       // pottery that we started in July", "1 to continue a previous
