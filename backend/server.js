@@ -175,6 +175,8 @@ app.get('/api/demo/bookings', async (req, res) => {
       .from('bookings')
       .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at')
       .eq('studio_id', DEMO_STUDIO_ID)
+      // Cancelled in Square: not a card. (No-shows stay, so the day reads true.)
+      .or('status.is.null,status.neq.cancelled')
       .order('session_start', { ascending: false })
       .limit(250);
     if (error) throw error;

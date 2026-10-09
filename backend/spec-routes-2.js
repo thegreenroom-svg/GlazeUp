@@ -3504,7 +3504,7 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
         .from('bookings')
         // session_start too, or the reschedule comparison below reads
         // undefined on every row and rewrites the whole diary each run.
-        .select('square_booking_id, session_start, notes')
+        .select('square_booking_id, session_start, notes, status')
         .eq('studio_id', STUDIO_ID)
         .not('square_booking_id', 'is', null);
       const existingIds = new Set((existing || []).map((b) => b.square_booking_id));
@@ -3531,6 +3531,7 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
       // bookings had stopped copying them at all -- the last note GlazeUp
       // held was from 27 August. Both Square notes, the customer's and the
       // staff's, are kept on the booking and refreshed when they change.
+      const statusFrom = (sq) => (/^CANCELLED|^DECLINED/.test(sq || '') ? 'cancelled' : sq === 'NO_SHOW' ? 'no_show' : 'active');
       const squareNotes = (b) => {
         const parts = [];
         if (b.customer_note && b.customer_note.trim()) parts.push(b.customer_note.trim());
@@ -3541,8 +3542,16 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
         const row = existingBySquareId.get(b.id);
         if (!row) continue;
         const n = squareNotes(b);
-        if (n && n !== row.notes) {
-          await supabase.from('bookings').update({ notes: n })
+        const upd = {};
+        if (n && n !== row.notes) upd.notes = n;
+        // [9 Oct] Cancellations. A booking cancelled in Square stayed
+        // "booked" here for good -- tomorrow had five cancelled bookings
+        // showing as cards, three of them test bookings. Square's status
+        // now follows across, both ways.
+        const st = statusFrom(b.status);
+        if (st !== (row.status || 'active') && (st !== 'active' || ['cancelled', 'no_show'].includes(row.status))) upd.status = st;
+        if (Object.keys(upd).length) {
+          await supabase.from('bookings').update(upd)
             .eq('studio_id', STUDIO_ID).eq('square_booking_id', b.id);
         }
       }
@@ -3665,6 +3674,7 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
             // every historic booking being wrong.
             space_name: serviceName,
             notes: squareNotes(b),
+            status: statusFrom(b.status),
             synced_from_square: new Date().toISOString(),
           });
           if (insertErr) throw insertErr;
