@@ -1048,8 +1048,12 @@ export default function DailyCardsPage() {
                 if (photos) bits.push(`${photos} piece${photos === 1 ? '' : 's'}`);
                 if (b.pottery_cents) bits.push(`${b.to_check ? 'from ' : ''}${money(b.pottery_cents)}`);
                 if (b.to_check) bits.push(`${b.to_check} to check`);
+                // [9 Oct] Fewer pieces than seats usually means a piece was
+                // missed off the photo, or is in a second photo.
+                const short = photos > 0 && !b.is_wheel && (b.party_size || 0) > photos;
                 const room = roomOf(b.space_name);
                 return (
+                  <>
                   <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.8rem', background: st.colour, color: 'white', textAlign: 'left' }}>
                     <span style={{ fontWeight: 800, fontSize: 'var(--text-sm)', letterSpacing: '.03em', textTransform: 'uppercase' }}>
                       {st.label}
@@ -1057,6 +1061,12 @@ export default function DailyCardsPage() {
                     </span>
                     {room && <span style={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: 999, background: 'rgba(255,255,255,.22)' }}>{room}</span>}
                   </div>
+                  {short && (
+                    <div className="no-print" style={{ padding: '0.3rem 0.8rem', background: '#fff4d6', color: '#8a5a00', fontSize: 'var(--text-xs)', fontWeight: 700, textAlign: 'left' }}>
+                      {photos} piece{photos === 1 ? '' : 's'} for {b.party_size} seats: check nothing was missed off the photo
+                    </div>
+                  )}
+                  </>
                 );
               })()}
               {(() => {

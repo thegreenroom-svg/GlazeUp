@@ -1,6 +1,7 @@
 import multer from 'multer';
 import { returnsWaitingFor } from './returns-match.js';
 import { photoTakenAt } from './photo-time.js';
+import { readCardQr, measure, learnSizes, sizeFit, sizeWords, cmFromName } from './table-vision.js';
 // ============================================================================
 // SPEC ROUTES PART 2 — COMMERCIAL + CUSTOMER-FACING
 // ----------------------------------------------------------------------------
@@ -6816,19 +6817,49 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
   const tillLookTried = new Map(); // piece id + till items left -> when tried
   async function reconcile(code, pottery) {
     const { data: pieces } = await supabase.from('pottery_pieces')
-      .select('id, square_item_id, shape_candidates, shape_confirmed, reference_photo_url, photo_box')
+      .select('id, square_item_id, shape_candidates, shape_confirmed, shape_confidence, reference_photo_url, photo_box, ai_square_item_id, ai_confidence')
       .eq('studio_id', STUDIO_ID).eq('booking_id', code).not('archived', 'is', true);
     const left = new Map();
     pottery.forEach((p) => left.set(p.square_item_id, (left.get(p.square_item_id) || 0) + p.qty));
     const now = new Date().toISOString();
-    const confirm = async (id, sid) => supabase.from('pottery_pieces').update({
-      square_item_id: sid, shape_confirmed: true, shape_confirmed_by: 'till', shape_confidence: 'till', shape_checked_at: now,
-    }).eq('id', id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true);
-    // Settled pieces first: they use up their own till line.
+    let settled = false;
+    const confirm = async (id, sid) => {
+      settled = true;
+      const { data: done } = await supabase.from('pottery_pieces').update({
+        square_item_id: sid, shape_confirmed: true, shape_confirmed_by: 'till', shape_confidence: 'till', shape_checked_at: now,
+      }).eq('id', id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true).select('id');
+      // Scored only when the till's own line settles it, not when a photo
+      // comparison did -- that would be the AI marking its own homework.
+      const p = (pieces || []).find((x) => x.id === id);
+      if (done?.length && p && !p._byPhoto) await recordOutcome(supabase, STUDIO_ID, p, sid, 'till');
+    };
+    // Settled pieces first: they use up their own till line. A shape that
+    // was itself picked FROM the till by photo ('till-medium', 'till-day')
+    // uses its line but is not confirmed by it -- that would be the till
+    // agreeing with a guess made from the till. It waits for a person.
+    const fromTill = (p) => p.shape_confidence === 'till-medium' || p.shape_confidence === 'till-day';
+    const offBill = [];
     for (const p of pieces || []) {
       if (p.square_item_id && (left.get(p.square_item_id) || 0) > 0) {
         left.set(p.square_item_id, left.get(p.square_item_id) - 1);
-        if (!p.shape_confirmed) await confirm(p.id, p.square_item_id);
+        if (!p.shape_confirmed && !fromTill(p)) await confirm(p.id, p.square_item_id);
+      } else if (p.square_item_id && !p.shape_confirmed && !fromTill(p) && p.ai_square_item_id) offBill.push(p);
+    }
+    // The AI's shape is not on the bill and the bill has exactly one item
+    // nobody has used: the AI was wrong, and that item is the likely
+    // answer. Scored as wrong (so "very likely" is not trusted blindly),
+    // but the shape itself is left for the photo check below or a person.
+    {
+      const spare = [...left.entries()].filter(([, n]) => n > 0);
+      if (offBill.length === 1 && spare.length === 1 && spare[0][1] === 1) {
+        try {
+          await supabase.from('shape_outcomes').upsert({
+            studio_id: STUDIO_ID, piece_id: offBill[0].id,
+            ai_square_item_id: offBill[0].ai_square_item_id, ai_confidence: offBill[0].ai_confidence || null,
+            final_square_item_id: spare[0][0], confirmed_by: 'till', correct: offBill[0].ai_square_item_id === spare[0][0],
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'piece_id', ignoreDuplicates: true });
+        } catch { /* scoring only */ }
       }
     }
     // Then unsure pieces whose options include exactly one remaining till item.
@@ -6853,28 +6884,97 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     const leftIds = [...left.entries()].filter(([, n]) => n > 0).map(([sid]) => sid).filter(Boolean);
     const unknown = (pieces || []).filter((p) => !p.square_item_id && !p.shape_confirmed && p.reference_photo_url && p.photo_box);
     const chooser = app.locals.chooseAmong;
-    if (!leftIds.length || !unknown.length || !chooser) return;
+    if (!leftIds.length || !unknown.length || !chooser) return settled;
     const sig = leftIds.slice().sort().join(',');
     const fresh = unknown.filter((p) => {
       const t = tillLookTried.get(`${p.id}|${sig}`);
       return !t || Date.now() - t > 6 * 3600000;
     });
-    if (!fresh.length) return;
+    if (!fresh.length) return settled;
     fresh.forEach((p) => tillLookTried.set(`${p.id}|${sig}`, Date.now()));
     let picks;
     try { picks = await chooser(fresh.map((p) => ({ id: p.id, url: p.reference_photo_url, box: p.photo_box })), leftIds); }
-    catch (e) { logger.warn('[till] photo look failed', e.message); return; }
+    catch (e) { logger.warn('[till] photo look failed', e.message); return settled; }
     const order = { high: 0, medium: 1 };
     const ranked = [...picks.entries()].filter(([, r]) => r.confidence in order).sort((a, b) => order[a[1].confidence] - order[b[1].confidence]);
     for (const [id, r] of ranked) {
       if ((left.get(r.square_item_id) || 0) <= 0) continue;
       left.set(r.square_item_id, left.get(r.square_item_id) - 1);
+      const p = (pieces || []).find((x) => x.id === id);
+      if (p) p._byPhoto = true;
       if (r.confidence === 'high') await confirm(id, r.square_item_id);
-      else await supabase.from('pottery_pieces').update({
-        square_item_id: r.square_item_id, shape_confidence: 'medium', shape_checked_at: now,
-      }).eq('id', id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true);
+      else {
+        settled = true;
+        await supabase.from('pottery_pieces').update({
+          square_item_id: r.square_item_id, shape_confidence: 'till-medium', shape_checked_at: now,
+        }).eq('id', id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true);
+      }
+    }
+    return settled;
+  }
+  // [9 Oct] THE WHOLE DAY AT ONCE. Booking by booking, a ticket nobody
+  // could link (a table code, no name) taught us nothing. But every piece
+  // of pottery rung through the till that day is one of that day's
+  // photographed pieces. So: add up the day's pottery from every ticket,
+  // take off what is already accounted for by a recognised or confirmed
+  // piece, and compare the day's still-unknown pieces by photo against
+  // only what is left. Each item can be used once. Clearly that shape:
+  // priced (not confirmed -- the link to a booking is a step weaker than a
+  // ticket on the booking itself). Anything less: left alone.
+  const dayTried = new Map();
+  async function dayPool(useful, prepared, since) {
+    const chooser = app.locals.chooseAmong;
+    if (!chooser) return;
+    const dayOf = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+    // The oldest day is only partly fetched (from "now minus N days"), so
+    // its pool would be missing the morning's tickets. Whole days only.
+    const firstPartial = dayOf(since);
+    const pool = new Map(); // day -> Map(id -> qty)
+    for (const x of useful) {
+      if (!x.pottery.length || !x.o.created_at) continue;
+      if (/CANCELED/i.test(x.o.state || '')) continue;
+      const d = dayOf(x.o.created_at);
+      if (d <= firstPartial) continue;
+      const m = pool.get(d) || new Map();
+      for (const p of x.pottery) m.set(p.square_item_id, (m.get(p.square_item_id) || 0) + (p.qty || 1));
+      pool.set(d, m);
+    }
+    for (const [day, left] of pool) {
+      const codes = prepared.filter((b) => dayOf(b.session_start) === day).map((b) => b.booking_code);
+      if (!codes.length) continue;
+      const { data: ps } = await supabase.from('pottery_pieces')
+        .select('id, square_item_id, shape_confirmed, reference_photo_url, photo_box')
+        .eq('studio_id', STUDIO_ID).not('archived', 'is', true).in('booking_id', codes);
+      for (const p of ps || []) {
+        if (p.square_item_id && (left.get(p.square_item_id) || 0) > 0) left.set(p.square_item_id, left.get(p.square_item_id) - 1);
+      }
+      const leftIds = [...left.entries()].filter(([, n]) => n > 0).map(([id]) => id);
+      const unknown = (ps || []).filter((p) => !p.square_item_id && !p.shape_confirmed && p.reference_photo_url && p.photo_box);
+      if (!leftIds.length || !unknown.length || leftIds.length > 16) continue;
+      const sig = `${day}|${leftIds.slice().sort().join(',')}|${unknown.map((p) => p.id).sort().join(',')}`;
+      if (dayTried.has(sig) && Date.now() - dayTried.get(sig) < 6 * 3600000) continue;
+      dayTried.set(sig, Date.now());
+      const picks = await chooser(unknown.slice(0, 10).map((p) => ({ id: p.id, url: p.reference_photo_url, box: p.photo_box })), leftIds);
+      const now = new Date().toISOString();
+      for (const [id, r] of picks) {
+        if (r.confidence !== 'high' || (left.get(r.square_item_id) || 0) <= 0) continue;
+        left.set(r.square_item_id, left.get(r.square_item_id) - 1);
+        await supabase.from('pottery_pieces').update({
+          square_item_id: r.square_item_id, shape_confidence: 'till-day', shape_checked_at: now,
+        }).eq('id', id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true).is('square_item_id', null);
+      }
     }
   }
+
+  // For recognition: settle what the till can before paying for more.
+  app.locals.reconcileTill = async (code) => {
+    try {
+      const { data: b } = await supabase.from('bookings').select('till_pottery')
+        .eq('studio_id', STUDIO_ID).eq('booking_code', code).maybeSingle();
+      const pottery = Array.isArray(b?.till_pottery) ? b.till_pottery : [];
+      return pottery.length ? await reconcile(code, pottery) : false;
+    } catch (e) { logger.warn('[till] reconcile failed', e.message); return false; }
+  };
 
   app.post('/api/spec/bookings/match-tickets', async (req, res) => {
     const dryRun = req.body?.dry_run === true;
@@ -7144,6 +7244,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
           (ml || []).forEach((l) => l.booking_code && touched.add(l.booking_code));
         }
         for (const code of touched) await rollUp(code);
+        try { await dayPool(useful, prepared, since); } catch (e) { logger.warn('[till] day pool failed', e.message); }
       }
 
       res.json({
@@ -7250,6 +7351,24 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
 // started to rely on. node --check passes either way, because calling an
 // undefined function is a RUNTIME error, not a syntax one: it would have
 // thrown on the first successful shelf match and nowhere else.
+// [9 Oct] CALIBRATION. When a person or the till settles a piece's shape,
+// the AI's earlier guess for it is scored right or wrong. Recognition reads
+// these back to decide how far to trust "very likely". One row per piece;
+// a later settlement replaces an earlier one.
+export async function recordOutcome(supabase, studioId, piece, finalId, by) {
+  try {
+    if (!piece?.id || !finalId) return;
+    await supabase.from('shape_outcomes').upsert({
+      studio_id: studioId, piece_id: piece.id,
+      ai_square_item_id: piece.ai_square_item_id || null,
+      ai_confidence: piece.ai_confidence || null,
+      final_square_item_id: finalId, confirmed_by: by || null,
+      correct: piece.ai_square_item_id ? piece.ai_square_item_id === finalId : null,
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'piece_id' });
+  } catch { /* scoring is a bonus, never a blocker */ }
+}
+
 export function boxFromGemini(box_2d) {
   if (!Array.isArray(box_2d) || box_2d.length !== 4) return null;
   const [ymin, xmin, ymax, xmax] = box_2d;
@@ -9626,6 +9745,8 @@ DESCRIPTIONS: one short line each -- colour, then form, then what distinguishes 
 
 Give a bounding box for each piece.
 
+THIRD: TWO MORE BOXES. Give a bounding box for the chalk tag itself as tag_box_2d (the whole board, edge to edge), and, if there is a printed paper card on the table (white card with the customer's name printed on it and a small square QR code in a corner), a bounding box for that card as card_box_2d. Return an empty list for either one that is not in the photo. These are used as a ruler, so box the object's real edges tightly.
+
 This photo is of a screen, so colours carry a warm cast and there is some moire banding. Judge colour against the pink paper placemat and prefer form and pattern over fine colour distinctions.`;
 
 const BACKFILL_SCHEMA = {
@@ -9650,6 +9771,8 @@ const BACKFILL_SCHEMA = {
     table: { type: 'string', description: 'Room or table from the bottom right, e.g. "T6", "T4b", "Lounge". Empty string if absent.' },
     party_size: { type: 'integer', description: 'The number after the x on the tag, e.g. 3 from "x3". 0 if absent.' },
     unpaid: { type: 'boolean', description: 'True only if the tag shows NP for not paid.' },
+    tag_box_2d: { type: 'array', items: { type: 'integer' }, description: 'Chalk tag [ymin, xmin, ymax, xmax] normalized 0-1000; empty if not visible.' },
+    card_box_2d: { type: 'array', items: { type: 'integer' }, description: 'Printed paper card [ymin, xmin, ymax, xmax] normalized 0-1000; empty if there is none.' },
   },
   // Required, deliberately. Optional plus "omit rather than guess" got
   // it omitted every single time across 39 photos.
@@ -9858,6 +9981,45 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
   // this processes only what is still pending, within a time budget, so
   // a request can never run past a proxy timeout. Call it repeatedly
   // until remaining hits zero.
+  // [9 Oct] Size of each piece against the tag or card on the same photo.
+  async function sizeFields(buf, stored) {
+    try {
+      const meta = await sharp(buf).metadata();
+      const swap = (meta.orientation || 1) >= 5;
+      const W = swap ? meta.height : meta.width, H = swap ? meta.width : meta.height;
+      const cardBox = boxFromGemini(stored?.card_box_2d), tagBox = boxFromGemini(stored?.tag_box_2d);
+      const ref = cardBox ? { kind: 'card', box: cardBox } : tagBox ? { kind: 'tag', box: tagBox } : null;
+      return (pc) => measure(boxFromGemini(pc.box_2d) || pc.box || null, ref, W, H) || {};
+    } catch { return () => ({}); }
+  }
+
+  // [9 Oct] A SECOND PHOTO OF A TABLE THAT ALREADY HAS ONE. It used to be
+  // left unmatched ("likely a second shot of the same table"), so a piece
+  // only in the second shot was lost. Now the new pieces are compared with
+  // the ones already saved and only the genuinely new ones are added.
+  async function addOnlyNew(booking, pieces, url, row, sizeOf, note) {
+    const { data: existing } = await supabase.from('pottery_pieces')
+      .select('id, reference_photo_url, photo_box, piece_type, description')
+      .eq('studio_id', STUDIO_ID).eq('booking_id', booking.booking_code).not('archived', 'is', true)
+      .not('reference_photo_url', 'is', null);
+    const same = app.locals.samePieces;
+    let keep = pieces;
+    if ((existing || []).length && same) {
+      const verdict = await same(existing, pieces.map((pc) => ({ url, box: boxFromGemini(pc.box_2d) || null, piece_type: pc.piece_type, description: pc.description })));
+      keep = pieces.filter((_, i) => !verdict.get(i));
+    }
+    if (!keep.length) return 0;
+    const { data: created } = await supabase.from('pottery_pieces').insert(keep.map((pc) => ({
+      studio_id: STUDIO_ID, booking_id: booking.booking_code,
+      piece_type: pc.piece_type || 'Piece', description: pc.description, status: 'queued',
+      reference_photo_url: url, reference_photo_taken_at: row.taken_at || new Date().toISOString(),
+      photo_box: boxFromGemini(pc.box_2d) || null, photo_taken_by: 'backfill',
+      parts: Math.max(1, Math.min(4, parseInt(pc.parts, 10) || 1)),
+      notes: note, ...sizeOf(pc),
+    }))).select('id');
+    return (created || []).length;
+  }
+
   app.post('/api/spec/backfill/run', async (req, res) => {
     const DIR = BACKFILL_DIR;
     try {
@@ -9987,6 +10149,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             continue;
           }
           const buf = await loadBackfillPhoto(row);
+          const sizeOf = await sizeFields(buf, stored);
           const fname = `backfill/${STUDIO_ID}/${row.filename}`;
           await supabase.storage.from('booking-photos').upload(fname, buf, { contentType: 'image/jpeg', upsert: true });
           const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fname);
@@ -10006,6 +10169,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             photo_taken_by: 'backfill',
             parts: Math.max(1, Math.min(4, parseInt(pc.parts, 10) || 1)),
             notes: 'Recovered from the iPad library, booking chosen by hand',
+            ...sizeOf(pc),
           }))).select('id');
 
           await supabase.from('backfill_photos').update({
@@ -10074,6 +10238,14 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           try { parsed = JSON.parse((rawText.match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { parsed = {}; }
           const pieces = (parsed.pieces || []).filter((p) => p && p.description);
           const tag = (parsed.tag_name || '').trim() || null;
+          // [9 Oct] The printed card's QR code names the booking outright.
+          // Only looked for when the read says a card is in the photo.
+          const cardBox = boxFromGemini(parsed.card_box_2d);
+          const qrCode = cardBox ? await readCardQr(sharp, buf, cardBox) : null;
+          const qrBooking = qrCode ? (allBookings || []).find((b) => b.booking_code === qrCode) || null : null;
+          if (qrCode) await supabase.from('backfill_photos').update({ qr_booking_code: qrCode }).eq('id', row.id);
+          const boxes = { tag_box_2d: parsed.tag_box_2d || [], card_box_2d: parsed.card_box_2d || [] };
+          const sizeOf = await sizeFields(buf, boxes);
 
           // [6 Sep] DECLARED HERE, not further down where it is used for
           // matching. It was below the no-match early return, which
@@ -10103,7 +10275,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             : '';
           const tagDay = (parsed.paint_date || '').trim() || takenDay;
 
-          if (!tag || !pieces.length) {
+          if ((!tag && !qrBooking) || !pieces.length) {
             await supabase.from('backfill_photos').update({
               status: 'unmatched', tag_name: tag,
               pieces_created: pieces.length,
@@ -10111,7 +10283,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
               // the cheap half, but a failed match was throwing the read
               // away -- so improving the matcher meant paying Gemini
               // again for work already done. Kept now: a re-match is free.
-              ai_result: { tag_name: tag, paint_date: tagDay, collect_date: (parsed.collect_date || '').trim(), table: (parsed.table || '').trim(), party_size: parsed.party_size || 0, unpaid: parsed.unpaid === true, pieces },
+              ai_result: { tag_name: tag, paint_date: tagDay, collect_date: (parsed.collect_date || '').trim(), table: (parsed.table || '').trim(), party_size: parsed.party_size || 0, unpaid: parsed.unpaid === true, pieces, ...boxes },
               error_message: `${!tag ? 'no name' : 'no pieces'} · pieces=${pieces.length} · keys=${Object.keys(parsed).join(',') || 'none'} · raw=${rawText.slice(0, 400).replace(/\s+/g, ' ')}`,
               processed_at: new Date().toISOString(),
             }).eq('id', row.id);
@@ -10119,7 +10291,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           }
 
           const ranked = (allBookings || [])
-            .map((b) => ({ b, sc: score(tag, b.customer_name) }))
+            .map((b) => ({ b, sc: qrBooking ? (b.booking_code === qrBooking.booking_code ? 1 : 0) : score(tag, b.customer_name) }))
             .filter((x) => x.sc >= 0.62)
             .sort((x, y) => y.sc - x.sc);
 
@@ -10138,9 +10310,31 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           // gambling someone's pottery onto the wrong name.
           // One clear candidate wins. Two still tied after the date has
           // had its say is exactly when a person should choose.
-          const win = pool.length === 1 ? pool[0].b
+          const win = (qrBooking && !taken.has(qrBooking.booking_code)) ? qrBooking
+            : pool.length === 1 ? pool[0].b
             : (pool.length > 1 && !runnerUp && pool[0].sc > pool[1].sc) ? pool[0].b
             : null;
+          // Second shot of a table already photographed: exactly one
+          // already-photographed booking is the clear match (or the QR
+          // says so). Add only the pieces not already saved.
+          // Without a QR code, only when the tag's own date picks out one
+          // booking -- otherwise a repeat customer's new visit could land
+          // on her earlier one.
+          const takenTier = qrBooking ? [qrBooking] : sameDay.map((x) => x.b);
+          const again = !win && pool.length === 0 && takenTier.length === 1 && taken.has(takenTier[0].booking_code) ? takenTier[0] : null;
+          if (again) {
+            const fname = `backfill/${STUDIO_ID}/${row.filename}`;
+            await supabase.storage.from('booking-photos').upload(fname, buf, { contentType: 'image/jpeg', upsert: true });
+            const { data: u } = supabase.storage.from('booking-photos').getPublicUrl(fname);
+            const added = await addOnlyNew(again, pieces, u.publicUrl, row, sizeOf, 'Second photo of the table: only pieces not already saved');
+            await supabase.from('backfill_photos').update({
+              status: 'done', booking_code: again.booking_code, tag_name: tag, pieces_created: added,
+              ai_result: { tag_name: tag, paint_date: tagDay, pieces, ...boxes, second_photo: true },
+              error_message: added ? null : 'Second photo of the same table, nothing new on it',
+              processed_at: new Date().toISOString(),
+            }).eq('id', row.id);
+            matched++; done++; continue;
+          }
           if (!win) {
             await supabase.from('backfill_photos').update({
               status: 'unmatched', tag_name: tag,
@@ -10153,7 +10347,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
               ai_result: {
                 tag_name: tag, paint_date: tagDay, collect_date: (parsed.collect_date || '').trim(),
                 table: (parsed.table || '').trim(), party_size: parseInt(parsed.party_size, 10) || 0,
-                unpaid: parsed.unpaid === true, pieces,
+                unpaid: parsed.unpaid === true, pieces, ...boxes,
                 candidates: ranked.slice(0, 5).map((x) => ({ booking_code: x.b.booking_code, name: x.b.customer_name, day: dayOf(x.b.session_start), score: Math.round(x.sc * 100) })),
               },
               pieces_created: pieces.length,
@@ -10188,7 +10382,8 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             photo_box: boxFromGemini(pc.box_2d) || null,
             photo_taken_by: 'backfill',
             parts: Math.max(1, Math.min(4, parseInt(pc.parts, 10) || 1)),
-            notes: 'Recovered from the iPad library, identified by the same AI step as a live capture',
+            notes: qrBooking ? 'From the iPad, booking read from the card QR code' : 'Recovered from the iPad library, identified by the same AI step as a live capture',
+            ...sizeOf(pc),
           }));
           const { data: created } = await supabase.from('pottery_pieces').insert(rows).select('id');
 
@@ -10835,14 +11030,169 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
   // every wake; it is a minute of fetching, in the background.
   setTimeout(() => { if (KEY()) catalogue().then(contactSheets).catch(() => {}); }, 20000);
 
+  // ---- [9 Oct] what the studio already knows, refreshed half-hourly -----
+  // Daisy: "Do all." Three of the improvements need the same history:
+  //  - SIZES: each shape's usual size, from pieces already confirmed and
+  //    measured against the tag or card on their photo (table-vision.js),
+  //    or a size written in the shape's name ("9.5cm").
+  //  - SELLING NOW: how often each shape was rung up or confirmed in the
+  //    last six weeks, so pumpkins outrank shapes not sold since spring.
+  //  - CALIBRATION: how often "very likely" and "clearly" were right,
+  //    from every shape a person or the till has since settled.
+  let stats = { at: 0 };
+  async function shapeStats() {
+    if (Date.now() - stats.at < 30 * 60 * 1000 && stats.sizes) return stats;
+    const out = { at: Date.now(), sizes: new Map(), selling: new Map(), calib: {} };
+    try {
+      const { data: measured } = await supabase.from('pottery_pieces')
+        .select('square_item_id, size_ref, size_rel, size_cm')
+        .eq('studio_id', STUDIO_ID).eq('shape_confirmed', true)
+        .not('square_item_id', 'is', null).not('size_rel', 'is', null)
+        .order('updated_at', { ascending: false }).limit(4000);
+      out.sizes = learnSizes(measured || []);
+      for (const c of await catalogue()) {
+        const cm = cmFromName(c.name);
+        if (!cm) continue;
+        const e = out.sizes.get(c.square_item_id) || { tag: null, cm: null, n: 0 };
+        if (!e.cm) e.cm = cm;
+        out.sizes.set(c.square_item_id, e);
+      }
+    } catch (e) { logger.warn('[shapes] sizes unavailable', e.message); }
+    try {
+      const since = new Date(Date.now() - 42 * 86400000).toISOString();
+      const { data: links } = await supabase.from('till_ticket_links').select('pottery')
+        .eq('studio_id', STUDIO_ID).gte('order_created_at', since).limit(5000);
+      for (const l of links || []) for (const p of (l.pottery || [])) {
+        if (p?.square_item_id) out.selling.set(p.square_item_id, (out.selling.get(p.square_item_id) || 0) + (p.qty || 1));
+      }
+      const { data: conf } = await supabase.from('pottery_pieces').select('square_item_id')
+        .eq('studio_id', STUDIO_ID).eq('shape_confirmed', true).not('square_item_id', 'is', null)
+        .gte('created_at', since).limit(5000);
+      for (const p of conf || []) out.selling.set(p.square_item_id, (out.selling.get(p.square_item_id) || 0) + 1);
+    } catch (e) { logger.warn('[shapes] selling unavailable', e.message); }
+    try {
+      const { data: oc } = await supabase.from('shape_outcomes').select('ai_confidence, correct')
+        .eq('studio_id', STUDIO_ID).not('ai_confidence', 'is', null)
+        .gte('created_at', new Date(Date.now() - 90 * 86400000).toISOString()).limit(5000);
+      for (const o of oc || []) {
+        const k = o.ai_confidence;
+        out.calib[k] = out.calib[k] || { n: 0, right: 0 };
+        out.calib[k].n++; if (o.correct) out.calib[k].right++;
+      }
+    } catch (e) { logger.warn('[shapes] calibration unavailable', e.message); }
+    stats = out;
+    return out;
+  }
+  // Is an answer at this confidence good enough to price the piece with?
+  // "Clearly" always is. "Very likely" is, until the record shows it is
+  // wrong more than 1 time in 5 (judged once there are 15 settled cases).
+  function trusted(confidence, st) {
+    if (confidence === 'high') return true;
+    if (confidence !== 'medium') return false;
+    const c = st?.calib?.medium;
+    if (!c || c.n < 15) return true;
+    return c.right / c.n >= 0.8;
+  }
+  const sellingTop = (st, n = 60) => new Set([...st.selling.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([id]) => id));
+  const baseName = (n) => String(n || '').toLowerCase().replace(/\d+(\.\d+)?\s*cm/g, ' ').replace(/\b(small|medium|med|large|lg|mini|big|tall|short|xl|sm|md)\b/g, ' ').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // [9 Oct] SHORTLIST BY PICTURE, FROM OUR OWN TABLES. A sheet of real
+  // customer-painted pieces, one per shape, newest confirmed example,
+  // numbered like the stock sheets. Painted pieces on our own tables look
+  // far more like the piece being matched than a white stock photo does.
+  let exSheet = { at: 0, built: [], building: null };
+  function exampleSheets(shapes) {
+    if (Date.now() - exSheet.at < 2 * 3600 * 1000 && exSheet.built.length) return exSheet.built;
+    if (!exSheet.building) {
+      exSheet.building = buildExampleSheets(shapes)
+        .then((built) => { exSheet = { at: Date.now(), built, building: null }; logger.info(`[shapes] ${built.length} painted-example sheet(s) ready`); })
+        .catch((e) => { logger.warn('[shapes] example sheets failed', e.message); exSheet.building = null; });
+    }
+    return exSheet.built;
+  }
+  async function buildExampleSheets(shapes) {
+    const index = new Map(shapes.map((s, i) => [s.square_item_id, i + 1]));
+    const { data: ex } = await supabase.from('pottery_pieces')
+      .select('square_item_id, reference_photo_url, photo_box')
+      .eq('studio_id', STUDIO_ID).eq('shape_confirmed', true)
+      .not('square_item_id', 'is', null).not('reference_photo_url', 'is', null).not('photo_box', 'is', null)
+      .order('updated_at', { ascending: false }).limit(600);
+    const pick = new Map();
+    for (const e of ex || []) if (index.has(e.square_item_id) && !pick.has(e.square_item_id)) pick.set(e.square_item_id, e);
+    const chosen = [...pick.values()].slice(0, SHEET_COLS * SHEET_ROWS * 2);
+    const photoCache = new Map();
+    const tiles = [];
+    for (const e of chosen) {
+      try {
+        if (!photoCache.has(e.reference_photo_url)) photoCache.set(e.reference_photo_url, await fetchBuf(e.reference_photo_url));
+        const t = await cropPiece(photoCache.get(e.reference_photo_url), e.photo_box, TILE);
+        tiles.push({ n: index.get(e.square_item_id), img: await sharp(t).resize(TILE, TILE, { fit: 'contain', background: { r: 255, g: 255, b: 255 } }).jpeg({ quality: 70 }).toBuffer() });
+      } catch { /* skip */ }
+      if (photoCache.size > 40) photoCache.delete(photoCache.keys().next().value);
+    }
+    const per = SHEET_COLS * SHEET_ROWS, out = [];
+    for (let i = 0; i < tiles.length; i += per) {
+      const chunk = tiles.slice(i, i + per);
+      const W = SHEET_COLS * (TILE + GAP) + GAP, H = Math.ceil(chunk.length / SHEET_COLS) * (TILE + GAP) + GAP;
+      const img = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 60, g: 60, b: 60 } } })
+        .composite(chunk.map((x, k) => ({ input: x.img, left: GAP + (k % SHEET_COLS) * (TILE + GAP), top: GAP + Math.floor(k / SHEET_COLS) * (TILE + GAP) })))
+        .jpeg({ quality: 72 }).toBuffer();
+      const map = [];
+      for (let r = 0; r * SHEET_COLS < chunk.length; r++) map.push(`row ${r + 1}: ` + chunk.slice(r * SHEET_COLS, (r + 1) * SHEET_COLS).map((x) => x.n).join(', '));
+      out.push({ img, map: map.join('; ') });
+    }
+    return out;
+  }
+
+  // [9 Oct] SAME PIECE, TWO PHOTOS. existing: saved pieces [{ id,
+  // reference_photo_url, photo_box }]; fresh: [{ url, box }]. Returns
+  // Map fresh index -> existing id when it is the same physical piece.
+  async function samePieces(existing, fresh) {
+    const out = new Map();
+    if (!KEY() || !existing.length || !fresh.length) return out;
+    const input = [{ type: 'text', text: `Two photos of the same customer's table in a pottery painting studio. SAVED pieces were cut from the first photo; NEW pieces from the second. For each NEW piece, say which SAVED piece is the very same physical object (same shape AND same painted decoration), or 0 if it is a different object not in the saved list. Two pieces that look alike but are separate objects are different. Be strict: only match when the painted decoration agrees.` }];
+    const photos = new Map();
+    const crop = async (url, box) => {
+      if (!photos.has(url)) photos.set(url, await fetchBuf(url));
+      return cropPiece(photos.get(url), box, 320);
+    };
+    const usedOld = [];
+    for (const e of existing.slice(0, 12)) {
+      try { const img = await crop(e.reference_photo_url, e.photo_box); input.push({ type: 'text', text: `SAVED ${usedOld.length + 1}:` }); input.push({ type: 'image', data: img.toString('base64'), mime_type: 'image/jpeg' }); usedOld.push(e); } catch { /* skip */ }
+    }
+    const usedNew = [];
+    for (let i = 0; i < fresh.length && i < 12; i++) {
+      try { const img = await crop(fresh[i].url, fresh[i].box); input.push({ type: 'text', text: `NEW ${usedNew.length + 1}:` }); input.push({ type: 'image', data: img.toString('base64'), mime_type: 'image/jpeg' }); usedNew.push(i); } catch { /* skip */ }
+    }
+    if (!usedOld.length || !usedNew.length) return out;
+    const r = await gemini(input, {
+      type: 'object',
+      properties: { results: { type: 'array', items: { type: 'object', properties: { new_piece: { type: 'integer' }, saved_piece: { type: 'integer' } }, required: ['new_piece', 'saved_piece'] } } },
+      required: ['results'],
+    }, 'second-photo-merge', 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
+    const claimed = new Set();
+    for (const x of r.results || []) {
+      const i = usedNew[(x.new_piece || 0) - 1];
+      const old = usedOld[(x.saved_piece || 0) - 1];
+      if (i === undefined || !old || claimed.has(old.id)) continue;
+      claimed.add(old.id);
+      out.set(i, old.id);
+    }
+    return out;
+  }
+  app.locals.samePieces = samePieces;
+
   async function matchCrops(crops) {
     const shapes = await catalogue();
+    const st = await shapeStats();
+    const hot = sellingTop(st);
     const out = new Map();
     if (!shapes.length || !crops.length) return out;
     const sheetsNow = contactSheets(shapes);
 
     // Pass 1: shortlist from names AND, once built, the stock photos.
-    const list = shapes.map((s, i) => `${i + 1}. ${s.name} (${catLabel(s.category)})`).join('\n');
+    const list = shapes.map((s, i) => `${i + 1}. ${s.name} (${catLabel(s.category)})${hot.has(s.square_item_id) ? ' [selling now]' : ''}`).join('\n');
+    const exNow = exampleSheets(shapes);
     const in1 = [{
       type: 'text',
       text: `These are painted pottery pieces from a paint-your-own pottery studio. Every piece started as a plain white bisque shape from the studio's range, listed below by number.\n\nFor each piece, pick up to FOUR shapes from the list that it could be, best first, judging by FORM only: overall silhouette, proportions, handles, spouts, lids, feet, sculpted or moulded details, and any letter or number it forms. Ignore the paint completely -- colours and painted designs are the customer's, not part of the shape.${sheetsNow.length ? `\n\nNames can be unhelpful, so STOCK PHOTO SHEETS follow the list: grids of the plain bisque shapes, 8 per row, with the shape number at each position given in words under each sheet. Look through the photos as well as the names -- a shape whose photo matches the piece belongs on the shortlist even if its name does not suggest it.` : ''}\n\nIf the piece is clearly not from this range (wheel-thrown, hand-built, or nothing listed is close), return an empty list for it rather than forcing a match.\n\nSHAPES:\n${list}`,
@@ -10851,8 +11201,17 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       in1.push({ type: 'text', text: `STOCK PHOTO SHEET ${i + 1} of ${sheetsNow.length}. Shape numbers by position -- ${sh.map}` });
       in1.push({ type: 'image', data: sh.img.toString('base64'), mime_type: 'image/jpeg' });
     });
+    // [9 Oct] Real painted examples from this studio's own tables, and a
+    // nudge toward what is selling now when two shapes fit equally.
+    in1[0].text += `\n\nShapes marked [selling now] were sold often in the last six weeks. When two shapes fit the form equally well, prefer the one selling now -- but form always comes first.`;
+    if (exNow.length) in1[0].text += `\n\nPAINTED EXAMPLE SHEETS follow the stock sheets: real customer-painted pieces from this studio's own tables, one per shape, numbered the same way. These are the closest thing to what the pieces below look like -- use them alongside the stock photos.`;
+    exNow.forEach((sh, i) => {
+      in1.push({ type: 'text', text: `PAINTED EXAMPLE SHEET ${i + 1} of ${exNow.length}. Shape numbers by position -- ${sh.map}` });
+      in1.push({ type: 'image', data: sh.img.toString('base64'), mime_type: 'image/jpeg' });
+    });
     crops.forEach((c, i) => {
-      in1.push({ type: 'text', text: `PIECE ${i + 1}: ${c.piece_type || ''}${c.description ? ' -- ' + c.description : ''}` });
+      const sz = sizeWords(c.size);
+      in1.push({ type: 'text', text: `PIECE ${i + 1}: ${c.piece_type || ''}${c.description ? ' -- ' + c.description : ''}${sz ? ` (measures ${sz})` : ''}` });
       in1.push({ type: 'image', data: c.img.toString('base64'), mime_type: 'image/jpeg' });
     });
     const s1 = await gemini(in1, {
@@ -10921,16 +11280,19 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       const batch = todo.slice(i, i + 4);
       const in2 = [{
         type: 'text',
-        text: `Each PIECE below is a painted pottery piece, shown next to up to four OPTIONS: catalogue photos of bisque shapes from the studio's range. Catalogue photos usually show the plain unpainted shape, sometimes an example paint job. Some options also have a confirmed customer-painted example of that exact shape from an earlier table -- the best guide to size and proportion, since it was photographed the same way.\n\nFor each piece, decide which option is the SAME SHAPE, judging FORM only: silhouette, proportions, handle and spout shape, lids, feet, sculpted or moulded details, letters. Ignore colours and painted designs entirely.\n\nAnswer 0 if none of the options is the same shape. Confidence: high = clearly the same moulded shape; medium = very likely but the angle or a hidden part leaves some doubt; low = a guess. Do not inflate confidence -- a wrong shape is worse than no shape.`,
+        text: `Each PIECE below is a painted pottery piece, shown next to up to four OPTIONS: catalogue photos of bisque shapes from the studio's range. Catalogue photos usually show the plain unpainted shape, sometimes an example paint job. Some options also have a confirmed customer-painted example of that exact shape from an earlier table -- the best guide to size and proportion, since it was photographed the same way.\n\nFor each piece, decide which option is the SAME SHAPE, judging FORM only: silhouette, proportions, handle and spout shape, lids, feet, sculpted or moulded details, letters. Ignore colours and painted designs entirely. Where a piece's measured size and an option's usual size are given, use them to tell sizes of the same shape apart (small against large); measurements from photos are rough, so treat a difference under about a third as agreement.\n\nAnswer 0 if none of the options is the same shape. Confidence: high = clearly the same moulded shape; medium = very likely but the angle or a hidden part leaves some doubt; low = a guess. Do not inflate confidence -- a wrong shape is worse than no shape.`,
       }];
       for (let k = 0; k < batch.length; k++) {
         const c = batch[k];
-        in2.push({ type: 'text', text: `PIECE ${k + 1}:` });
+        const psz = sizeWords(c.size);
+        in2.push({ type: 'text', text: `PIECE ${k + 1}:${psz ? ` it measures ${psz}.` : ''}` });
         in2.push({ type: 'image', data: c.img.toString('base64'), mime_type: 'image/jpeg' });
         const cands = shortlist.get(c.key);
         for (let j = 0; j < cands.length; j++) {
           const s = cands[j];
-          in2.push({ type: 'text', text: `PIECE ${k + 1}, OPTION ${j + 1}: ${s.name}` });
+          const known = st.sizes.get(s.square_item_id);
+          const ksz = known ? sizeWords(known.cm ? { size_cm: known.cm } : known.tag ? { size_ref: 'tag', size_rel: known.tag } : null) : '';
+          in2.push({ type: 'text', text: `PIECE ${k + 1}, OPTION ${j + 1}: ${s.name}${ksz ? ` (usually ${ksz})` : ''}` });
           if (s.image_url) {
             try {
               if (!imgCache.has(s.image_url)) imgCache.set(s.image_url, await small(await fetchBuf(s.image_url)));
@@ -10996,7 +11358,9 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
           const words = new Set(nouns(`${s.name} ${catLabel(s.category)}`));
           const hit = kind.some((k) => words.has(k));
           const extra = [...desc].filter((w) => words.has(w)).length;
-          return { s, score: hit ? 10 + extra + (examples.has(s.square_item_id) ? 1 : 0) : 0 };
+          if (!hit) return { s, score: 0 };
+          const fit = sizeFit(c.size, st.sizes.get(s.square_item_id));
+          return { s, score: 10 + extra + (examples.has(s.square_item_id) ? 1 : 0) + (hot.has(s.square_item_id) ? 2 : 0) + (fit === null ? 0 : fit * 3 - 1) };
         })
         .filter((x) => x.score > 0)
         .sort((x, y) => y.score - x.score)
@@ -11017,6 +11381,21 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       for (const [k, alts] of second) shortlist.set(k, [...alts, ...before.get(k)].slice(0, 6));
     }
 
+    // [9 Oct] THE RULER. Same shape in two sizes on the shortlist, and the
+    // measurement clearly says the other size: take the other size.
+    for (const c of crops) {
+      const r = results.get(c.key);
+      if (!r?.chosen || !c.size) continue;
+      const fitNow = sizeFit(c.size, st.sizes.get(r.chosen.square_item_id));
+      if (fitNow === null || fitNow >= 0.4) continue;
+      const fam = baseName(r.chosen.name);
+      const better = (shortlist.get(c.key) || [])
+        .filter((s) => s.square_item_id !== r.chosen.square_item_id && baseName(s.name) === fam)
+        .map((s) => ({ s, fit: sizeFit(c.size, st.sizes.get(s.square_item_id)) }))
+        .filter((x) => x.fit !== null && x.fit >= 0.7)
+        .sort((a, b) => b.fit - a.fit)[0];
+      if (better) results.set(c.key, { chosen: better.s, confidence: r.confidence === 'high' ? 'medium' : r.confidence, by_size: true });
+    }
     for (const c of crops) {
       const cands = shortlist.get(c.key) || [];
       const r = results.get(c.key) || { chosen: null, confidence: cands.length ? 'unsure' : 'none' };
@@ -11032,7 +11411,7 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     const photo = await fetchBuf(url);
     const crops = [];
     for (const p of pieces) {
-      try { crops.push({ p, key: p.id, img: await cropPiece(photo, p.photo_box), piece_type: p.piece_type, description: p.description }); }
+      try { crops.push({ p, key: p.id, img: await cropPiece(photo, p.photo_box), piece_type: p.piece_type, description: p.description, size: p.size_rel ? { size_ref: p.size_ref, size_rel: Number(p.size_rel), size_cm: p.size_cm ? Number(p.size_cm) : null } : null }); }
       catch (e) { logger.warn('[shapes] crop failed', p.id, e.message); }
     }
     if (!crops.length) return { skipped: 'no crops' };
@@ -11040,15 +11419,21 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
 
     // Save. Never touch anything a person has confirmed.
     const now = new Date().toISOString();
+    const st = await shapeStats();
     let matched = 0;
     for (const c of crops) {
       const m = matched_.get(c.p.id) || { shortlist: [], chosen: null, confidence: 'none' };
       const cands = m.shortlist;
       const r = m;
-      const keep = r.chosen && (r.confidence === 'high' || r.confidence === 'medium');
+      // [9 Oct] Calibrated: "very likely" only prices a piece while it has
+      // been right at least 4 times in 5. Either way the guess is kept, so
+      // it can be scored when a person or the till settles the piece.
+      const keep = r.chosen && trusted(r.confidence, st);
       if (keep) matched++;
       await supabase.from('pottery_pieces').update({
         square_item_id: keep ? r.chosen.square_item_id : null,
+        ai_square_item_id: r.chosen ? r.chosen.square_item_id : null,
+        ai_confidence: r.chosen ? r.confidence : null,
         shape_confidence: r.confidence,
         shape_candidates: cands.map((s) => ({ square_item_id: s.square_item_id, name: s.name })),
         shape_checked_at: now,
@@ -11068,7 +11453,7 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
   async function sweep({ photos = 3, booking_code = null } = {}) {
     if (!KEY()) return { error: 'GEMINI_API_KEY not configured' };
     let q = supabase.from('pottery_pieces')
-      .select('id, piece_type, description, reference_photo_url, photo_box, booking_id')
+      .select('id, piece_type, description, reference_photo_url, photo_box, booking_id, size_ref, size_rel, size_cm, square_item_id')
       .eq('studio_id', STUDIO_ID)
       .not('reference_photo_url', 'is', null)
       .not('archived', 'is', true)
@@ -11082,8 +11467,28 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       groups.get(p.reference_photo_url).push(p);
     }
     const out = { photos: 0, pieces: 0, matched: 0, errors: [] };
-    for (const [url, ps] of [...groups.entries()].slice(0, booking_code ? 20 : photos)) {
+    for (const [url, psAll] of [...groups.entries()].slice(0, booking_code ? 20 : photos)) {
       try {
+        // [9 Oct] CHEAPEST CHECK FIRST. If the till has already been
+        // matched to this booking, compare against just what was rung up
+        // (one small AI call) before the full recognition (two big ones).
+        let ps = psAll;
+        const tillCheck = app.locals.reconcileTill;
+        if (tillCheck && !booking_code) {
+          const codes = [...new Set(psAll.map((p) => p.booking_id))];
+          let settledAny = false;
+          for (const code of codes) settledAny = (await tillCheck(code)) || settledAny;
+          if (settledAny) {
+            const { data: still } = await supabase.from('pottery_pieces').select('id, square_item_id, shape_confirmed')
+              .in('id', psAll.map((p) => p.id));
+            if (!still) throw new Error('could not re-read pieces after the till check');
+            const open = new Set(still.filter((x) => !x.square_item_id && !x.shape_confirmed).map((x) => x.id));
+            const closed = psAll.filter((p) => !open.has(p.id)).map((p) => p.id);
+            if (closed.length) await supabase.from('pottery_pieces').update({ shape_checked_at: new Date().toISOString() }).in('id', closed).is('shape_checked_at', null);
+            ps = psAll.filter((p) => open.has(p.id));
+          }
+        }
+        if (!ps.length) { out.photos++; continue; }
         const r = await recognisePhoto(url, ps);
         out.photos++; out.pieces += r.pieces || 0; out.matched += r.matched || 0;
       } catch (e) {
@@ -11092,7 +11497,7 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
         // A photo that will not load is marked so the sweep moves on.
         if (e.response?.status === 404 || /extract_area|unsupported image/i.test(e.message)) {
           await supabase.from('pottery_pieces').update({ shape_checked_at: new Date().toISOString(), shape_confidence: 'no_photo' })
-            .in('id', ps.map((p) => p.id));
+            .in('id', psAll.map((p) => p.id));
         }
       }
     }
@@ -11269,8 +11674,9 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
         shape_confidence: sid ? 'confirmed' : 'none',
         shape_checked_at: new Date().toISOString(),
       }).eq('id', req.params.id).eq('studio_id', STUDIO_ID)
-        .select('id, square_item_id, shape_confirmed').single();
+        .select('id, square_item_id, shape_confirmed, ai_square_item_id, ai_confidence').single();
       if (error) throw error;
+      if (sid) await recordOutcome(supabase, STUDIO_ID, data, sid, req.body?.confirmed_by || 'staff');
       res.json(data);
     } catch (err) {
       res.status(500).json({ error: err.message });
