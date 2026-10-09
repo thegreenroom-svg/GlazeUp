@@ -1171,12 +1171,21 @@ export default function DailyCardsPage() {
                 const room = b.is_wheel ? 'Wheel' : roomOf(b.space_name);
                 return (
                   <>
-                  <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.8rem', background: st.colour, color: 'white', textAlign: 'left' }}>
+                  <div
+                    className="no-print"
+                    // [9 Oct] Daisy: "press again to close?" In the list, the
+                    // band at the top of an open card folds it back to its row.
+                    onClick={listView && view === 'painting' ? (e) => { e.stopPropagation(); openCard(b.booking_code); } : undefined}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.8rem', background: st.colour, color: 'white', textAlign: 'left', cursor: listView && view === 'painting' ? 'pointer' : undefined }}
+                  >
                     <span style={{ fontWeight: 800, fontSize: 'var(--text-sm)', letterSpacing: '.03em', textTransform: 'uppercase' }}>
                       {st.label}
                       {bits.length > 0 && <span style={{ fontWeight: 600, textTransform: 'none', letterSpacing: 0, opacity: .92 }}> · {bits.join(' · ')}</span>}
                     </span>
-                    {room && <span style={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: 999, background: 'rgba(255,255,255,.22)' }}>{room}</span>}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                      {room && <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: 999, background: 'rgba(255,255,255,.22)' }}>{room}</span>}
+                      {listView && view === 'painting' && <ChevronUp size={16} aria-label="Close" />}
+                    </span>
                   </div>
                   {short && (
                     <div className="no-print" style={{ padding: '0.3rem 0.8rem', background: '#fff4d6', color: '#8a5a00', fontSize: 'var(--text-xs)', fontWeight: 700, textAlign: 'left' }}>
