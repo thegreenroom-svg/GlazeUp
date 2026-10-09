@@ -52,7 +52,7 @@ export function registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sha
       return norm(v);
     };
     let text = null;
-    if (m.kind === 'clip') {
+    if (m.kind === 'clip' && m.withText) {
       const tok = await T.AutoTokenizer.from_pretrained(m.id);
       const tm = await T.CLIPTextModelWithProjection.from_pretrained(m.id, { dtype });
       text = async (strings) => {
@@ -84,6 +84,11 @@ export function registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sha
       logger.info(`[vision-test] ${s}`);
       await supabase.from('vision_test_runs').update({ log: log.join('\n') }).eq('id', runId);
     };
+    // First run (9 Oct, 18:46): memory reached 511MB just cutting out the
+    // pieces, and the server restarted while the model loaded. Keep image
+    // handling lean: no image cache, one at a time.
+    sharp.cache(false);
+    sharp.concurrency(1);
     const summary = { memory_peak_mb: mb(), models: {} };
     const detail = [];
     let peak = mb();
@@ -104,7 +109,8 @@ export function registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sha
     for (const g of gold || []) {
       try {
         if (!photos.has(g.reference_photo_url)) photos.set(g.reference_photo_url, await fetchBuf(g.reference_photo_url));
-        crops.set(g.id, await cropPiece(photos.get(g.reference_photo_url), g.photo_box, 320));
+        crops.set(g.id, await cropPiece(photos.get(g.reference_photo_url), g.photo_box, 256));
+        if (photos.size > 2) photos.delete(photos.keys().next().value);
       } catch (e) { await say(`crop failed ${g.id}: ${e.message}`); }
     }
     photos.clear();
@@ -115,7 +121,7 @@ export function registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sha
       let E = null, lastErr = null;
       for (const id of [m.id, ...(m.alt || [])]) {
         for (const dtype of [opts.dtype || 'q8', 'fp32']) {
-          try { E = await makeEmbedder({ ...m, id }, dtype); m.used = `${id} (${dtype})`; break; }
+          try { E = await makeEmbedder({ ...m, id, withText: !!opts.text }, dtype); m.used = `${id} (${dtype})`; break; }
           catch (e) { lastErr = e; }
         }
         if (E) break;
@@ -142,7 +148,7 @@ export function registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sha
           tick();
         }
       };
-      await Promise.all(Array.from({ length: 4 }, worker));
+      await Promise.all(Array.from({ length: 2 }, worker));
       await say(`${m.id}: ${cat.length} catalogue fingerprints (${made} new, ${missed} failed) in ${Math.round((Date.now() - tEmb) / 1000)}s`);
 
       // Text fingerprints of the shape names (CLIP only).
@@ -222,6 +228,8 @@ export function registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sha
       if (global.gc) global.gc();
     }
     summary.memory_peak_mb = peak;
+    sharp.cache({ memory: 50, files: 20, items: 100 });
+    sharp.concurrency(0);
     await supabase.from('vision_test_runs').update({ status: 'done', summary, detail: detail.slice(0, 2000) }).eq('id', runId);
     await say('done');
   }
@@ -235,6 +243,10 @@ export function registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sha
     catch (err) {
       logger.error('[vision-test] failed', err.message);
       await supabase.from('vision_test_runs').update({ status: `failed: ${err.message}`.slice(0, 400) }).eq('id', row.id);
-    } finally { running = false; }
+    } finally {
+      running = false;
+      sharp.cache({ memory: 50, files: 20, items: 100 });
+      sharp.concurrency(0);
+    }
   });
 }
