@@ -173,7 +173,7 @@ app.get('/api/demo/bookings', async (req, res) => {
     // most are in the past -- Daisy asked to see everything.)
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at')
+      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at, till_pottery')
       .eq('studio_id', DEMO_STUDIO_ID)
       // Cancelled in Square: not a card. (No-shows stay, so the day reads true.)
       .or('status.is.null,status.neq.cancelled')
@@ -232,12 +232,27 @@ app.get('/api/demo/bookings', async (req, res) => {
           .eq('studio_id', DEMO_STUDIO_ID).in('square_item_id', sids.slice(i, i + 200));
         (cat || []).forEach((c) => { priceOf[c.square_item_id] = c.price_min_cents || c.price_cents || 0; });
       }
+      // What the till charged, where a piece's shape is on its booking's
+      // bill (each line used once); the catalogue price otherwise.
+      const bills = {};
+      data.forEach((b) => {
+        const m = new Map();
+        (Array.isArray(b.till_pottery) ? b.till_pottery : []).forEach((r) => {
+          if (!r?.square_item_id) return;
+          const a = m.get(r.square_item_id) || [];
+          for (let i = 0; i < (r.qty || 1); i++) a.push(r.cents || 0);
+          m.set(r.square_item_id, a);
+        });
+        bills[b.booking_code] = m;
+      });
       (pieceRows || []).forEach((p) => {
         if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0, cents: 0, to_check: 0 };
         const pc = pieceCounts[p.booking_id];
         pc.pieces++;
         if (p.reference_photo_url) pc.with_photo++;
-        if (p.square_item_id && priceOf[p.square_item_id]) pc.cents += priceOf[p.square_item_id];
+        const charged = p.square_item_id && bills[p.booking_id]?.get(p.square_item_id)?.shift();
+        if (charged) pc.cents += charged;
+        else if (p.square_item_id && priceOf[p.square_item_id]) pc.cents += priceOf[p.square_item_id];
         else if (!p.square_item_id) pc.to_check++;
       });
     }
@@ -285,7 +300,7 @@ app.get('/api/demo/bookings', async (req, res) => {
       } catch (e) { logger.warn('[returning] lookup failed', e.message); }
     }
 
-    const merged = data.map((b) => ({
+    const merged = data.map(({ till_pottery, ...b }) => ({
       ...b,
       collection_date: collectionDates[b.booking_code] || null,
       finished_at: finishedAt[b.booking_code] || null,

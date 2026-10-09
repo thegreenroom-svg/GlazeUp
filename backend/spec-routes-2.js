@@ -5956,9 +5956,23 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
         if (!c && !fallbackName) return null;
         return { square_item_id: id, name: c?.name || fallbackName, price_cents: c?.price_cents || 0, price_min_cents: c?.price_min_cents || c?.price_cents || 0 };
       };
+      // [9 Oct] What the till actually charged beats the catalogue: a shape
+      // with sizes was shown at its cheapest (Rimmed Plate £20) when the
+      // bill says £29. Each bill line is used once.
+      const billLeft = new Map();
+      (Array.isArray(bk?.till_pottery) ? bk.till_pottery : []).forEach((r) => {
+        if (!r?.square_item_id) return;
+        const a = billLeft.get(r.square_item_id) || [];
+        for (let i = 0; i < (r.qty || 1); i++) a.push(r.cents || 0);
+        billLeft.set(r.square_item_id, a);
+      });
       let total = 0, priced = 0, unsure = 0;
       pieces.forEach((p) => {
         p.shape = p.square_item_id ? shapeOf(p.square_item_id) : null;
+        const charged = p.shape && billLeft.get(p.shape.square_item_id)?.shift();
+        if (charged) p.shape = { ...p.shape, price_cents: charged, price_min_cents: charged, from_bill: true };
+        // Settled by a person or the till's own line, or still a guess.
+        p.shape_sure = !!(p.shape && (p.shape_confirmed || charged));
         p.options = !p.shape
           ? (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 4).map((c) => shapeOf(c?.square_item_id, c?.name)).filter(Boolean)
           : [];
@@ -6882,7 +6896,14 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     // confirm and not used to teach recognition. A guess: left alone.
     // Same question is only asked once every 6 hours.
     const leftIds = [...left.entries()].filter(([, n]) => n > 0).map(([sid]) => sid).filter(Boolean);
-    const unknown = (pieces || []).filter((p) => !p.square_item_id && !p.shape_confirmed && p.reference_photo_url && p.photo_box);
+    // [9 Oct] Daisy: "check accuracy". Against the bills, recognition's
+    // own picks were the right KIND of thing but often the wrong shape
+    // (Book Worm Mug for an Early Riser Mug, Pitcher for a Country Jug,
+    // Ruffled vase for a Flower vase small). So a recognised shape that is
+    // NOT on the bill, while the bill has something unused, is looked at
+    // again against what was actually rung up.
+    const offBillIds = new Set(offBill.map((p) => p.id));
+    const unknown = (pieces || []).filter((p) => (!p.square_item_id || offBillIds.has(p.id)) && !p.shape_confirmed && p.reference_photo_url && p.photo_box);
     const chooser = app.locals.chooseAmong;
     if (!leftIds.length || !unknown.length || !chooser) return settled;
     const sig = leftIds.slice().sort().join(',');

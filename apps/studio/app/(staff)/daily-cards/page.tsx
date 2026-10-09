@@ -1451,7 +1451,7 @@ export default function DailyCardsPage() {
                               {p.shape ? (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                                   <span style={{ color: 'var(--charcoal)' }}>{k + 1}. {p.shape.name}</span>
-                                  <span style={{ fontWeight: priceText(p.shape) ? 700 : 500, color: priceText(p.shape) ? 'var(--charcoal)' : 'var(--stone)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{priceText(p.shape) || 'priced at the till'}</span>
+                                  <span style={{ fontWeight: priceText(p.shape) ? 700 : 500, color: priceText(p.shape) ? 'var(--charcoal)' : 'var(--stone)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{!p.shape_sure && <span title="Recognised from the photo, not yet checked against the till or by a person" style={{ color: 'var(--stone)', fontWeight: 600, fontSize: 'var(--text-xs)' }}>guess · </span>}{p.shape.from_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>till · </span>}{priceText(p.shape) || 'priced at the till'}</span>
                                 </div>
                               ) : (
                                 <div>
