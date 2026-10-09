@@ -880,7 +880,9 @@ export default function DailyCardsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Find a booking: name, phone, table..."
-            style={{ width: '100%', padding: '0.75rem 0.9rem', fontSize: 'var(--text-md)', border: '1px solid #ddd', borderRadius: 8, background: 'white' }}
+            // [9 Oct] Explicit text colour: on a phone in dark mode the
+            // typed text and the names below came out white on white.
+            style={{ width: '100%', padding: '0.75rem 0.9rem', fontSize: 'var(--text-md)', border: '1px solid #ddd', borderRadius: 8, background: 'white', color: '#2b2622', colorScheme: 'light' }}
           />
           {results && (
             <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, top: '100%', marginTop: 4, background: 'white', border: '1px solid #e5ddd2', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: '60vh', overflowY: 'auto' }}>
@@ -891,7 +893,7 @@ export default function DailyCardsPage() {
                   onClick={() => goToCard(r.booking_code, r.session_start)}
                   style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', padding: '0.8rem 1rem', border: 'none', borderBottom: '1px solid #f1ece5', background: 'none', textAlign: 'left', cursor: 'pointer' }}
                 >
-                  <span style={{ fontWeight: 600 }}>{r.customer_name}</span>
+                  <span style={{ fontWeight: 600, color: '#2b2622' }}>{r.customer_name}</span>
                   <span style={{ fontSize: 'var(--text-sm)', color: '#888', whiteSpace: 'nowrap' }}>
                     {new Date(r.session_start).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                     {r.table_number ? ` · Table ${r.table_number}` : ''}
