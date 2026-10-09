@@ -234,7 +234,13 @@ export default function DailyCardsPage() {
   // a booking; "Not a booking" hides it. Checked every two minutes.
   const [tillLoose, setTillLoose] = useState<any[]>([]);
   const [tillOpen, setTillOpen] = useState(false);
+  // [9 Oct] Daisy: "I think the till confusing so rid ... just want to see
+  // actual tickets and photographed." The till box and the till section on
+  // each card are switched off; matching carries on quietly in the
+  // background (arrival from a named ticket, shapes settled by the bill).
+  const SHOW_TILL = false;
   const loadTillLoose = useCallback(async () => {
+    if (!SHOW_TILL) return;
     try {
       const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till/unmatched?date=${cardDateRef.current}`, { cache: 'no-store' });
       const d = r.ok ? await r.json() : null;
@@ -918,7 +924,7 @@ export default function DailyCardsPage() {
         </div>
       )}
 
-      {tillLoose.length > 0 && (
+      {SHOW_TILL && tillLoose.length > 0 && (
         <div style={{ margin: '0 0 1rem', border: '1px solid #e2c9a0', background: '#fdf7ee', borderRadius: 8, padding: '0.6rem 0.8rem' }}>
           <button onClick={() => setTillOpen((o) => !o)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, color: '#8a5a1a', fontSize: 'var(--text-sm)' }}>
             {tillLoose.length} till ticket{tillLoose.length === 1 ? '' : 's'} not on a booking {tillOpen ? '▲' : '▼'}
@@ -1370,7 +1376,7 @@ export default function DailyCardsPage() {
                               {p.shape ? (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                                   <span style={{ color: 'var(--charcoal)' }}>{k + 1}. {p.shape.name}</span>
-                                  <span style={{ fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>{p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{priceText(p.shape) || 'no price'}</span>
+                                  <span style={{ fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{priceText(p.shape) || 'no price'}</span>
                                 </div>
                               ) : (
                                 <div>
@@ -1400,7 +1406,7 @@ export default function DailyCardsPage() {
                           )}
                         </div>
                       )}
-                      {tp.till && (
+                      {SHOW_TILL && tp.till && (
                         <div style={{ maxWidth: 520, margin: '0.8rem auto 0', background: '#f6f3ee', borderRadius: 6, padding: '0.5rem 0.7rem', fontSize: 'var(--text-sm)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                             <span style={{ color: 'var(--charcoal)' }}>Till: {tp.till.tickets}</span>
