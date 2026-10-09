@@ -6793,10 +6793,11 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
 
       const ids = useful.map((x) => x.o.id);
       const manual = new Set();
+      const manualTo = new Map();
       for (let i = 0; i < ids.length; i += 200) {
-        const { data } = await supabase.from('till_ticket_links').select('order_id')
+        const { data } = await supabase.from('till_ticket_links').select('order_id, booking_code')
           .eq('studio_id', STUDIO_ID).eq('manual', true).in('order_id', ids.slice(i, i + 200));
-        (data || []).forEach((l) => manual.add(l.order_id));
+        (data || []).forEach((l) => { manual.add(l.order_id); if (l.booking_code) manualTo.set(l.order_id, l.booking_code); });
       }
 
       const { data: bookings } = await supabase.from('bookings')
@@ -6833,77 +6834,129 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
             const ids = [...new Set([p.square_item_id, ...cands.map((c) => c?.square_item_id)].filter(Boolean))];
             const words = new Set(nounsOf([p.piece_type, p.description, ...cands.map((c) => c?.name)].join(' ')));
             if (!piecesBy.has(p.booking_id)) piecesBy.set(p.booking_id, []);
-            piecesBy.get(p.booking_id).push({ ids, words });
+            piecesBy.get(p.booking_id).push({ ids, words, main: p.square_item_id || null });
           }
         }
       }
-      // Can every pottery line on the ticket be pinned to a different piece
-      // in this booking's photo? Small enough to try greedily, rarest first.
-      // Returns how many lines it could pin. A fit is every line, or all
-      // but one when there are at least three -- recognition sometimes calls
-      // a Country Jug a Pitcher, and one miss should not lose the table.
-      // Every line must land on a different piece: by catalogue item
-      // (exact), or failing that by the kind of thing it is -- a "Country
-      // Jug" on the bill against a piece read as a pitcher whose shortlist
-      // has jugs on it. Exact fits outrank kind-only fits.
-      const explains = (pottery, code) => {
-        const pieces = (piecesBy.get(code) || []).map((x) => ({ ...x, used: false }));
+      // [9 Oct] ELIMINATION. Daisy: "surely you can match till tickets to
+      // bookings using elimination". Each ticket used to be judged on its
+      // own, so a mug ticket stayed unplaced whenever two tables in the
+      // session had a mug -- even after one of those mugs was already
+      // accounted for by another ticket. Now pieces are used up as tickets
+      // claim them, and the matching goes round again: once Rebekah's mug
+      // is on her bill, the other mug ticket can only be Vicky's.
+      //
+      // A ticket's pottery fits a booking when every line lands on a
+      // different, not-yet-claimed piece in that booking's photo: by
+      // catalogue item (exact), or failing that by the kind of thing it is
+      // (a "Country Jug" against a piece read as a pitcher with jugs on its
+      // shortlist). Exact fits outrank kind-only fits.
+      const consumed = new Map();
+      const takenIn = (code) => { if (!consumed.has(code)) consumed.set(code, new Set()); return consumed.get(code); };
+      const fitOf = (pottery, code) => {
+        const taken = takenIn(code);
+        const pieces = (piecesBy.get(code) || []).map((x, i) => ({ ...x, i, used: taken.has(i) }));
         const want = [];
         pottery.forEach((p) => { for (let q = 0; q < p.qty; q++) want.push(p); });
-        if (!want.length || !pieces.length || want.length > pieces.length) return 0;
-        let exact = 0, kind = 0;
-        const left = [];
+        const free = pieces.filter((x) => !x.used).length;
+        if (!want.length || !free || want.length > free) return null;
+        let exact = 0, kind = 0, main = 0;
+        const left = [], used = [];
         for (const w of want) {
-          const pc = pieces.filter((x) => !x.used && x.ids.includes(w.square_item_id)).sort((a, b) => a.ids.length - b.ids.length)[0];
-          if (pc) { pc.used = true; exact++; } else left.push(w);
+          // The piece recognised AS this item first, then one with it on
+          // the shortlist.
+          const pc = pieces.filter((x) => !x.used && x.main === w.square_item_id)[0]
+            || pieces.filter((x) => !x.used && x.ids.includes(w.square_item_id)).sort((m, n) => m.ids.length - n.ids.length)[0];
+          if (pc) { pc.used = true; used.push(pc.i); exact++; if (pc.main === w.square_item_id) main++; } else left.push(w);
         }
         for (const w of left) {
           const head = nounsOf(w.name).slice(-1)[0];
           const pc = head && pieces.find((x) => !x.used && x.words.has(head));
-          if (pc) { pc.used = true; kind++; }
+          if (pc) { pc.used = true; used.push(pc.i); kind++; }
         }
-        if (exact + kind < want.length) return 0;
-        return kind ? 7 : 9;
+        if (exact + kind < want.length) return null;
+        // 10: every line is what recognition said the piece was. 9: every
+        // line is on a piece's shortlist. 7: some only by kind.
+        return { score: kind ? 7 : main === want.length ? 10 : 9, used };
       };
+      const claim = (code, used) => used.forEach((i) => takenIn(code).add(i));
 
       // A ticket opened up to an hour before or ninety minutes after the
-      // session belongs to it. Time only ever ranks; a match needs a name or
-      // the table on the card.
+      // session belongs to it. Time only ever ranks.
       const EARLY = 60 * 60 * 1000, LATE = 90 * 60 * 1000;
+      const inWindow = (b, created) => created >= b.start - EARLY && created <= b.end + LATE;
       const links = [];
-      const unmatched = [];
+      const linkOf = (x, code, basis) => ({
+        order_id: x.o.id, studio_id: STUDIO_ID, booking_code: code,
+        ticket_name: x.name || null, order_created_at: x.o.created_at, state: x.o.state,
+        total_cents: x.o.total_money?.amount || 0, pottery: x.pottery, basis,
+        manual: false, updated_at: new Date().toISOString(),
+      });
+
+      // Pottery already placed by hand is spoken for.
       for (const x of useful) {
-        if (manual.has(x.o.id)) continue;
+        const code = manualTo.get(x.o.id);
+        if (code && x.pottery.length) { const f = fitOf(x.pottery, code); if (f) claim(code, f.used); }
+      }
+
+      // 1. Names. A ticket with a first name or surname on it that points at
+      //    exactly one booking in its session.
+      let open = useful.filter((x) => !manual.has(x.o.id));
+      const rest = [];
+      for (const x of open) {
         const parsed = parseTicketName(x.name);
         const created = new Date(x.o.created_at).getTime();
-        const scored = [];
+        const named = [];
         for (const b of prepared) {
-          if (created < b.start - EARLY || created > b.end + LATE) continue;
+          if (!inWindow(b, created)) continue;
           let score = 0; const basis = [];
           if (b.first && parsed.words.includes(b.first)) { score += 12; basis.push('first name'); }
           if (b.last && b.last.length >= 3 && parsed.words.includes(b.last)) { score += 14; basis.push('surname'); }
-          // [9 Oct] No tables. Daisy: "table numbers are kind of irrelevant
-          // ... it's only for the till point. We know the booking names." A
-          // card saying T2 took the T2A ticket that belonged to the next
-          // table. Names and the pottery against the photo only.
-          const fit = x.pottery.length && created >= b.start - EARLY && created <= b.end + LATE ? explains(x.pottery, b.booking_code) : 0;
-          if (fit) { score += fit; basis.push(fit === 9 ? 'pottery matches photo' : 'pottery like the photo'); }
-          if (!score) continue;
-          scored.push({ b, score, gap: Math.abs(created - b.start), basis: basis.join(' + ') });
+          if (score) named.push({ b, score, gap: Math.abs(created - b.start), basis: basis.join(' + ') });
         }
-        scored.sort((p, q) => (q.score - p.score) || (p.gap - q.gap));
-        // Two bookings equally good is a guess, so it waits for a person.
-        if (!scored.length || (scored[1] && scored[1].score === scored[0].score)) {
-          unmatched.push(x);
-          continue;
-        }
-        links.push({
-          order_id: x.o.id, studio_id: STUDIO_ID, booking_code: scored[0].b.booking_code,
-          ticket_name: x.name || null, order_created_at: x.o.created_at, state: x.o.state,
-          total_cents: x.o.total_money?.amount || 0, pottery: x.pottery, basis: scored[0].basis,
-          manual: false, updated_at: new Date().toISOString(),
-        });
+        named.sort((p, q) => (q.score - p.score) || (p.gap - q.gap));
+        if (named.length && !(named[1] && named[1].score === named[0].score)) {
+          const code = named[0].b.booking_code;
+          if (x.pottery.length) { const f = fitOf(x.pottery, code); if (f) claim(code, f.used); }
+          links.push(linkOf(x, code, named[0].basis));
+        } else rest.push(x);
       }
+
+      // 2. Elimination on the pottery, round and round until nothing new
+      //    settles. Each round only takes tickets with exactly one best fit;
+      //    their pieces are then off the table for everyone else.
+      let pending = rest.filter((x) => x.pottery.length);
+      const unmatched = rest.filter((x) => !x.pottery.length);
+      for (let round = 0; round < 12 && pending.length; round++) {
+        const settled = [];
+        for (const x of pending) {
+          const created = new Date(x.o.created_at).getTime();
+          const fits = prepared.filter((b) => inWindow(b, created))
+            .map((b) => ({ b, f: fitOf(x.pottery, b.booking_code) }))
+            .filter((r) => r.f)
+            .sort((p, q) => q.f.score - p.f.score);
+          if (fits.length && !(fits[1] && fits[1].f.score === fits[0].f.score)) settled.push({ x, ...fits[0] });
+        }
+        if (!settled.length) break;
+        // Settle one at a time, strongest first, re-fitting each against
+        // what is left: two tickets for the same table (T4A with two
+        // baubles, "T8 holly" with one more) both land, on different pieces.
+        settled.sort((p, q) => q.f.score - p.f.score || p.x.pottery.length - q.x.pottery.length);
+        const clean = [];
+        for (const r of settled) {
+          const f = fitOf(r.x.pottery, r.b.booking_code);
+          if (!f) continue;
+          claim(r.b.booking_code, f.used);
+          clean.push(r);
+          const how = f.score === 7 ? 'pottery like the photo' : 'pottery matches photo';
+          links.push(linkOf(r.x, r.b.booking_code, `${how}${round ? ', by elimination' : ''}`));
+        }
+        if (!clean.length) break;
+        const done = new Set(clean.map((r) => r.x.o.id));
+        pending = pending.filter((x) => !done.has(x.o.id));
+      }
+      unmatched.push(...pending);
+
       // Manual links still get their totals and state kept fresh.
       const manualFresh = useful.filter((x) => manual.has(x.o.id)).map((x) => ({
         order_id: x.o.id, state: x.o.state, total_cents: x.o.total_money?.amount || 0, pottery: x.pottery, updated_at: new Date().toISOString(),
