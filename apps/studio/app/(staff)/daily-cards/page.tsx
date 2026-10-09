@@ -133,7 +133,28 @@ export default function DailyCardsPage() {
   const router = useRouter();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ pieces: ViewerPiece[]; start: number; title: string } | null>(null);
-  const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[]; booking: any } | 'loading' | 'error'>>({});
+  const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[]; booking: any; pricing?: { total_cents: number; priced: number; unsure: number } | null } | 'loading' | 'error'>>({});
+  // [9 Oct] Prices on the card. A shape with several sizes shows its range.
+  const money = (c: number) => `£${(c / 100).toFixed(c % 100 ? 2 : 0)}`;
+  const priceText = (sh: any) => !sh || !sh.price_cents ? '' : (sh.price_min_cents && sh.price_min_cents < sh.price_cents ? `${money(sh.price_min_cents)}–${money(sh.price_cents)}` : money(sh.price_cents));
+  // Tapping one of the options confirms it, the same as the Recognition
+  // page does, and the card updates straight away.
+  const confirmShape = async (code: string, pieceId: string, shape: any | null) => {
+    setTablePieces((t) => {
+      const tp = t[code];
+      if (!tp || tp === 'loading' || tp === 'error') return t;
+      const pieces = tp.pieces.map((p: any) => p.id === pieceId ? { ...p, shape, options: [], shape_confirmed: true } : p);
+      let total = 0, priced = 0, unsure = 0;
+      pieces.forEach((p: any) => { if (p.shape?.price_cents) { total += p.shape.price_min_cents || p.shape.price_cents; priced++; } else unsure++; });
+      return { ...t, [code]: { ...tp, pieces, pricing: { total_cents: total, priced, unsure } } };
+    });
+    let who: string | null = null;
+    try { who = JSON.parse(localStorage.getItem('glazeup_shift') || '{}').name || null; } catch { /* private mode */ }
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${pieceId}/shape`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ square_item_id: shape?.square_item_id || null, confirmed_by: who }),
+    }).catch(() => { /* card reloads on next open */ });
+  };
   // [6 Oct] Daisy: leave a card to do something (table photo, returns,
   // collection card) and coming back should land on that same card, open,
   // not the top of the day or the menu. Remembered for this tab only, and
@@ -151,7 +172,7 @@ export default function DailyCardsPage() {
     try {
       const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(code)}/table-pieces`);
       const d = r.ok ? await r.json() : null;
-      setTablePieces((t) => ({ ...t, [code]: d ? { photo_url: d.photo_url || null, pieces: Array.isArray(d.pieces) ? d.pieces : [], booking: d.booking || null } : 'error' }));
+      setTablePieces((t) => ({ ...t, [code]: d ? { photo_url: d.photo_url || null, pieces: Array.isArray(d.pieces) ? d.pieces : [], booking: d.booking || null, pricing: d.pricing || null } : 'error' }));
     } catch {
       setTablePieces((t) => ({ ...t, [code]: 'error' }));
     }
@@ -1143,7 +1164,8 @@ export default function DailyCardsPage() {
                           {tp.pieces.map((p: any, k: number) => (
                             <button key={p.id} onClick={() => show(k)} style={{ background: 'none', border: 'none', padding: 0, width: 84, textAlign: 'center', cursor: 'zoom-in' }}>
                               <PieceThumb url={p.reference_photo_url} box={p.photo_box} size={72} ring={p.returned_at ? '#A8651A' : undefined} />
-                              <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.2rem', color: 'var(--charcoal)', textTransform: 'capitalize' }}>{k + 1}. {p.piece_type || 'Piece'}</span>
+                              <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.2rem', color: 'var(--charcoal)', textTransform: p.shape ? 'none' : 'capitalize' }}>{k + 1}. {p.shape?.name || p.piece_type || 'Piece'}</span>
+                              {p.shape?.price_cents > 0 && <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)' }}>{priceText(p.shape)}</span>}
                               {p.stage && <span style={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.25, color: p.returned_at ? '#A8651A' : 'var(--stone)', fontWeight: 600 }}>{p.returned_at ? 'to finish' : p.stage}</span>}
                               {p.returned_at && (
                                 <span
@@ -1156,6 +1178,43 @@ export default function DailyCardsPage() {
                               )}
                             </button>
                           ))}
+                        </div>
+                      )}
+                      {tp.pieces.length > 0 && (
+                        <div style={{ maxWidth: 520, margin: '0.9rem auto 0', borderTop: '1px solid var(--sand, #e8dccb)', paddingTop: '0.6rem' }}>
+                          {tp.pieces.map((p: any, k: number) => (
+                            <div key={p.id} style={{ padding: '0.3rem 0', fontSize: 'var(--text-sm)' }}>
+                              {p.shape ? (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                                  <span style={{ color: 'var(--charcoal)' }}>{k + 1}. {p.shape.name}</span>
+                                  <span style={{ fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>{priceText(p.shape) || 'no price'}</span>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span style={{ color: 'var(--stone)' }}>{k + 1}. {p.piece_type || 'Piece'}: {p.options?.length ? 'which is it?' : 'not recognised'}</span>
+                                  {p.options?.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.3rem' }}>
+                                      {p.options.map((o: any) => (
+                                        <button
+                                          key={o.square_item_id}
+                                          onClick={() => confirmShape(b.booking_code, p.id, o)}
+                                          style={{ border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', borderRadius: 999, padding: '0.25rem 0.6rem', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' }}
+                                        >
+                                          {o.name}{priceText(o) ? ` ${priceText(o)}` : ''}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {tp.pricing && tp.pricing.priced > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--sand, #e8dccb)', marginTop: '0.4rem', paddingTop: '0.5rem', fontWeight: 700, color: 'var(--charcoal)' }}>
+                              <span>Pottery{tp.pricing.unsure ? ` (${tp.pricing.unsure} still to check)` : ''}</span>
+                              <span>{tp.pieces.some((p: any) => p.shape?.price_min_cents && p.shape.price_min_cents < p.shape.price_cents) ? 'from ' : ''}{money(tp.pricing.total_cents)}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>

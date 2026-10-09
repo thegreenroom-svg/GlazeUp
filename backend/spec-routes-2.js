@@ -5798,7 +5798,7 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
     try {
       const { data, error } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description, photo_box, reference_photo_url, returned_at, return_reason, created_at, status, packed_at, shelf_id')
+        .select('id, piece_type, description, photo_box, reference_photo_url, returned_at, return_reason, created_at, status, packed_at, shelf_id, square_item_id, shape_confidence, shape_candidates, shape_confirmed')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', req.params.code)
         .not('archived', 'is', true)
@@ -5830,12 +5830,48 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
         else if (p.status === 'ready' || p.shelf_id) p.stage = p.shelf_id && shelfLabel[p.shelf_id] ? `Out of the kiln, on ${shelfLabel[p.shelf_id]}` : 'Out of the kiln';
         else p.stage = 'Painted, waiting for the kiln';
       });
+      // [9 Oct] Daisy: "I want to see all available prices matched to pieces
+      // on tables photographed." Recognition already picks a shape for each
+      // piece (or a shortlist when it is not sure); the card never showed it.
+      // Each piece now carries its shape and price, or up to three options
+      // with prices to tap and confirm. Prices come from the Square
+      // catalogue copy; a shape with several sizes shows its range.
+      const ids = new Set();
+      pieces.forEach((p) => {
+        if (p.square_item_id) ids.add(p.square_item_id);
+        (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 3).forEach((c) => c?.square_item_id && ids.add(c.square_item_id));
+      });
+      const shapes = {};
+      if (ids.size) {
+        const { data: cat } = await supabase
+          .from('piece_catalogue')
+          .select('square_item_id, name, price_cents, price_min_cents')
+          .eq('studio_id', STUDIO_ID)
+          .in('square_item_id', [...ids]);
+        (cat || []).forEach((c) => { shapes[c.square_item_id] = c; });
+      }
+      const shapeOf = (id, fallbackName) => {
+        const c = shapes[id];
+        if (!c && !fallbackName) return null;
+        return { square_item_id: id, name: c?.name || fallbackName, price_cents: c?.price_cents || 0, price_min_cents: c?.price_min_cents || c?.price_cents || 0 };
+      };
+      let total = 0, priced = 0, unsure = 0;
+      pieces.forEach((p) => {
+        p.shape = p.square_item_id ? shapeOf(p.square_item_id) : null;
+        p.options = !p.shape
+          ? (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 3).map((c) => shapeOf(c?.square_item_id, c?.name)).filter(Boolean)
+          : [];
+        if (p.shape?.price_cents) { total += p.shape.price_min_cents || p.shape.price_cents; priced++; } else unsure++;
+        delete p.shape_candidates;
+      });
+      const pricing = { total_cents: total, priced, unsure };
+
       // The photo the most pieces were taken from. Boxes are only drawn for
       // pieces from that photo, since a box means nothing on another image.
       const tally = {};
       pieces.forEach((p) => { if (p.reference_photo_url) tally[p.reference_photo_url] = (tally[p.reference_photo_url] || 0) + 1; });
       const photo_url = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0] || null;
-      res.json({ photo_url, pieces, booking: bk || null });
+      res.json({ photo_url, pieces, booking: bk || null, pricing });
     } catch (err) {
       logger.error('table-pieces failed', err.message);
       res.status(500).json({ error: err.message });
