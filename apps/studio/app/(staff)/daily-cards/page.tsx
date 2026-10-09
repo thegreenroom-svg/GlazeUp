@@ -388,6 +388,56 @@ export default function DailyCardsPage() {
     }
   }, []);
 
+  // [9 Oct] Daisy: "an alert when new photos arrive from the automation."
+  // Every minute, any photos the iPad has sent since this screen last
+  // looked: whose table each was, or that one needs a look. The cards
+  // reload so the new pieces are on them straight away. Remembered per
+  // device, so a photo is announced once.
+  const SEEN_KEY = 'glazeup_photos_seen';
+  const [photoNews, setPhotoNews] = useState<any[]>([]);
+  useEffect(() => {
+    let stop = false;
+    const tick = async () => {
+      let since: string | null = null;
+      try { since = localStorage.getItem(SEEN_KEY); } catch { /* private mode */ }
+      if (!since) {
+        since = new Date().toISOString();
+        try { localStorage.setItem(SEEN_KEY, since); } catch { /* private mode */ }
+      }
+      try {
+        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/photos/recent?since=${encodeURIComponent(since)}`, { cache: 'no-store' });
+        const d = r.ok ? await r.json() : null;
+        const fresh = (d?.photos || []) as any[];
+        if (!stop && fresh.length) {
+          setPhotoNews(fresh);
+          // Only once they have been read do they count as new pieces.
+          if (fresh.some((p) => p.state === 'matched')) load(false);
+        }
+      } catch { /* try again next minute */ }
+    };
+    tick();
+    const t = setInterval(tick, 60 * 1000);
+    return () => { stop = true; clearInterval(t); };
+  }, [load]);
+  const dismissPhotoNews = () => {
+    const last = photoNews.reduce((m, p) => (p.created_at > m ? p.created_at : m), '');
+    try { localStorage.setItem(SEEN_KEY, last || new Date().toISOString()); } catch { /* private mode */ }
+    setPhotoNews([]);
+  };
+
+  // [9 Oct] Running AI cost, for owner PINs only.
+  const [aiCost, setAiCost] = useState<any>(null);
+  useEffect(() => {
+    let owner = false;
+    try { owner = ['General Manager', 'Co-Director', 'Studio Executive'].includes(JSON.parse(localStorage.getItem('glazeup_shift') || '{}').role); } catch { /* not an owner */ }
+    if (!owner) return;
+    const get = () => fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/ai-cost-total`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).then((d) => d && setAiCost(d)).catch(() => {});
+    get();
+    const t = setInterval(get, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+
   useEffect(() => {
     setNewSinceLoad([]);
     setLoading(true);
@@ -836,6 +886,34 @@ export default function DailyCardsPage() {
           </div>
         )}
       </div>
+
+      {photoNews.length > 0 && (() => {
+        const matched = photoNews.filter((p) => p.state === 'matched');
+        const reading = photoNews.filter((p) => p.state === 'reading');
+        const look = photoNews.filter((p) => p.state === 'needs a look');
+        return (
+          <div style={{ margin: '0 0 1rem', border: '1px solid #b9d3bf', background: '#eef6f0', borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: 'var(--text-sm)', color: '#2f5d3a' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'baseline' }}>
+              <strong>{photoNews.length} new table photo{photoNews.length === 1 ? '' : 's'} from the iPad</strong>
+              <button onClick={dismissPhotoNews} style={{ background: 'none', border: 'none', color: '#2f5d3a', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Got it</button>
+            </div>
+            {matched.length > 0 && (
+              <div style={{ marginTop: '0.25rem' }}>
+                {matched.map((p) => `${p.customer_name || p.tag_name}${p.pieces ? ` (${p.pieces} piece${p.pieces === 1 ? '' : 's'})` : ''}`).join(', ')}
+              </div>
+            )}
+            {reading.length > 0 && <div style={{ marginTop: '0.2rem', color: '#5d7a63' }}>{reading.length} still being read</div>}
+            {look.length > 0 && <div style={{ marginTop: '0.2rem', color: '#A8651A', fontWeight: 600 }}>{look.length} couldn&apos;t be matched to a booking: see Backfill</div>}
+          </div>
+        );
+      })()}
+
+      {aiCost && (
+        <div style={{ margin: '0 0 0.8rem', fontSize: 'var(--text-xs)', color: 'var(--stone)', textAlign: 'right' }}
+          title={(aiCost.month_by_kind_gbp || []).map((k: any) => `${k.kind}: £${k.gbp.toFixed(2)}`).join('\n')}>
+          AI cost: today £{(aiCost.today_gbp || 0).toFixed(2)} · this week £{(aiCost.week_gbp || 0).toFixed(2)} · this month £{(aiCost.month_gbp || 0).toFixed(2)} · since July £{(aiCost.total_gbp || 0).toFixed(2)}
+        </div>
+      )}
 
       {tillLoose.length > 0 && (
         <div style={{ margin: '0 0 1rem', border: '1px solid #e2c9a0', background: '#fdf7ee', borderRadius: 8, padding: '0.6rem 0.8rem' }}>

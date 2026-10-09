@@ -1539,15 +1539,43 @@ export function registerPopularityRoute(app, supabase, STUDIO_ID, logger, axios)
 export function registerAiCostRoute(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/ai-cost-total', async (req, res) => {
     try {
-      const { data, error } = await supabase
-        .from('ai_usage')
-        .select('cost_usd, kind')
-        .eq('studio_id', STUDIO_ID);
-      if (error) throw error;
-
-      const rows = data || [];
+      // [9 Oct] Daisy: "a running AI cost total". Today, this week, this
+      // month and all time, plus what it was spent on this month. Costs are
+      // logged per call in dollars from token counts; pounds are an
+      // approximate conversion.
+      const rows = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from('ai_usage')
+          .select('cost_usd, kind, created_at')
+          .eq('studio_id', STUDIO_ID)
+          .range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      const GBP = 0.79;
+      const now = new Date();
+      const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+      const weekStart = new Date(dayStart); weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const sumSince = (d) => rows.filter((r) => new Date(r.created_at) >= d).reduce((s, r) => s + Number(r.cost_usd || 0), 0);
       const totalUsd = rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0);
-      res.json({ total_usd: totalUsd, total_gbp: totalUsd * 0.79, call_count: rows.length });
+      const LABEL = {
+        'shape-shortlist': 'Recognising shapes', 'shape-compare': 'Recognising shapes', 'till-tiebreak': 'Placing till tickets',
+        'backfill-identify': 'Reading iPad photos', 'identify-pieces-gemini': 'Photographing tables', 'shelf-sweep-gemini': 'Shelf photos',
+      };
+      const byKind = {};
+      rows.filter((r) => new Date(r.created_at) >= monthStart).forEach((r) => {
+        const k = LABEL[r.kind] || 'Other';
+        byKind[k] = (byKind[k] || 0) + Number(r.cost_usd || 0) * GBP;
+      });
+      const first = rows.map((r) => r.created_at).sort()[0] || null;
+      res.json({
+        total_usd: totalUsd, total_gbp: totalUsd * GBP, call_count: rows.length, since: first,
+        today_gbp: sumSince(dayStart) * GBP, week_gbp: sumSince(weekStart) * GBP, month_gbp: sumSince(monthStart) * GBP,
+        month_by_kind_gbp: Object.entries(byKind).sort((a, b) => b[1] - a[1]).map(([kind, gbp]) => ({ kind, gbp })),
+      });
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message, total_usd: 0, call_count: 0 });
@@ -1563,6 +1591,45 @@ export function registerAiCostRoute(app, supabase, STUDIO_ID, logger) {
 // 5 real days stale as of this write) and Daisy needs today's real figure
 // regardless of whether that background sync job is currently healthy.
 // ============================================================================
+// [9 Oct] Daisy: "an alert when new photos arrive from the automation."
+// Photos the iPad sent since a moment the screen last saw, with whose
+// table each turned out to be. The cards page asks every minute.
+export function registerRecentPhotosRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/photos/recent', async (req, res) => {
+    try {
+      const since = req.query.since && !Number.isNaN(Date.parse(req.query.since))
+        ? new Date(req.query.since).toISOString()
+        : new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase.from('backfill_photos')
+        .select('id, status, tag_name, booking_code, pieces_created, error_message, created_at, processed_at')
+        .eq('studio_id', STUDIO_ID)
+        .gt('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(100);
+      if (error) throw error;
+      const rows = data || [];
+      const codes = [...new Set(rows.map((r) => r.booking_code).filter(Boolean))];
+      const names = {};
+      if (codes.length) {
+        const { data: bs } = await supabase.from('bookings').select('booking_code, customer_name').eq('studio_id', STUDIO_ID).in('booking_code', codes);
+        (bs || []).forEach((b) => { names[b.booking_code] = b.customer_name; });
+      }
+      res.json({
+        now: new Date().toISOString(),
+        photos: rows.map((r) => ({
+          id: r.id, created_at: r.created_at,
+          state: r.status === 'done' ? 'matched' : ['pending', 'processing', 'assigned'].includes(r.status) ? 'reading' : 'needs a look',
+          customer_name: r.booking_code ? (names[r.booking_code] || r.tag_name) : null,
+          tag_name: r.tag_name || null, booking_code: r.booking_code || null, pieces: r.pieces_created || 0,
+        })),
+      });
+    } catch (err) {
+      logger.error('recent photos failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 export function registerLiveTotalRoute(app, supabase, STUDIO_ID, logger, axios) {
   app.get('/api/spec/today-live-total', async (req, res) => {
     try {
