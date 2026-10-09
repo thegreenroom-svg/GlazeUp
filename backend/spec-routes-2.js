@@ -6623,6 +6623,13 @@ export function registerPieceCheckRoutes(app, supabase, STUDIO_ID, logger) {
 // person can attach a ticket by hand, and a hand link is never overwritten.
 // Nothing is ever written to Square.
 // ============================================================================
+// The words that say what a thing is, singular: "Baubles 2 for £30" ->
+// bauble; "Pitcher 1.5 Litre (Twisted Handle)" -> pitcher, litre, twisted,
+// handle. The last one is usually the noun ("Country Jug" -> jug).
+const NOUN_STOP = new Set(['with', 'and', 'the', 'for', 'large', 'small', 'medium', 'mini', 'big', 'little', 'regular', 'white', 'round', 'square', 'painted', 'details', 'design', 'pattern', 'colourful', 'colorful']);
+const nounsOf = (s) => String(s || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z\s]/g, ' ')
+  .split(/\s+/).filter((w) => w.length >= 3 && !NOUN_STOP.has(w))
+  .map((w) => (w.endsWith('es') && /(ch|sh|x|ss)es$/.test(w) ? w.slice(0, -2) : w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w));
 const normTable = (s) => {
   const m = String(s || '').toUpperCase().match(/^\s*(?:T|L|TABLE)?\s*(\d{1,2})\s*([A-Z])?\b/);
   return m ? { num: parseInt(m[1], 10), letter: m[2] || '' } : null;
@@ -6805,14 +6812,18 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         const codes = prepared.map((b) => b.booking_code);
         for (let i = 0; i < codes.length; i += 200) {
           const { data: ps } = await supabase.from('pottery_pieces')
-            .select('booking_id, square_item_id, shape_candidates')
+            .select('booking_id, square_item_id, shape_candidates, piece_type, description')
             .eq('studio_id', STUDIO_ID).not('archived', 'is', true)
             .in('booking_id', codes.slice(i, i + 200));
           for (const p of ps || []) {
-            const ids = p.square_item_id ? [p.square_item_id]
-              : (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).map((c) => c?.square_item_id).filter(Boolean);
+            // [9 Oct] The recognised shape AND its shortlist: Kylie's
+            // baubles were recognised as Dry Foot Bauble, but the till rang
+            // them up as "Baubles 2 for £30", which was on the shortlist.
+            const cands = Array.isArray(p.shape_candidates) ? p.shape_candidates : [];
+            const ids = [...new Set([p.square_item_id, ...cands.map((c) => c?.square_item_id)].filter(Boolean))];
+            const words = new Set(nounsOf([p.piece_type, p.description, ...cands.map((c) => c?.name)].join(' ')));
             if (!piecesBy.has(p.booking_id)) piecesBy.set(p.booking_id, []);
-            piecesBy.get(p.booking_id).push(ids);
+            piecesBy.get(p.booking_id).push({ ids, words });
           }
         }
       }
@@ -6821,19 +6832,28 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       // Returns how many lines it could pin. A fit is every line, or all
       // but one when there are at least three -- recognition sometimes calls
       // a Country Jug a Pitcher, and one miss should not lose the table.
+      // Every line must land on a different piece: by catalogue item
+      // (exact), or failing that by the kind of thing it is -- a "Country
+      // Jug" on the bill against a piece read as a pitcher whose shortlist
+      // has jugs on it. Exact fits outrank kind-only fits.
       const explains = (pottery, code) => {
-        const pieces = (piecesBy.get(code) || []).map((ids) => ({ ids, used: false }));
+        const pieces = (piecesBy.get(code) || []).map((x) => ({ ...x, used: false }));
         const want = [];
-        pottery.forEach((p) => { for (let q = 0; q < p.qty; q++) want.push(p.square_item_id); });
-        if (!want.length || !pieces.length) return false;
-        want.sort((a, b) => pieces.filter((x) => x.ids.includes(a)).length - pieces.filter((x) => x.ids.includes(b)).length);
-        let hit = 0;
-        for (const sid of want) {
-          const pc = pieces.filter((x) => !x.used && x.ids.includes(sid))
-            .sort((x, y) => x.ids.length - y.ids.length)[0];
-          if (pc) { pc.used = true; hit++; }
+        pottery.forEach((p) => { for (let q = 0; q < p.qty; q++) want.push(p); });
+        if (!want.length || !pieces.length || want.length > pieces.length) return 0;
+        let exact = 0, kind = 0;
+        const left = [];
+        for (const w of want) {
+          const pc = pieces.filter((x) => !x.used && x.ids.includes(w.square_item_id)).sort((a, b) => a.ids.length - b.ids.length)[0];
+          if (pc) { pc.used = true; exact++; } else left.push(w);
         }
-        return hit === want.length || (want.length >= 3 && hit >= want.length - 1);
+        for (const w of left) {
+          const head = nounsOf(w.name).slice(-1)[0];
+          const pc = head && pieces.find((x) => !x.used && x.words.has(head));
+          if (pc) { pc.used = true; kind++; }
+        }
+        if (exact + kind < want.length) return 0;
+        return kind ? 7 : 9;
       };
 
       // A ticket opened up to an hour before or ninety minutes after the
@@ -6856,9 +6876,8 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
           // ... it's only for the till point. We know the booking names." A
           // card saying T2 took the T2A ticket that belonged to the next
           // table. Names and the pottery against the photo only.
-          if (x.pottery.length && created >= b.start - EARLY && created <= b.end + LATE && explains(x.pottery, b.booking_code)) {
-            score += 9; basis.push('pottery matches photo');
-          }
+          const fit = x.pottery.length && created >= b.start - EARLY && created <= b.end + LATE ? explains(x.pottery, b.booking_code) : 0;
+          if (fit) { score += fit; basis.push(fit === 9 ? 'pottery matches photo' : 'pottery like the photo'); }
           if (!score) continue;
           scored.push({ b, score, gap: Math.abs(created - b.start), basis: basis.join(' + ') });
         }
@@ -6948,7 +6967,9 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       res.json({
         // Pottery, or a table at the studio. A name-only cafe order is
         // somebody's coffee, not a booking to place.
-        tickets: orders.filter((x) => !linked.has(x.o.id) && (x.pottery.length || normTable(x.name))).map((x) => ({
+        // [9 Oct] Pottery only. A drinks-only ticket ("T7b £9.20") does not
+        // need placing -- the pottery is what has to reach the right card.
+        tickets: orders.filter((x) => !linked.has(x.o.id) && x.pottery.length).map((x) => ({
           order_id: x.o.id, name: x.name || null, created_at: x.o.created_at, state: x.o.state,
           total_cents: x.o.total_money?.amount || 0, pottery: x.pottery,
         })),
