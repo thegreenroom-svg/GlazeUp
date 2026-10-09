@@ -3504,7 +3504,7 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
         .from('bookings')
         // session_start too, or the reschedule comparison below reads
         // undefined on every row and rewrites the whole diary each run.
-        .select('square_booking_id, session_start')
+        .select('square_booking_id, session_start, notes')
         .eq('studio_id', STUDIO_ID)
         .not('square_booking_id', 'is', null);
       const existingIds = new Set((existing || []).map((b) => b.square_booking_id));
@@ -3525,6 +3525,27 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
       let rescheduled = 0;
       const rescheduleChanges = [];
       const existingBySquareId = new Map((existing || []).map((b) => [b.square_booking_id, b]));
+      // [9 Oct] Notes, kept current. The girls know someone is coming back
+      // to finish a piece from the booking notes ("We are coming to finish
+      // some pottery that we started in July... yarn bowl"), and new
+      // bookings had stopped copying them at all -- the last note GlazeUp
+      // held was from 27 August. Both Square notes, the customer's and the
+      // staff's, are kept on the booking and refreshed when they change.
+      const squareNotes = (b) => {
+        const parts = [];
+        if (b.customer_note && b.customer_note.trim()) parts.push(b.customer_note.trim());
+        if (b.seller_note && b.seller_note.trim()) parts.push(`Staff: ${b.seller_note.trim()}`);
+        return parts.length ? parts.join('\n') : null;
+      };
+      for (const b of allBookings) {
+        const row = existingBySquareId.get(b.id);
+        if (!row) continue;
+        const n = squareNotes(b);
+        if (n && n !== row.notes) {
+          await supabase.from('bookings').update({ notes: n })
+            .eq('studio_id', STUDIO_ID).eq('square_booking_id', b.id);
+        }
+      }
       for (const b of allBookings) {
         const row = existingBySquareId.get(b.id);
         if (!row) continue;
@@ -3643,6 +3664,7 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
             // studio adds a space later the mapping can change without
             // every historic booking being wrong.
             space_name: serviceName,
+            notes: squareNotes(b),
             synced_from_square: new Date().toISOString(),
           });
           if (insertErr) throw insertErr;

@@ -165,6 +165,7 @@ app.get('/api/demo/studio', async (req, res) => {
   }
 });
 
+const RETURNING_RE = /\b(finish(ing)?|unfinished|continu(e|ing)|carry(ing)? on|previous (project|visit|session|piece)|started (it|them|in|on|last)|come back to|coming back to|half[- ]?(done|painted|finished)|part[- ]?(done|painted)|left (it|them) (here|with you)|returns? shelf|(2nd|second) (painting )?(session|visit))\b/i;
 app.get('/api/demo/bookings', async (req, res) => {
   try {
     // Show all real bookings, most recent first. (Earlier version filtered
@@ -276,6 +277,11 @@ app.get('/api/demo/bookings', async (req, res) => {
       })(),
       piece_count: pieceCounts[b.booking_code]?.pieces || 0,
       photo_count: pieceCounts[b.booking_code]?.with_photo || 0,
+      // [9 Oct] Daisy: the girls always know who is coming back to finish
+      // a piece, because it is in the booking notes ("coming to finish some
+      // pottery that we started in July", "1 to continue a previous
+      // project"). The note itself is shown, since it often names the piece.
+      returning_note: RETURNING_RE.test(b.notes || '') ? String(b.notes).trim().slice(0, 300) : null,
     }));
 
     res.json(merged);

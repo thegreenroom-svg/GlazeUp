@@ -78,6 +78,7 @@ interface Booking {
   visit_number?: number;
   previous_visits?: number;
   last_visit?: string | null;
+  returning_note?: string | null;
   returns_waiting?: {
     id?: string;
     own?: boolean;
@@ -1020,6 +1021,17 @@ export default function DailyCardsPage() {
                         cannot tell a clean booking from one the check never
                         ran on. Explicitly saying "none" is the whole value
                         of a check. */}
+                    {/* [9 Oct] Coming back to finish, from the Square
+                        booking notes -- where the girls already look before
+                        laying the table. Screen only, like the returns line. */}
+                    {b.returning_note && (
+                      <p className="no-print" style={{
+                        fontSize: '0.78rem', margin: '.7rem auto 0', maxWidth: 420,
+                        fontWeight: 600, color: '#A8651A', lineHeight: 1.4,
+                      }}>
+                        Coming back to finish: <span style={{ fontWeight: 400, fontStyle: 'italic' }}>&ldquo;{b.returning_note}&rdquo;</span>
+                      </p>
+                    )}
                     {(() => {
                       const r = b.returns_waiting;
                       const has = !!(r && r.length);
