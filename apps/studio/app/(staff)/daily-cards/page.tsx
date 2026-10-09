@@ -400,9 +400,12 @@ export default function DailyCardsPage() {
     const tick = async () => {
       let since: string | null = null;
       try { since = localStorage.getItem(SEEN_KEY); } catch { /* private mode */ }
+      // First time on this device: announce today's photos so far, rather
+      // than starting from now and saying nothing. (Daisy opened the new
+      // version after the 15:28 photos had landed and saw no banner.)
       if (!since) {
-        since = new Date().toISOString();
-        try { localStorage.setItem(SEEN_KEY, since); } catch { /* private mode */ }
+        const d = new Date(); d.setHours(0, 0, 0, 0);
+        since = d.toISOString();
       }
       try {
         const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/photos/recent?since=${encodeURIComponent(since)}`, { cache: 'no-store' });
