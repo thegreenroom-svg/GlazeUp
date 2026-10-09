@@ -6813,9 +6813,10 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
 
   // The till as a second opinion on shapes. Only ever settles a piece when
   // the answer is unambiguous, and never touches one a person confirmed.
+  const tillLookTried = new Map(); // piece id + till items left -> when tried
   async function reconcile(code, pottery) {
     const { data: pieces } = await supabase.from('pottery_pieces')
-      .select('id, square_item_id, shape_candidates, shape_confirmed')
+      .select('id, square_item_id, shape_candidates, shape_confirmed, reference_photo_url, photo_box')
       .eq('studio_id', STUDIO_ID).eq('booking_id', code).not('archived', 'is', true);
     const left = new Map();
     pottery.forEach((p) => left.set(p.square_item_id, (left.get(p.square_item_id) || 0) + p.qty));
@@ -6838,7 +6839,40 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       if (hits.length === 1) {
         left.set(hits[0], left.get(hits[0]) - 1);
         await confirm(p.id, hits[0]);
+        p.square_item_id = hits[0];
       }
+    }
+    // [9 Oct] Daisy: "check prices again ... against till ring up so at
+    // least eliminate prices charged." Pieces still unknown are compared,
+    // by photo, against ONLY what is left on the bill -- not the whole
+    // range. Toby's mugs were offered tumblers; if the bill says Colette
+    // Mug, they are now looked at against the Colette Mug. Clearly that
+    // shape: confirmed. Very likely: priced, but left for a person to
+    // confirm and not used to teach recognition. A guess: left alone.
+    // Same question is only asked once every 6 hours.
+    const leftIds = [...left.entries()].filter(([, n]) => n > 0).map(([sid]) => sid).filter(Boolean);
+    const unknown = (pieces || []).filter((p) => !p.square_item_id && !p.shape_confirmed && p.reference_photo_url && p.photo_box);
+    const chooser = app.locals.chooseAmong;
+    if (!leftIds.length || !unknown.length || !chooser) return;
+    const sig = leftIds.slice().sort().join(',');
+    const fresh = unknown.filter((p) => {
+      const t = tillLookTried.get(`${p.id}|${sig}`);
+      return !t || Date.now() - t > 6 * 3600000;
+    });
+    if (!fresh.length) return;
+    fresh.forEach((p) => tillLookTried.set(`${p.id}|${sig}`, Date.now()));
+    let picks;
+    try { picks = await chooser(fresh.map((p) => ({ id: p.id, url: p.reference_photo_url, box: p.photo_box })), leftIds); }
+    catch (e) { logger.warn('[till] photo look failed', e.message); return; }
+    const order = { high: 0, medium: 1 };
+    const ranked = [...picks.entries()].filter(([, r]) => r.confidence in order).sort((a, b) => order[a[1].confidence] - order[b[1].confidence]);
+    for (const [id, r] of ranked) {
+      if ((left.get(r.square_item_id) || 0) <= 0) continue;
+      left.set(r.square_item_id, left.get(r.square_item_id) - 1);
+      if (r.confidence === 'high') await confirm(id, r.square_item_id);
+      else await supabase.from('pottery_pieces').update({
+        square_item_id: r.square_item_id, shape_confidence: 'medium', shape_checked_at: now,
+      }).eq('id', id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true);
     }
   }
 
