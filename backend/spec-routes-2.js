@@ -6661,6 +6661,10 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     };
   }
 
+  // Tie-breaks already tried, so a low-confidence answer is not asked
+  // again on every five-minute run.
+  const tieTried = new Map();
+
   // Catalogue lookups: any variation id or item id -> the shape.
   let catCache = { at: 0, byId: new Map() };
   async function catalogueIndex() {
@@ -6715,7 +6719,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       live_ticket_name: ls.length ? ls.map((l) => l.ticket_name || 'unnamed').join(' + ') : null,
       live_ticket_total_cents: ls.length ? ls.reduce((s, l) => s + (l.total_cents || 0), 0) : null,
       live_ticket_matched_at: ls.length ? new Date().toISOString() : null,
-      live_ticket_match_basis: ls.length ? [...new Set(ls.map((l) => (l.manual ? 'by hand' : l.basis)).filter(Boolean))].join(', ') : null,
+      live_ticket_match_basis: ls.length ? [...new Set(ls.map((l) => l.basis || (l.manual ? 'by hand' : null)).filter(Boolean))].join(', ') : null,
       paid_piece_count: ls.length ? pottery.reduce((s, p) => s + p.qty, 0) : null,
       paid_piece_cents: ls.length ? pottery.reduce((s, p) => s + p.qty * p.cents, 0) : null,
       paid_ticket_count: ls.length || null,
@@ -6823,7 +6827,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         const codes = prepared.map((b) => b.booking_code);
         for (let i = 0; i < codes.length; i += 200) {
           const { data: ps } = await supabase.from('pottery_pieces')
-            .select('booking_id, square_item_id, shape_candidates, piece_type, description')
+            .select('id, booking_id, square_item_id, shape_candidates, piece_type, description, reference_photo_url, photo_box')
             .eq('studio_id', STUDIO_ID).not('archived', 'is', true)
             .in('booking_id', codes.slice(i, i + 200));
           for (const p of ps || []) {
@@ -6834,7 +6838,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
             const ids = [...new Set([p.square_item_id, ...cands.map((c) => c?.square_item_id)].filter(Boolean))];
             const words = new Set(nounsOf([p.piece_type, p.description, ...cands.map((c) => c?.name)].join(' ')));
             if (!piecesBy.has(p.booking_id)) piecesBy.set(p.booking_id, []);
-            piecesBy.get(p.booking_id).push({ ids, words, main: p.square_item_id || null });
+            piecesBy.get(p.booking_id).push({ ids, words, main: p.square_item_id || null, id: p.id, url: p.reference_photo_url, box: p.photo_box });
           }
         }
       }
@@ -6927,7 +6931,14 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       //    their pieces are then off the table for everyone else.
       let pending = rest.filter((x) => x.pottery.length);
       const unmatched = rest.filter((x) => !x.pottery.length);
-      for (let round = 0; round < 12 && pending.length; round++) {
+      const fitsFor = (x) => {
+        const created = new Date(x.o.created_at).getTime();
+        return prepared.filter((b) => inWindow(b, created))
+          .map((b) => ({ b, f: fitOf(x.pottery, b.booking_code) }))
+          .filter((r) => r.f)
+          .sort((p, q) => q.f.score - p.f.score);
+      };
+      const eliminate = (round0) => { for (let round = round0; round < round0 + 12 && pending.length; round++) {
         const settled = [];
         for (const x of pending) {
           const created = new Date(x.o.created_at).getTime();
@@ -6954,6 +6965,43 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         if (!clean.length) break;
         const done = new Set(clean.map((r) => r.x.o.id));
         pending = pending.filter((x) => !done.has(x.o.id));
+      } };
+      eliminate(0);
+
+      // 3. Still tied: look. For single-item tickets that two or more tables
+      //    could take, compare those tables' candidate pieces with the stock
+      //    photos of the items on those tickets. A confident answer settles
+      //    the ticket, and elimination runs again on what is left. Settled
+      //    this way, a link is kept (like one placed by hand) so the photos
+      //    are not compared again every five minutes.
+      const tied = pending.filter((x) => x.pottery.length === 1 && x.pottery[0].qty === 1 && fitsFor(x).length >= 2);
+      const chooser = app.locals.chooseAmong;
+      if (!dryRun && tied.length && chooser) {
+        const key = tied.map((x) => x.o.id).sort().join(',');
+        if (!tieTried.has(key) || Date.now() - tieTried.get(key) > 6 * 60 * 60 * 1000) {
+          tieTried.set(key, Date.now());
+          const cand = new Map();
+          for (const x of tied) for (const r of fitsFor(x)) {
+            const pc = (piecesBy.get(r.b.booking_code) || [])[r.f.used[0]];
+            if (pc?.url) cand.set(pc.id, { ...pc, booking_code: r.b.booking_code, idx: r.f.used[0] });
+          }
+          const options = [...new Set(tied.map((x) => x.pottery[0].square_item_id))];
+          try {
+            const seen = await chooser([...cand.values()], options);
+            for (const x of tied) {
+              const sid = x.pottery[0].square_item_id;
+              const hits = [...cand.values()].filter((pc) => {
+                const v = seen.get(pc.id);
+                return v && v.square_item_id === sid && v.confidence !== 'low';
+              });
+              if (hits.length !== 1 || takenIn(hits[0].booking_code).has(hits[0].idx)) continue;
+              claim(hits[0].booking_code, [hits[0].idx]);
+              links.push({ ...linkOf(x, hits[0].booking_code, 'compared photos'), manual: true });
+              pending = pending.filter((y) => y.o.id !== x.o.id);
+            }
+            eliminate(20);
+          } catch (e) { logger.warn('[match-tickets] photo tie-break failed', e.message); }
+        }
       }
       unmatched.push(...pending);
 
@@ -10557,6 +10605,50 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     const raw = extractGeminiText(response.data) || '';
     return JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
   }
+
+  // [9 Oct] THE TILL'S TIE-BREAK. Daisy: "can't you match the mugs to
+  // photos?" When two tables each had a mug and the bill says one Forged
+  // Bell Mug and one Early Riser Mug, look: each table's mug against the
+  // stock photos of just those two. pieces: [{ id, url, box }], options:
+  // [square_item_id]. Returns Map piece id -> { square_item_id, confidence }.
+  async function chooseAmong(pieces, optionIds) {
+    const out = new Map();
+    if (!KEY() || !pieces.length || !optionIds.length) return out;
+    const shapes = (await catalogue()).filter((c) => optionIds.includes(c.square_item_id));
+    if (!shapes.length) return out;
+    const input = [{ type: 'text', text: `Each PIECE below is a painted pottery piece photographed on a studio table. Then come the OPTIONS: catalogue photos of the plain bisque shapes this studio sold for these tables. Every piece is one of the options, or none of them.\n\nFor each piece, say which option is the SAME MOULDED SHAPE, judging form only: silhouette, proportions, handle, rim, foot, any sculpted detail. Ignore paint. Answer 0 for none. Confidence: high = clearly that shape; medium = very likely; low = a guess.` }];
+    for (let j = 0; j < shapes.length; j++) {
+      input.push({ type: 'text', text: `OPTION ${j + 1}: ${shapes[j].name}` });
+      if (shapes[j].image_url) {
+        try { input.push({ type: 'image', data: (await small(await fetchBuf(shapes[j].image_url))).toString('base64'), mime_type: 'image/jpeg' }); }
+        catch { input.push({ type: 'text', text: '(no photo)' }); }
+      }
+    }
+    const used = [];
+    for (const pc of pieces) {
+      try {
+        const img = await cropPiece(await fetchBuf(pc.url), pc.box, 512);
+        input.push({ type: 'text', text: `PIECE ${used.length + 1}:` });
+        input.push({ type: 'image', data: img.toString('base64'), mime_type: 'image/jpeg' });
+        used.push(pc);
+      } catch { /* no photo, cannot compare */ }
+    }
+    if (!used.length) return out;
+    const r = await gemini(input, {
+      type: 'object',
+      properties: { results: { type: 'array', items: { type: 'object', properties: {
+        piece: { type: 'integer' }, option: { type: 'integer' }, confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+      }, required: ['piece', 'option', 'confidence'] } } },
+      required: ['results'],
+    }, 'till-tiebreak', 'gemini-3.7-flash', 'gemini-3.5-flash-lite');
+    for (const x of r.results || []) {
+      const pc = used[(x.piece || 0) - 1];
+      const sh = x.option >= 1 ? shapes[x.option - 1] : null;
+      if (pc && sh) out.set(pc.id, { square_item_id: sh.square_item_id, confidence: x.confidence });
+    }
+    return out;
+  }
+  app.locals.chooseAmong = chooseAmong;
 
   // ---- the matching itself: crops in, shapes out --------------------------
   // crops: [{ key, img (jpeg buffer), piece_type, description }]
