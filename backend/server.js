@@ -166,6 +166,20 @@ app.get('/api/demo/studio', async (req, res) => {
   }
 });
 
+// [9 Oct] Mark a booking as a wheel session (or not). Our own record only;
+// nothing is written to Square.
+app.post('/api/demo/bookings/:code/wheel', async (req, res) => {
+  try {
+    const wheel = req.body?.wheel === null ? null : !!req.body?.wheel;
+    const { error } = await supabase.from('bookings').update({ wheel })
+      .eq('studio_id', DEMO_STUDIO_ID).eq('booking_code', req.params.code);
+    if (error) throw error;
+    res.json({ ok: true, wheel });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/demo/bookings', async (req, res) => {
   try {
     // Show all real bookings, most recent first. (Earlier version filtered
@@ -173,7 +187,7 @@ app.get('/api/demo/bookings', async (req, res) => {
     // most are in the past -- Daisy asked to see everything.)
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at, till_pottery')
+      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at, till_pottery, wheel')
       .eq('studio_id', DEMO_STUDIO_ID)
       // Cancelled in Square: not a card. (No-shows stay, so the day reads true.)
       .or('status.is.null,status.neq.cancelled')
@@ -324,7 +338,10 @@ app.get('/api/demo/bookings', async (req, res) => {
       to_check: pieceCounts[b.booking_code]?.to_check || 0,
       // [9 Oct] Wheel hire and throwing sessions: no painted table, so no
       // table photo to wait for.
-      is_wheel: /wheel|throwing/i.test(b.space_name || ''),
+      // A card can be marked as wheel by hand when it was booked as
+      // painting (Thea Priest and Debbie Curtis, 9 Oct: Lounge bookings,
+      // on the wheel). The hand mark wins either way.
+      is_wheel: typeof b.wheel === 'boolean' ? b.wheel : /wheel|throwing/i.test(b.space_name || ''),
       // [9 Oct] Daisy: the girls always know who is coming back to finish
       // a piece, because it is in the booking notes ("coming to finish some
       // pottery that we started in July", "1 to continue a previous

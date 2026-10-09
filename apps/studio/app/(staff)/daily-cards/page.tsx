@@ -640,6 +640,20 @@ export default function DailyCardsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, collectingList, sessionFiltered, showEarlier, earlierDone.length]);
 
+  // [9 Oct] Daisy: Thea Priest and Debbie Curtis were booked into the
+  // Lounge but were on the pottery wheel. A card can be switched to a wheel
+  // session by hand, so it stops asking for a table photo.
+  const markWheel = async (b: Booking, wheel: boolean) => {
+    const set = (v: boolean) => setBookings((bs) => bs.map((x) => (x.booking_code === b.booking_code ? { ...x, is_wheel: v } : x)));
+    set(wheel);
+    try {
+      const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${encodeURIComponent(b.booking_code)}/wheel`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wheel }),
+      });
+      if (!r.ok) throw new Error();
+    } catch { set(!wheel); }
+  };
+
   const markArrived = async (b: Booking, arrived: boolean) => {
     const before = b.arrived_at ?? null;
     const set = (v: string | null) => setBookings((bs) => bs.map((x) => (x.booking_code === b.booking_code ? { ...x, arrived_at: v } : x)));
@@ -1061,7 +1075,7 @@ export default function DailyCardsPage() {
                 // [9 Oct] Fewer pieces than seats usually means a piece was
                 // missed off the photo, or is in a second photo.
                 const short = photos > 0 && !b.is_wheel && (b.party_size || 0) > photos;
-                const room = roomOf(b.space_name);
+                const room = b.is_wheel ? 'Wheel' : roomOf(b.space_name);
                 return (
                   <>
                   <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.8rem', background: st.colour, color: 'white', textAlign: 'left' }}>
@@ -1359,6 +1373,11 @@ export default function DailyCardsPage() {
                         <p style={{ marginTop: '0.45rem', fontSize: 'var(--text-sm)', color: '#6b625a', lineHeight: 1.35 }}>{st.hint}</p>
                       )}
                       {/* The undo for this card's last step, for as long as it stands. */}
+                      {!(b.photo_count || 0) && !b.collected_at && (
+                        <button onClick={() => markWheel(b, !b.is_wheel)} style={undoLink}>
+                          {b.is_wheel ? 'Not on the wheel? Undo' : 'On the wheel instead? No photo needed'}
+                        </button>
+                      )}
                       {st.label === 'Painting' && (
                         <button onClick={() => markArrived(b, false)} style={undoLink}>Not here yet? Undo arrival</button>
                       )}
