@@ -5,10 +5,10 @@ import { PieceViewer, ViewerPiece } from '@/components/PieceViewer';
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams } from 'next/navigation';
-import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Camera, Loader, LayoutGrid } from 'lucide-react';
+import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Camera, Loader, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { EmptyState } from '@/components/EmptyState';
 
@@ -104,6 +104,7 @@ interface Booking {
   photo_count?: number;
   pottery_cents?: number;
   to_check?: number;
+  guesses?: number;
   is_wheel?: boolean;
   visit_number?: number;
   previous_visits?: number;
@@ -149,6 +150,30 @@ export default function DailyCardsPage() {
   // Every booking for the day shows as a card by default; finished
   // sessions can still be folded away with the button.
   const [showEarlier, setShowEarlier] = useState(true);
+  // [9 Oct] Daisy: "Do all" -- a compact list for the phone, and filters.
+  // The list is remembered per device; phones start in the list.
+  const [listView, setListView] = useState(false);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('glazeup_cards_list');
+      setListView(v === null ? window.innerWidth < 700 : v === '1');
+    } catch { setListView(window.innerWidth < 700); }
+  }, []);
+  const toggleList = () => setListView((v) => { try { localStorage.setItem('glazeup_cards_list', v ? '0' : '1'); } catch { /* private */ } return !v; });
+  const [filter, setFilter] = useState<'all' | 'nophoto' | 'check' | 'ready' | 'wheel'>('all');
+  // Studio alerts (missing photos at 15:45), from the server.
+  const [alerts, setAlerts] = useState<{ id: number; message: string }[]>([]);
+  useEffect(() => {
+    const get = () => fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/alerts`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).then((d) => d && setAlerts(d.alerts || [])).catch(() => {});
+    get();
+    const t = setInterval(get, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+  const dismissAlert = (id: number) => {
+    setAlerts((a) => a.filter((x) => x.id !== id));
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/alerts/${id}/dismiss`, { method: 'POST' }).catch(() => {});
+  };
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   // The table photo and collection screens open in a sheet over the card.
   const [sheet, setSheet] = useState<{ code: string; src: string; title: string } | null>(null);
@@ -349,6 +374,12 @@ export default function DailyCardsPage() {
     if (!bookings.some((b) => b.booking_code === linkedCode)) return;
     preselected.current = true;
     setSelected(new Set([linkedCode]));
+    // From Find a booking: open the card itself, scrolled to.
+    if (searchParams.get('open')) {
+      openCard(linkedCode);
+      setTimeout(() => document.getElementById(`card-${linkedCode}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedCode, bookings]);
   // Reset the session filter whenever the day changes -- a session index
   // from a different day (e.g. its 3rd Saturday slot) means nothing once
@@ -632,13 +663,37 @@ export default function DailyCardsPage() {
     return t ? bookings.filter((b) => b.session_start === t) : bookings;
   }, [bookings, sessionTimes, selectedSessionIdx]);
   const earlierDone = isToday && selectedSessionIdx === null ? sessionFiltered.filter(isEarlierDone) : [];
+  const matchesFilter = (b: Booking) => {
+    if (filter === 'all') return true;
+    const st = cardStatus(b, collectDate);
+    if (filter === 'nophoto') return st.label === 'No photo yet';
+    if (filter === 'check') return (b.to_check || 0) + (b.guesses || 0) > 0;
+    if (filter === 'ready') return st.label === 'Ready to collect';
+    if (filter === 'wheel') return !!b.is_wheel;
+    return true;
+  };
   const visibleBookings = useMemo(() => {
     if (view === 'collecting') return collectingList;
-    if (showEarlier || !earlierDone.length) return sessionFiltered;
+    const base = sessionFiltered.filter(matchesFilter);
+    if (showEarlier || !earlierDone.length || filter !== 'all') return base;
     const hide = new Set(earlierDone.map((b) => b.booking_code));
-    return sessionFiltered.filter((b) => !hide.has(b.booking_code));
+    return base.filter((b) => !hide.has(b.booking_code));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, collectingList, sessionFiltered, showEarlier, earlierDone.length]);
+  }, [view, collectingList, sessionFiltered, showEarlier, earlierDone.length, filter]);
+  // The day at a glance, for the summary bar.
+  const dayCounts = useMemo(() => {
+    const c = { all: bookings.length, photographed: 0, nophoto: 0, check: 0, ready: 0, wheel: 0 };
+    bookings.forEach((b) => {
+      const st = cardStatus(b, collectDate);
+      if ((b.photo_count || 0) > 0) c.photographed++;
+      if (st.label === 'No photo yet') c.nophoto++;
+      if ((b.to_check || 0) + (b.guesses || 0) > 0) c.check++;
+      if (st.label === 'Ready to collect') c.ready++;
+      if (b.is_wheel) c.wheel++;
+    });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, collectDate]);
 
   // [9 Oct] Daisy: Thea Priest and Debbie Curtis were booked into the
   // Lounge but were on the pottery wheel. A card can be switched to a wheel
@@ -784,7 +839,7 @@ export default function DailyCardsPage() {
       <div className="no-print">
         {/* [6 Oct] This is the main screen now. Kept to the day, the
             sessions and the cards; everything else is behind Menu. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.8rem', flexWrap: 'nowrap' }}>
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() - 86400000).toISOString().slice(0, 10))}
             aria-label="Previous day"
@@ -796,7 +851,7 @@ export default function DailyCardsPage() {
             type="date"
             value={cardDate}
             onChange={(e) => setCardDate(e.target.value)}
-            style={{ padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: 'var(--text-md)', color: '#333', backgroundColor: 'white' }}
+            style={{ flex: '1 1 0', minWidth: 0, width: 'auto', maxWidth: 180, padding: '0.45rem 0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: 'var(--text-sm)', color: '#333', backgroundColor: 'white' }}
           />
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 86400000).toISOString().slice(0, 10))}
@@ -875,37 +930,60 @@ export default function DailyCardsPage() {
           ))}
         </div>
 
-        {view === 'painting' && earlierDone.length > 0 && (
-          <button
-            onClick={() => setShowEarlier((x) => !x)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '1rem', padding: '0.5rem 0.9rem', borderRadius: 8, border: '1px dashed #d8cbbc', background: 'transparent', color: '#8a8178', fontSize: 'var(--text-sm)', fontWeight: 600 }}
-          >
-            {showEarlier ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            {showEarlier ? 'Hide' : 'Show'} finished sessions ({earlierDone.length})
-          </button>
-        )}
-
-        {view === 'painting' && sessionTimes.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={goToPrevSession}
-              disabled={selectedSessionIdx === null}
-              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: selectedSessionIdx === null ? 'default' : 'pointer', fontSize: 'var(--text-base)', opacity: selectedSessionIdx === null ? 0.5 : 1 }}
-            >
-              ← Previous session
-            </button>
-            <span style={{ padding: '0.4rem 0.7rem', fontSize: 'var(--text-base)', color: '#666', fontWeight: 600 }}>
-              {selectedSessionIdx === null
-                ? `All sessions (${sessionTimes.length})`
-                : new Date(sessionTimes[selectedSessionIdx]).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-            </span>
-            <button
-              onClick={goToNextSession}
-              disabled={selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1}
-              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 'default' : 'pointer', fontSize: 'var(--text-base)', opacity: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 0.5 : 1 }}
-            >
-              Next session →
-            </button>
+        {/* [9 Oct] One bar: the day at a glance, tap to filter. Replaces the
+            stacked session buttons and the finished-sessions toggle. */}
+        {view === 'painting' && bookings.length > 0 && (
+          <div style={{ marginBottom: '0.9rem' }}>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {([
+                ['all', `All ${dayCounts.all}`, '#8a8178'],
+                ['nophoto', `No photo ${dayCounts.nophoto}`, '#b03a2e'],
+                ['check', `To check ${dayCounts.check}`, '#A8651A'],
+                ['ready', `Ready ${dayCounts.ready}`, '#b8860b'],
+                ['wheel', `Wheel ${dayCounts.wheel}`, '#6a5a8a'],
+              ] as const).filter(([k]) => k === 'all' || (dayCounts as any)[k] > 0).map(([k, label, colour]) => (
+                <button
+                  key={k}
+                  onClick={() => setFilter(filter === k ? 'all' : k)}
+                  style={{ padding: '0.35rem 0.75rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-xs)', border: `1px solid ${colour}`, background: filter === k ? colour : 'white', color: filter === k ? 'white' : colour }}
+                >
+                  {label}
+                </button>
+              ))}
+              <span style={{ fontSize: 'var(--text-xs)', color: '#8a8178', marginLeft: '0.2rem' }}>{dayCounts.photographed} photographed</span>
+              <button
+                onClick={toggleList}
+                aria-label={listView ? 'Show as cards' : 'Show as a list'}
+                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.7rem', borderRadius: 6, border: '1px solid #d8cbbc', background: 'white', color: '#6b625a', fontSize: 'var(--text-xs)', fontWeight: 700 }}
+              >
+                {listView ? <><LayoutGrid size={13} /> Cards</> : <><ListIcon size={13} /> List</>}
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.45rem' }}>
+              {sessionTimes.length > 1 && (
+                <select
+                  value={selectedSessionIdx === null ? '' : String(selectedSessionIdx)}
+                  onChange={(e) => setSelectedSessionIdx(e.target.value === '' ? null : Number(e.target.value))}
+                  style={{ padding: '0.3rem 0.5rem', borderRadius: 6, border: '1px solid #d8cbbc', background: 'white', fontSize: 'var(--text-xs)', color: '#333' }}
+                >
+                  <option value="">All sessions ({sessionTimes.length})</option>
+                  {sessionTimes.map((t, i) => (
+                    <option key={t} value={i}>{new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</option>
+                  ))}
+                </select>
+              )}
+              {earlierDone.length > 0 && filter === 'all' && (
+                <button onClick={() => setShowEarlier((x) => !x)} style={{ background: 'none', border: 'none', padding: 0, color: '#8a8178', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' }}>
+                  {showEarlier ? 'Hide' : 'Show'} finished sessions ({earlierDone.length})
+                </button>
+              )}
+              {aiCost && (
+                <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--stone)' }}
+                  title={(aiCost.month_by_kind_gbp || []).map((k: any) => `${k.kind}: £${k.gbp.toFixed(2)}`).join('\n')}>
+                  AI £{(aiCost.today_gbp || 0).toFixed(2)} today · £{(aiCost.month_gbp || 0).toFixed(2)} this month
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -913,22 +991,32 @@ export default function DailyCardsPage() {
         {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
         {syncError && <div style={{ padding: '1rem', backgroundColor: '#5a2a2a', color: '#ffcccc', borderRadius: '4px', marginBottom: '1rem' }}>{syncError}</div>}
 
-        {newSinceLoad.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.9rem', backgroundColor: '#fdf6e3', border: '1px solid #e0a020', borderRadius: '8px', marginBottom: '1.25rem' }}>
-            <AlertCircle size={18} color="#e0a020" style={{ flexShrink: 0, marginTop: 2 }} />
-            <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 600, fontSize: 'var(--text-md)' }}>
-                {newSinceLoad.length} new booking{newSinceLoad.length === 1 ? '' : 's'} since you loaded this page
-              </p>
-              <p style={{ fontSize: 'var(--text-sm)', color: '#666', marginTop: '0.2rem' }}>
-                {newSinceLoad.map((b) => b.customer_name).join(', ')} — marked below, print those too.
-              </p>
+        {/* [9 Oct] News in one box, a line each: studio alerts, new
+            bookings, new iPad photos. */}
+        {(alerts.length > 0 || newSinceLoad.length > 0 || photoNews.length > 0) && (() => {
+          const matched = photoNews.filter((p) => p.state === 'matched');
+          const reading = photoNews.filter((p) => p.state === 'reading');
+          const look = photoNews.filter((p) => p.state === 'needs a look');
+          const row = (key: string, colour: string, text: React.ReactNode, action: string, onAction: () => void) => (
+            <div key={key} style={{ display: 'flex', gap: '0.6rem', alignItems: 'baseline', justifyContent: 'space-between', padding: '0.45rem 0.7rem', borderTop: '1px solid #ece5db', fontSize: 'var(--text-sm)', color: colour }}>
+              <span style={{ minWidth: 0 }}>{text}</span>
+              <button onClick={onAction} style={{ flexShrink: 0, background: 'none', border: 'none', color: colour, fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 'var(--text-xs)' }}>{action}</button>
             </div>
-            <button onClick={acceptNew} style={{ background: 'none', border: 'none', color: '#e0a020', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              Dismiss
-            </button>
-          </div>
-        )}
+          );
+          return (
+            <div style={{ border: '1px solid #ece5db', borderRadius: 8, background: 'white', marginBottom: '1rem', overflow: 'hidden' }}>
+              <div style={{ marginTop: -1 }}>
+                {alerts.map((a) => row(`a${a.id}`, '#b03a2e', <strong>{a.message}</strong>, 'Dismiss', () => dismissAlert(a.id)))}
+                {newSinceLoad.length > 0 && row('new', '#8a5a00',
+                  <><strong>{newSinceLoad.length} new booking{newSinceLoad.length === 1 ? '' : 's'}:</strong> {newSinceLoad.map((b) => b.customer_name).join(', ')}. Marked below, print those too.</>,
+                  'Got it', acceptNew)}
+                {photoNews.length > 0 && row('photos', '#2f5d3a',
+                  <><strong>{photoNews.length} new table photo{photoNews.length === 1 ? '' : 's'}:</strong> {matched.map((p) => `${p.customer_name || p.tag_name}${p.pieces ? ` (${p.pieces})` : ''}`).join(', ')}{reading.length ? `${matched.length ? '; ' : ''}${reading.length} still being read` : ''}{look.length ? `; ${look.length} need a look in Backfill` : ''}</>,
+                  'Got it', dismissPhotoNews)}
+              </div>
+            </div>
+          );
+        })()}
 
         {!loading && bookings.length === 0 && (
           <EmptyState
@@ -966,33 +1054,7 @@ export default function DailyCardsPage() {
         )}
       </div>
 
-      {photoNews.length > 0 && (() => {
-        const matched = photoNews.filter((p) => p.state === 'matched');
-        const reading = photoNews.filter((p) => p.state === 'reading');
-        const look = photoNews.filter((p) => p.state === 'needs a look');
-        return (
-          <div style={{ margin: '0 0 1rem', border: '1px solid #b9d3bf', background: '#eef6f0', borderRadius: 8, padding: '0.6rem 0.8rem', fontSize: 'var(--text-sm)', color: '#2f5d3a' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'baseline' }}>
-              <strong>{photoNews.length} new table photo{photoNews.length === 1 ? '' : 's'} from the iPad</strong>
-              <button onClick={dismissPhotoNews} style={{ background: 'none', border: 'none', color: '#2f5d3a', fontWeight: 700, cursor: 'pointer', padding: 0 }}>Got it</button>
-            </div>
-            {matched.length > 0 && (
-              <div style={{ marginTop: '0.25rem' }}>
-                {matched.map((p) => `${p.customer_name || p.tag_name}${p.pieces ? ` (${p.pieces} piece${p.pieces === 1 ? '' : 's'})` : ''}`).join(', ')}
-              </div>
-            )}
-            {reading.length > 0 && <div style={{ marginTop: '0.2rem', color: '#5d7a63' }}>{reading.length} still being read</div>}
-            {look.length > 0 && <div style={{ marginTop: '0.2rem', color: '#A8651A', fontWeight: 600 }}>{look.length} couldn&apos;t be matched to a booking: see Backfill</div>}
-          </div>
-        );
-      })()}
 
-      {aiCost && (
-        <div style={{ margin: '0 0 0.8rem', fontSize: 'var(--text-xs)', color: 'var(--stone)', textAlign: 'right' }}
-          title={(aiCost.month_by_kind_gbp || []).map((k: any) => `${k.kind}: £${k.gbp.toFixed(2)}`).join('\n')}>
-          AI cost: today £{(aiCost.today_gbp || 0).toFixed(2)} · this week £{(aiCost.week_gbp || 0).toFixed(2)} · this month £{(aiCost.month_gbp || 0).toFixed(2)} · since July £{(aiCost.total_gbp || 0).toFixed(2)}
-        </div>
-      )}
 
       {SHOW_TILL && tillLoose.length > 0 && (
         <div style={{ margin: '0 0 1rem', border: '1px solid #e2c9a0', background: '#fdf7ee', borderRadius: 8, padding: '0.6rem 0.8rem' }}>
@@ -1028,16 +1090,46 @@ export default function DailyCardsPage() {
         </div>
       )}
 
-      <div className="card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+      <div className="card-grid" style={{ display: 'grid', gridTemplateColumns: listView && view === 'painting' ? '1fr' : 'repeat(auto-fill, minmax(220px, 1fr))', gap: listView && view === 'painting' ? '0.4rem' : '1rem' }}>
         {visibleBookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
           const isSelected = selected.has(b.booking_code);
           const setupFlags = tableSetupFlags(b.notes);
+          // [9 Oct] List view: one row per booking; the open one shows as
+          // its full card. The full card is still rendered (hidden on
+          // screen) so printing works the same either way.
+          const compact = listView && view === 'painting' && openCode !== b.booking_code;
+          const st0 = cardStatus(b, collectDate);
+          const photos0 = b.photo_count || 0;
           return (
+            <React.Fragment key={b.booking_code}>
+            {compact && (
+              <div
+                className="no-print"
+                id={`row-${b.booking_code}`}
+                onClick={() => openCard(b.booking_code)}
+                style={{ display: 'flex', alignItems: 'stretch', background: 'white', border: isNew ? '2px solid #e0a020' : '1px solid #e5ddd2', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}
+              >
+                <div style={{ width: 6, flexShrink: 0, background: st0.colour }} />
+                <div style={{ flex: 1, minWidth: 0, padding: '0.55rem 0.7rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'baseline' }}>
+                    <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.customer_name}</span>
+                    <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: '#8a8178' }}>
+                      {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}{(b.is_wheel ? 'Wheel' : roomOf(b.space_name)) ? ` · ${b.is_wheel ? 'Wheel' : roomOf(b.space_name)}` : ''}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.15rem', fontSize: 'var(--text-xs)' }}>
+                    <span style={{ fontWeight: 800, color: st0.colour, textTransform: 'uppercase', letterSpacing: '.03em' }}>{st0.label}</span>
+                    <span style={{ color: '#6b625a' }}>
+                      {[photos0 ? `${photos0} piece${photos0 === 1 ? '' : 's'}` : '', b.pottery_cents ? money(b.pottery_cents) : '', (b.to_check || 0) + (b.guesses || 0) ? `${(b.to_check || 0) + (b.guesses || 0)} to check` : ''].filter(Boolean).join(' · ')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div
-              key={b.booking_code}
               id={`card-${b.booking_code}`}
-              className="print-card"
+              className={`print-card${compact ? ' list-hidden' : ''}`}
               data-selected={(printOnly ? printOnly === b.booking_code : isSelected) ? "true" : "false"}
               style={{
                 padding: '0', 
@@ -1070,8 +1162,9 @@ export default function DailyCardsPage() {
                 const photos = b.photo_count || 0;
                 const bits: string[] = [];
                 if (photos) bits.push(`${photos} piece${photos === 1 ? '' : 's'}`);
+                const toCheck = (b.to_check || 0) + (b.guesses || 0);
                 if (b.pottery_cents) bits.push(`${b.to_check ? 'from ' : ''}${money(b.pottery_cents)}`);
-                if (b.to_check) bits.push(`${b.to_check} to check`);
+                if (toCheck) bits.push(`${toCheck} to check`);
                 // [9 Oct] Fewer pieces than seats usually means a piece was
                 // missed off the photo, or is in a second photo.
                 const short = photos > 0 && !b.is_wheel && (b.party_size || 0) > photos;
@@ -1561,6 +1654,7 @@ export default function DailyCardsPage() {
                   nothing on it a customer would not want on their table. */}
 
             </div>
+            </React.Fragment>
           );
         })}
       </div>
@@ -1603,6 +1697,10 @@ export default function DailyCardsPage() {
         
         .card-grid > div:not([data-selected="true"]) {
           display: block;
+        }
+        @media screen {
+          .card-grid > .no-print { display: flex; }
+          .card-grid > .list-hidden { display: none !important; }
         }
         
         @media print {

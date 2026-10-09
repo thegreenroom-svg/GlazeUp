@@ -120,7 +120,8 @@ const field = {
         {(results || []).map((b) => (
           <button
             key={b.booking_code}
-            onClick={() => router.push(`/packing?code=${encodeURIComponent(b.booking_code)}`)}
+            // [9 Oct] Straight to the card: pieces, photos, prices, where it all is, and Hand over.
+            onClick={() => router.push(`/daily-cards?date=${b.session_start.slice(0, 10)}&code=${encodeURIComponent(b.booking_code)}&open=1`)}
             style={{ textAlign: 'left', background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.8rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}
           >
             <div style={{ minWidth: 0 }}>

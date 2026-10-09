@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch, Calculator, HelpCircle, AlertTriangle, Activity } from 'lucide-react';
+import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch, Calculator, HelpCircle, AlertTriangle, Activity, CheckCircle2, Flame, Clock } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -78,6 +78,9 @@ const TOOLS = [
   { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
   { key: 'returns',  label: 'Returns shelf',        detail: 'Coming back to finish',                  href: '/returns',  icon: RotateCcw, tint: '#A8651A' },
   { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
+  { key: 'quick-check', label: 'Quick check',        detail: 'Settle the guessed shapes, one tap each', href: '/quick-check', icon: CheckCircle2, tint: '#3D7A4A' },
+  { key: 'kiln-plan', label: 'Kiln plan',            detail: 'What still needs firing for each date', href: '/kiln-plan', icon: Flame, tint: '#B8562E' },
+  { key: 'overdue',  label: 'Overdue collections',  detail: 'Past their date, pottery still here',  href: '/overdue',  icon: Clock,     tint: '#8C4A4A' },
   { key: 'stickers',   label: 'Shelf stickers',       detail: 'QR labels for each collection date',   href: '/shelf-stickers', icon: QrCode, tint: '#6B7A5F' },
 ];
 

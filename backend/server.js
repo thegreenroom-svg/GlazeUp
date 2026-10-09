@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { returnsWaitingFor } from './returns-match.js';
+import { registerOpsRoutes } from './ops-routes.js';
 import { RETURNING_RE, earlierVisitFor, closeContinued } from './returning-link.js';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
@@ -15,7 +16,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute, registerShapeRecognitionRoutes, registerOtherMatchRoutes, registerPieceCheckRoutes, registerHeartbeatRoutes, makeHeartbeat, registerRecentPhotosRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute, registerShapeRecognitionRoutes, registerOtherMatchRoutes, registerPieceCheckRoutes, registerHeartbeatRoutes, makeHeartbeat, registerRecentPhotosRoute, sendCollectionEmail, customerEmailState } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -233,7 +234,7 @@ app.get('/api/demo/bookings', async (req, res) => {
     if (codes.length) {
       const { data: pieceRows } = await supabase
         .from('pottery_pieces')
-        .select('booking_id, reference_photo_url, square_item_id')
+        .select('booking_id, reference_photo_url, square_item_id, shape_confirmed')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', codes)
         .neq('archived', true);
@@ -260,11 +261,13 @@ app.get('/api/demo/bookings', async (req, res) => {
         bills[b.booking_code] = m;
       });
       (pieceRows || []).forEach((p) => {
-        if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0, cents: 0, to_check: 0 };
+        if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0, cents: 0, to_check: 0, guesses: 0 };
         const pc = pieceCounts[p.booking_id];
         pc.pieces++;
         if (p.reference_photo_url) pc.with_photo++;
         const charged = p.square_item_id && bills[p.booking_id]?.get(p.square_item_id)?.shift();
+        // A recognised shape nobody (person or till) has settled yet.
+        if (p.square_item_id && !p.shape_confirmed && !charged) pc.guesses++;
         if (charged) pc.cents += charged;
         else if (p.square_item_id && priceOf[p.square_item_id]) pc.cents += priceOf[p.square_item_id];
         else if (!p.square_item_id) pc.to_check++;
@@ -336,6 +339,7 @@ app.get('/api/demo/bookings', async (req, res) => {
       photo_count: pieceCounts[b.booking_code]?.with_photo || 0,
       pottery_cents: pieceCounts[b.booking_code]?.cents || 0,
       to_check: pieceCounts[b.booking_code]?.to_check || 0,
+      guesses: pieceCounts[b.booking_code]?.guesses || 0,
       // [9 Oct] Wheel hire and throwing sessions: no painted table, so no
       // table photo to wait for.
       // A card can be marked as wheel by hand when it was booked as
@@ -1828,6 +1832,7 @@ registerPieceCheckRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerRecentPhotosRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerHeartbeatRoutes(app, supabase, logger);
 const heartbeat = makeHeartbeat(supabase, logger);
+registerOpsRoutes(app, supabase, DEMO_STUDIO_ID, logger, { sendCollectionEmail, customerEmailState, heartbeat });
 registerShelfSweepRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
 registerSquareAccessCheckRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerDriveBackupRoutes(app, supabase, DEMO_STUDIO_ID, logger, upload, fs);
@@ -1961,6 +1966,7 @@ app.listen(PORT, () => {
         if (waiting) {
           const bfRes = await fetch(`${SELF_URL}/api/spec/backfill/run`, { method: 'POST' });
           const bf = await bfRes.json().catch(() => ({}));
+          if (bfRes.ok) await heartbeat.ok('photo-read'); else await heartbeat.fail('photo-read', bf.error || bfRes.status);
           logger.info(`[auto-sync] iPad photos: ${bf.matched ?? 0} matched, ${bf.unmatched ?? 0} need a look, ${waiting} were waiting`);
         }
       } catch (err) {
@@ -1975,6 +1981,8 @@ app.listen(PORT, () => {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: 3 }),
         });
         const sh = await shRes.json().catch(() => ({}));
+        if (shRes.ok && !(sh.errors || []).length) await heartbeat.ok('shape-recognition');
+        else if (!shRes.ok || (sh.errors || []).length) await heartbeat.fail('shape-recognition', sh.error || (sh.errors || [])[0] || shRes.status);
         if (sh.pieces) logger.info(`[auto-sync] shapes: ${sh.matched}/${sh.pieces} recognised`);
       } catch (err) {
         logger.error('[auto-sync] shape recognition failed', err.message);
@@ -2009,6 +2017,14 @@ app.listen(PORT, () => {
         body: JSON.stringify({ days: 3 }),
       });
       const ticketData = await ticketRes.json().catch(() => ({}));
+      if (ticketRes.ok) await heartbeat.ok('ticket-match'); else await heartbeat.fail('ticket-match', ticketData.error || ticketRes.status);
+      // [9 Oct] Customers told their pottery is ready, once everything is
+      // out of the kiln. Sends nothing unless customer emails are switched on.
+      try {
+        const re = await fetch(`${SELF_URL}/api/spec/ready-emails/run`, { method: 'POST' });
+        const rd = await re.json().catch(() => ({}));
+        if (rd.sent?.length) logger.info(`[auto-sync] ready emails sent: ${rd.sent.join(', ')}`);
+      } catch (err) { logger.warn('[auto-sync] ready emails failed', err.message); }
       // A returner's own table photo is in: the earlier pieces it shows
       // have been finished, so they stop showing as waiting.
       try {

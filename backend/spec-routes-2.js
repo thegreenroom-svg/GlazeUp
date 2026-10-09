@@ -2820,7 +2820,7 @@ export function customerEmailState() {
   return { enabled, configured, live: enabled && configured };
 }
 
-async function sendCollectionEmail({ to, customerName, collectionDate, photoUrls = [], pieceCount = 0, logger }) {
+export async function sendCollectionEmail({ to, customerName, collectionDate, photoUrls = [], pieceCount = 0, logger }) {
   if (process.env.CUSTOMER_EMAILS_ENABLED !== 'true') {
     logger.warn('[collection-email] parked -- CUSTOMER_EMAILS_ENABLED is not "true", no email sent');
     return { sent: false, reason: 'switched_off' };
@@ -9974,6 +9974,11 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // Two copies of the same photo racing each other: the second loses
       // on the unique index, which is the right outcome.
       if (insErr && !/duplicate|unique/i.test(insErr.message)) throw insErr;
+      // [9 Oct] "Photos from the iPad" on the health page: last arrival.
+      try {
+        const now = new Date().toISOString();
+        await supabase.from('job_runs').upsert({ job: 'backfill-ingest', last_ok_at: now, last_try_at: now, last_error: null, updated_at: now }, { onConflict: 'job' });
+      } catch { /* health only */ }
       res.json({ ok: true, queued: !insErr, day });
     } catch (err) {
       cleanup();
@@ -11203,7 +11208,48 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
   }
   app.locals.samePieces = samePieces;
 
-  async function matchCrops(crops) {
+  // [9 Oct] THE TEST SET (ops-routes.js). Recognition run fresh on pieces
+  // whose answer is known, nothing saved, and scored.
+  app.locals.benchmarkShapes = async (gold) => {
+    const byUrl = new Map();
+    for (const g of gold) { if (!byUrl.has(g.reference_photo_url)) byUrl.set(g.reference_photo_url, []); byUrl.get(g.reference_photo_url).push(g); }
+    const shapesNow = await catalogue();
+    const nameOf = new Map(shapesNow.map((s) => [s.square_item_id, s.name]));
+    const detail = [];
+    for (const [url, gs] of byUrl) {
+      let photo;
+      try { photo = await fetchBuf(url); } catch { continue; }
+      const crops = [];
+      for (const g of gs) {
+        try {
+          crops.push({ key: g.id, img: await cropPiece(photo, g.photo_box), piece_type: g.piece_type, description: g.description,
+            size: g.size_rel ? { size_ref: g.size_ref, size_rel: Number(g.size_rel), size_cm: g.size_cm ? Number(g.size_cm) : null } : null });
+        } catch { /* skip */ }
+      }
+      if (!crops.length) continue;
+      const m = await matchCrops(crops, { noExampleSheets: true });
+      for (const g of gs) {
+        const r = m.get(g.id);
+        if (!r) continue;
+        const got = r.chosen?.square_item_id || null;
+        const truthName = nameOf.get(g.square_item_id) || g.square_item_id;
+        detail.push({
+          piece: g.id, truth: truthName, got: got ? (nameOf.get(got) || got) : null, confidence: r.confidence,
+          exact: got === g.square_item_id,
+          family: !!got && got !== g.square_item_id && baseName(nameOf.get(got)) === baseName(truthName),
+        });
+      }
+    }
+    return {
+      pieces: detail.length,
+      exact: detail.filter((d) => d.exact).length,
+      family: detail.filter((d) => d.family).length,
+      none: detail.filter((d) => !d.got).length,
+      detail,
+    };
+  };
+
+  async function matchCrops(crops, opts = {}) {
     const shapes = await catalogue();
     const st = await shapeStats();
     const hot = sellingTop(st);
@@ -11213,7 +11259,9 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
 
     // Pass 1: shortlist from names AND, once built, the stock photos.
     const list = shapes.map((s, i) => `${i + 1}. ${s.name} (${catLabel(s.category)})${hot.has(s.square_item_id) ? ' [selling now]' : ''}`).join('\n');
-    const exNow = exampleSheets(shapes);
+    // The test set turns the painted-example sheets off: they are built
+    // from confirmed pieces, which is exactly the answer key.
+    const exNow = opts.noExampleSheets ? [] : exampleSheets(shapes);
     const in1 = [{
       type: 'text',
       text: `These are painted pottery pieces from a paint-your-own pottery studio. Every piece started as a plain white bisque shape from the studio's range, listed below by number.\n\nFor each piece, pick up to FOUR shapes from the list that it could be, best first, judging by FORM only: overall silhouette, proportions, handles, spouts, lids, feet, sculpted or moulded details, and any letter or number it forms. Ignore the paint completely -- colours and painted designs are the customer's, not part of the shape.${sheetsNow.length ? `\n\nNames can be unhelpful, so STOCK PHOTO SHEETS follow the list: grids of the plain bisque shapes, 8 per row, with the shape number at each position given in words under each sheet. Look through the photos as well as the names -- a shape whose photo matches the piece belongs on the shortlist even if its name does not suggest it.` : ''}\n\nIf the piece is clearly not from this range (wheel-thrown, hand-built, or nothing listed is close), return an empty list for it rather than forcing a match.\n\nSHAPES:\n${list}`,
