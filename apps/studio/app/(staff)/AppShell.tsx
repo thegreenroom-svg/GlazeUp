@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/ThemeContext';
 import { NudgeProvider, HelpPanel, NudgeSettingsPanel } from '@/components/NudgeSystem';
 import { confirmLeaveIfGuarded } from '@/lib/leaveGuard';
 import { isEmbedded } from '@/lib/embed';
+import { UpdateBar } from '@/components/UpdateBar';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -57,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <NudgeProvider>
+        <UpdateBar />
         {/* No StudioNavigation here on purpose. Daisy: "I don't wanna
             really see any of these other buttons, like, packing and
             things separately. It's all part of that one button core
