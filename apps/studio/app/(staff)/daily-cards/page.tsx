@@ -393,7 +393,7 @@ export default function DailyCardsPage() {
   // looked: whose table each was, or that one needs a look. The cards
   // reload so the new pieces are on them straight away. Remembered per
   // device, so a photo is announced once.
-  const SEEN_KEY = 'glazeup_photos_seen';
+  const SEEN_KEY = 'glazeup_photos_seen_v2'; // v2: devices that started from 'now' start again from midnight
   const [photoNews, setPhotoNews] = useState<any[]>([]);
   useEffect(() => {
     let stop = false;
