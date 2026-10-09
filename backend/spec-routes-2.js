@@ -2,7 +2,6 @@ import multer from 'multer';
 import { returnsWaitingFor } from './returns-match.js';
 import { photoTakenAt } from './photo-time.js';
 import { readCardQr, measure, learnSizes, sizeFit, sizeWords, cmFromName } from './table-vision.js';
-import { registerVisionTestRoutes } from './vision-test.js';
 // ============================================================================
 // SPEC ROUTES PART 2 — COMMERCIAL + CUSTOMER-FACING
 // ----------------------------------------------------------------------------
@@ -11212,8 +11211,6 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     return out;
   }
   app.locals.samePieces = samePieces;
-  // [9 Oct] Test only: shapes recognised in-house, no AI calls. See vision-test.js.
-  registerVisionTestRoutes(app, { supabase, STUDIO_ID, logger, sharp, fetchBuf, cropPiece, catalogue, baseName });
 
   // [9 Oct] THE TEST SET (ops-routes.js). Recognition run fresh on pieces
   // whose answer is known, nothing saved, and scored.
