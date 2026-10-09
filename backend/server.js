@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { returnsWaitingFor } from './returns-match.js';
+import { RETURNING_RE, earlierVisitFor, closeContinued } from './returning-link.js';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
@@ -165,7 +166,6 @@ app.get('/api/demo/studio', async (req, res) => {
   }
 });
 
-const RETURNING_RE = /\b(finish(ing)?|unfinished|continu(e|ing)|carry(ing)? on|previous (project|visit|session|piece)|started (it|them|in|on|last)|come back to|coming back to|half[- ]?(done|painted|finished)|part[- ]?(done|painted)|left (it|them) (here|with you)|returns? shelf|(2nd|second) (painting )?(session|visit))\b/i;
 app.get('/api/demo/bookings', async (req, res) => {
   try {
     // Show all real bookings, most recent first. (Earlier version filtered
@@ -257,6 +257,20 @@ app.get('/api/demo/bookings', async (req, res) => {
     // returns-match.js.
     const waitingByCode = await returnsWaitingFor(supabase, DEMO_STUDIO_ID, data);
 
+    // [9 Oct] For a booking coming back to finish: the visit it refers to
+    // and the pieces left unfinished, with photos. Only for the handful of
+    // bookings whose notes say so.
+    const earlier = {};
+    for (const b of data.filter((x) => RETURNING_RE.test(x.notes || ''))) {
+      try {
+        const r = await earlierVisitFor(supabase, DEMO_STUDIO_ID, b);
+        if (r?.booking) earlier[b.booking_code] = {
+          booking_code: r.booking.booking_code, customer_name: r.booking.customer_name,
+          session_start: r.booking.session_start, pieces: r.pieces.slice(0, 8),
+        };
+      } catch (e) { logger.warn('[returning] lookup failed', e.message); }
+    }
+
     const merged = data.map((b) => ({
       ...b,
       collection_date: collectionDates[b.booking_code] || null,
@@ -282,6 +296,7 @@ app.get('/api/demo/bookings', async (req, res) => {
       // pottery that we started in July", "1 to continue a previous
       // project"). The note itself is shown, since it often names the piece.
       returning_note: RETURNING_RE.test(b.notes || '') ? String(b.notes).trim().slice(0, 300) : null,
+      returning_from: earlier[b.booking_code] || null,
     }));
 
     res.json(merged);
@@ -1942,6 +1957,12 @@ app.listen(PORT, () => {
         body: JSON.stringify({ days: 3 }),
       });
       const ticketData = await ticketRes.json().catch(() => ({}));
+      // A returner's own table photo is in: the earlier pieces it shows
+      // have been finished, so they stop showing as waiting.
+      try {
+        const cc = await closeContinued(supabase, DEMO_STUDIO_ID, logger);
+        if (cc.closed) logger.info(`[auto-sync] ${cc.closed} returning piece(s) marked as continued`);
+      } catch (err) { logger.warn('[auto-sync] returns close failed', err.message); }
       if (ticketData.bookings_matched) logger.info(`[auto-sync] ${ticketData.tickets_matched} till ticket(s) attached to ${ticketData.bookings_matched} booking(s)`);
 
       // Fills in the room on bookings synced before the sync stored it.

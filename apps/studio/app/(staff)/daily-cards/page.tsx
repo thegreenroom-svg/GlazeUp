@@ -79,6 +79,7 @@ interface Booking {
   previous_visits?: number;
   last_visit?: string | null;
   returning_note?: string | null;
+  returning_from?: { booking_code: string; customer_name: string; session_start: string; pieces: { id: string; piece_type: string; description: string | null; photo: string | null; box: any; highlight: boolean }[] } | null;
   returns_waiting?: {
     id?: string;
     own?: boolean;
@@ -1031,6 +1032,34 @@ export default function DailyCardsPage() {
                       }}>
                         Coming back to finish: <span style={{ fontWeight: 400, fontStyle: 'italic' }}>&ldquo;{b.returning_note}&rdquo;</span>
                       </p>
+                    )}
+                    {b.returning_note && b.returning_from && (
+                      <div className="no-print" style={{ margin: '.4rem auto 0', maxWidth: 420, fontSize: '0.72rem', color: '#8A7F74' }}>
+                        From {b.returning_from.customer_name}, {new Date(b.returning_from.session_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        {b.returning_from.pieces.length === 0
+                          ? ' (no photo of that table)'
+                          : (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center', marginTop: '0.35rem' }}>
+                              {b.returning_from.pieces.map((p, k) => (
+                                <button
+                                  key={p.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewer({
+                                      title: `${b.customer_name}: to finish`,
+                                      start: k,
+                                      pieces: b.returning_from!.pieces.map((x) => ({ photo: x.photo, box: x.box, piece_type: x.piece_type, description: x.description || undefined, note: x.highlight ? 'Named in the booking note' : 'Unfinished from that visit' })) as any,
+                                    });
+                                  }}
+                                  style={{ background: 'none', border: 'none', padding: 0, width: 64, cursor: 'zoom-in', textAlign: 'center' }}
+                                >
+                                  <PieceThumb url={p.photo} box={p.box} size={56} ring={p.highlight ? '#A8651A' : undefined} />
+                                  <span style={{ display: 'block', fontSize: '0.62rem', color: p.highlight ? '#A8651A' : '#8A7F74', fontWeight: p.highlight ? 700 : 500, textTransform: 'capitalize' }}>{p.piece_type}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                      </div>
                     )}
                     {(() => {
                       const r = b.returns_waiting;
