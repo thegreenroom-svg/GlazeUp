@@ -5812,7 +5812,7 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
       // photographed -> out of the kiln on a shelf -> packed -> collected.
       const { data: bk } = await supabase
         .from('bookings')
-        .select('collected_at, collection_date, fulfilment_method')
+        .select('collected_at, collection_date, fulfilment_method, live_ticket_name, live_ticket_total_cents, live_ticket_match_basis, till_pottery, arrived_at, table_number')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_code', req.params.code)
         .maybeSingle();
@@ -5866,12 +5866,38 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
       });
       const pricing = { total_cents: total, priced, unsure };
 
+      // [9 Oct] The till's side. What was rung up for this booking, and
+      // where it and the table photo disagree: pottery on the bill with no
+      // piece photographed, or a recognised piece with nothing on the bill.
+      let till = null;
+      if (bk?.live_ticket_name) {
+        const rung = Array.isArray(bk.till_pottery) ? bk.till_pottery : [];
+        const left = new Map();
+        rung.forEach((r) => left.set(r.square_item_id, (left.get(r.square_item_id) || 0) + (r.qty || 1)));
+        const notBilled = [];
+        pieces.forEach((p, k) => {
+          if (p.archived) return;
+          const sid = p.shape?.square_item_id;
+          if (sid && (left.get(sid) || 0) > 0) { left.set(sid, left.get(sid) - 1); p.on_bill = true; }
+          else if (sid) notBilled.push({ index: k + 1, name: p.shape.name });
+        });
+        const notPhotographed = [];
+        rung.forEach((r) => {
+          const n = left.get(r.square_item_id) || 0;
+          if (n > 0) { notPhotographed.push({ name: r.name, qty: n }); left.set(r.square_item_id, 0); }
+        });
+        till = {
+          tickets: bk.live_ticket_name, total_cents: bk.live_ticket_total_cents || 0, basis: bk.live_ticket_match_basis || null,
+          pottery: rung, not_billed: notBilled, not_photographed: notPhotographed,
+        };
+      }
+
       // The photo the most pieces were taken from. Boxes are only drawn for
       // pieces from that photo, since a box means nothing on another image.
       const tally = {};
       pieces.forEach((p) => { if (p.reference_photo_url) tally[p.reference_photo_url] = (tally[p.reference_photo_url] || 0) + 1; });
       const photo_url = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0] || null;
-      res.json({ photo_url, pieces, booking: bk || null, pricing });
+      res.json({ photo_url, pieces, booking: bk || null, pricing, till });
     } catch (err) {
       logger.error('table-pieces failed', err.message);
       res.status(500).json({ error: err.message });
@@ -6396,7 +6422,10 @@ export function parseTicketName(raw) {
 
   // Table code at the START only. A ticket called "Party Holly" has no code,
   // and hunting for a letter+number anywhere would find one in a surname.
-  const codeMatch = name.match(/^([TL])\s*(\d{1,2})\s*([A-Za-z])?/i);
+  // [9 Oct] The table letter must touch the number ("T6A"). Allowing a
+  // space before it ate the first letter of the name in "T8 Kate", so Kate
+  // never matched.
+  const codeMatch = name.match(/^([TL])\s*(\d{1,2})([A-Za-z])?(?![A-Za-z])/i);
   let code = null;
   if (codeMatch) {
     code = `${codeMatch[1].toUpperCase()}${parseInt(codeMatch[2], 10)}`;
@@ -6410,7 +6439,7 @@ export function parseTicketName(raw) {
   const STOP = new Set(['party', 'parties', 'pots', 'pottery', 'table', 'the', 'and', 'x']);
   const words = name
     .replace(/[-–]\s*\d{1,2}\s*$/, '')
-    .replace(/^[TL]\s*\d{1,2}\s*[A-Za-z]?/i, '')
+    .replace(/^[TL]\s*\d{1,2}([A-Za-z](?![A-Za-z]))?/i, '')
     .split(/[\s,&]+/)
     .map((w) => w.replace(/[^A-Za-z]/g, '').toLowerCase())
     .filter((w) => w.length >= 3 && !STOP.has(w));
@@ -6558,171 +6587,334 @@ export function registerPieceCheckRoutes(app, supabase, STUDIO_ID, logger) {
   });
 }
 
+// [9 Oct] TILL TICKETS -> BOOKINGS, AND WHAT WAS ACTUALLY RUNG UP
+// ----------------------------------------------------------------------------
+// Daisy: the girls open a ticket at the till when a table first orders
+// drinks, named with the table ("T6A") and often a first name ("T8 Kate",
+// "Kelly"). Read-only from Square, that ticket tells us:
+//   - they have ARRIVED (the first ticket's time), without anyone tapping;
+//   - which TABLE they are at (filled onto the card when it was blank);
+//   - what POTTERY was rung up -- real catalogue items, so a second,
+//     independent answer to "what shape is this piece", and a check that
+//     nothing on the table photo went unbilled.
+// Every ticket that matches is stored as a link, so a booking gathers all
+// its tickets (drinks on one, pottery on another, split bills "- 2"). A
+// person can attach a ticket by hand, and a hand link is never overwritten.
+// Nothing is ever written to Square.
+// ============================================================================
+const normTable = (s) => {
+  const m = String(s || '').toUpperCase().match(/^\s*(?:T|L|TABLE)?\s*(\d{1,2})\s*([A-Z])?\b/);
+  return m ? { num: parseInt(m[1], 10), letter: m[2] || '' } : null;
+};
+const tablesAgree = (a, b) => {
+  const x = normTable(a), y = normTable(b);
+  if (!x || !y || x.num !== y.num) return false;
+  return !x.letter || !y.letter || x.letter === y.letter;
+};
+
 export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axios) {
+  async function squareHeaders() {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token, square_token_expires_at')
+      .eq('studio_id', STUDIO_ID)
+      .single();
+    if (!connection || new Date(connection.square_token_expires_at) < new Date()) return null;
+    return {
+      Authorization: `Bearer ${connection.square_access_token}`,
+      'Square-Version': '2024-01-18',
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    };
+  }
+
+  // Catalogue lookups: any variation id or item id -> the shape.
+  let catCache = { at: 0, byId: new Map() };
+  async function catalogueIndex() {
+    if (Date.now() - catCache.at < 10 * 60 * 1000 && catCache.byId.size) return catCache.byId;
+    const byId = new Map();
+    for (let from = 0; ; from += 1000) {
+      const { data } = await supabase.from('piece_catalogue')
+        .select('square_item_id, name, price_cents, variations')
+        .eq('studio_id', STUDIO_ID).range(from, from + 999);
+      for (const c of data || []) {
+        if (!c.square_item_id) continue;
+        const shape = { square_item_id: c.square_item_id, name: c.name };
+        byId.set(c.square_item_id, shape);
+        for (const v of (Array.isArray(c.variations) ? c.variations : [])) if (v && v.id) byId.set(v.id, shape);
+      }
+      if (!data || data.length < 1000) break;
+    }
+    catCache = { at: Date.now(), byId };
+    return byId;
+  }
+  const potteryOn = (order, byId) => {
+    const out = [];
+    for (const li of order.line_items || []) {
+      const shape = li.catalog_object_id && byId.get(li.catalog_object_id);
+      if (!shape) continue;
+      const qty = Math.max(1, Math.round(Number(li.quantity || 1)));
+      const each = li.base_price_money?.amount ?? Math.round((li.total_money?.amount || 0) / qty);
+      out.push({ square_item_id: shape.square_item_id, name: shape.name, qty, cents: each });
+    }
+    return out;
+  };
+
+  // Gather every linked ticket for a booking onto the booking, mark it
+  // arrived and give it a table if it had none, then check the table photo
+  // against what was rung up.
+  async function rollUp(code) {
+    const { data: links } = await supabase.from('till_ticket_links')
+      .select('order_id, ticket_name, order_created_at, state, total_cents, pottery, basis, manual')
+      .eq('studio_id', STUDIO_ID).eq('booking_code', code)
+      .order('order_created_at', { ascending: true });
+    const { data: b } = await supabase.from('bookings')
+      .select('booking_code, arrived_at, table_number')
+      .eq('studio_id', STUDIO_ID).eq('booking_code', code).maybeSingle();
+    if (!b) return;
+    const ls = links || [];
+    const pottery = [];
+    ls.forEach((l) => (l.pottery || []).forEach((p) => {
+      const cur = pottery.find((x) => x.square_item_id === p.square_item_id && x.cents === p.cents);
+      if (cur) cur.qty += p.qty; else pottery.push({ ...p });
+    }));
+    const upd = {
+      live_ticket_name: ls.length ? ls.map((l) => l.ticket_name || 'unnamed').join(' + ') : null,
+      live_ticket_total_cents: ls.length ? ls.reduce((s, l) => s + (l.total_cents || 0), 0) : null,
+      live_ticket_matched_at: ls.length ? new Date().toISOString() : null,
+      live_ticket_match_basis: ls.length ? [...new Set(ls.map((l) => (l.manual ? 'by hand' : l.basis)).filter(Boolean))].join(', ') : null,
+      paid_piece_count: ls.length ? pottery.reduce((s, p) => s + p.qty, 0) : null,
+      paid_piece_cents: ls.length ? pottery.reduce((s, p) => s + p.qty * p.cents, 0) : null,
+      paid_ticket_count: ls.length || null,
+      paid_pieces_at: ls.length ? new Date().toISOString() : null,
+      till_pottery: ls.length ? pottery : null,
+    };
+    if (ls.length && !b.arrived_at) upd.arrived_at = ls[0].order_created_at;
+    if (!b.table_number) {
+      const withTable = ls.find((l) => normTable(l.ticket_name));
+      if (withTable) upd.table_number = String(withTable.ticket_name).trim().split(/\s|-/)[0].toUpperCase();
+    }
+    await supabase.from('bookings').update(upd).eq('studio_id', STUDIO_ID).eq('booking_code', code);
+    if (pottery.length) await reconcile(code, pottery);
+  }
+
+  // The till as a second opinion on shapes. Only ever settles a piece when
+  // the answer is unambiguous, and never touches one a person confirmed.
+  async function reconcile(code, pottery) {
+    const { data: pieces } = await supabase.from('pottery_pieces')
+      .select('id, square_item_id, shape_candidates, shape_confirmed')
+      .eq('studio_id', STUDIO_ID).eq('booking_id', code).not('archived', 'is', true);
+    const left = new Map();
+    pottery.forEach((p) => left.set(p.square_item_id, (left.get(p.square_item_id) || 0) + p.qty));
+    const now = new Date().toISOString();
+    const confirm = async (id, sid) => supabase.from('pottery_pieces').update({
+      square_item_id: sid, shape_confirmed: true, shape_confirmed_by: 'till', shape_confidence: 'till', shape_checked_at: now,
+    }).eq('id', id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true);
+    // Settled pieces first: they use up their own till line.
+    for (const p of pieces || []) {
+      if (p.square_item_id && (left.get(p.square_item_id) || 0) > 0) {
+        left.set(p.square_item_id, left.get(p.square_item_id) - 1);
+        if (!p.shape_confirmed) await confirm(p.id, p.square_item_id);
+      }
+    }
+    // Then unsure pieces whose options include exactly one remaining till item.
+    for (const p of pieces || []) {
+      if (p.square_item_id || p.shape_confirmed) continue;
+      const opts = (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).map((c) => c?.square_item_id).filter(Boolean);
+      const hits = opts.filter((sid) => (left.get(sid) || 0) > 0);
+      if (hits.length === 1) {
+        left.set(hits[0], left.get(hits[0]) - 1);
+        await confirm(p.id, hits[0]);
+      }
+    }
+  }
+
   app.post('/api/spec/bookings/match-tickets', async (req, res) => {
     const dryRun = req.body?.dry_run === true;
-    const daysBack = Math.min(parseInt(req.body?.days, 10) || 1, 30);
+    const daysBack = Math.min(parseInt(req.body?.days, 10) || 2, 30);
     try {
-      const { data: connection } = await supabase
-        .from('square_connections')
-        .select('square_access_token, square_token_expires_at')
-        .eq('studio_id', STUDIO_ID)
-        .single();
-      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
-        return res.status(400).json({ error: 'No valid Square connection', matched: 0 });
-      }
-      const headers = {
-        Authorization: `Bearer ${connection.square_access_token}`,
-        'Square-Version': '2024-01-18',
-        'Content-Type': 'application/json',
-        // Square's bookings endpoint returns 406 without this. Every
-        // header block that feeds a /v2/bookings call needs it.
-        Accept: 'application/json',
-      };
-
+      const headers = await squareHeaders();
+      if (!headers) return res.status(400).json({ error: 'No valid Square connection', matched: 0 });
       const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
       const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
       if (!locationIds.length) return res.json({ matched: 0, reason: 'no_square_locations' });
 
       const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-      const ordersRes = await axios.post(
-        'https://connect.squareup.com/v2/orders/search',
-        {
+      const orders = [];
+      let cursor;
+      do {
+        const r = await axios.post('https://connect.squareup.com/v2/orders/search', {
           location_ids: locationIds,
-          query: { filter: { date_time_filter: { created_at: { start_at: since.toISOString() } } } },
-          limit: 500,
-        },
-        { headers }
-      );
-      const orders = (ordersRes.data.orders || []).filter((o) => o.ticket_name || o.source?.name);
+          query: {
+            filter: {
+              date_time_filter: { created_at: { start_at: since.toISOString() } },
+              state_filter: { states: ['OPEN', 'COMPLETED'] },
+            },
+          },
+          limit: 500, cursor,
+        }, { headers });
+        orders.push(...(r.data.orders || []));
+        cursor = r.data.cursor;
+      } while (cursor && orders.length < 2000);
 
-      const { data: bookings } = await supabase
-        .from('bookings')
-        .select('booking_code, customer_name, session_start, session_end')
+      const byId = await catalogueIndex();
+      const useful = orders
+        .map((o) => ({ o, name: o.ticket_name || o.source?.name || '', pottery: potteryOn(o, byId) }))
+        .filter((x) => x.name || x.pottery.length);
+
+      const ids = useful.map((x) => x.o.id);
+      const manual = new Set();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data } = await supabase.from('till_ticket_links').select('order_id')
+          .eq('studio_id', STUDIO_ID).eq('manual', true).in('order_id', ids.slice(i, i + 200));
+        (data || []).forEach((l) => manual.add(l.order_id));
+      }
+
+      const { data: bookings } = await supabase.from('bookings')
+        .select('booking_code, customer_name, session_start, session_end, table_number, status')
         .eq('studio_id', STUDIO_ID)
-        .gte('session_start', since.toISOString());
-
-      // Every catalogue id that is a piece of bisque, so a round of lattes
-      // on the same ticket does not get counted as pottery.
-      const bisqueIds = new Set();
-      {
-        const { data: cat } = await supabase
-          .from('piece_catalogue')
-          .select('square_item_id, variations')
-          .eq('studio_id', STUDIO_ID)
-          .limit(2000);
-        for (const c of cat || []) {
-          if (c.square_item_id) bisqueIds.add(c.square_item_id);
-          for (const v of (Array.isArray(c.variations) ? c.variations : [])) {
-            if (v && v.id) bisqueIds.add(v.id);
-          }
-        }
-      }
-      // How many pieces a ticket is for. Quantity matters: one line saying
-      // x3 is three pots, not one.
-      const piecesOn = (order) => {
-        let n = 0, cents = 0;
-        for (const li of (order.line_items || [])) {
-          const id = li.catalog_object_id;
-          if (!id || !bisqueIds.has(id)) continue;
-          n += Number(li.quantity || 1);
-          cents += (li.total_money?.amount || 0);
-        }
-        return { n, cents };
-      };
-
-      const prepared = (bookings || []).map((b) => {
-        const first = String(b.customer_name || '').trim().split(/\s+/)[0].toLowerCase();
-        return {
-          ...b,
-          first_name: first,
-          start: new Date(b.session_start).getTime(),
-          end: b.session_end ? new Date(b.session_end).getTime() : new Date(b.session_start).getTime() + 2 * 60 * 60 * 1000,
-        };
-      });
-
-      // Score every plausible pairing, then assign best-first. A ticket opened
-      // slightly before or after a session still belongs to it, so the window
-      // is generous -- but time alone never matches anything, it only ranks.
-      const WINDOW = 3 * 60 * 60 * 1000;
-      const pairs = [];
-      for (const o of orders) {
-        const ticketName = o.ticket_name || o.source?.name;
-        const parsed = parseTicketName(ticketName);
-        const created = new Date(o.created_at).getTime();
-        for (const b of prepared) {
-          if (created < b.start - WINDOW || created > b.end + WINDOW) continue;
-          // First name only. Table-code matching is gone with the tables --
-          // it was the weaker of the two signals anyway (10 against 12) and
-          // it depended on a Square permission the app was never granted.
-          let score = 0;
-          const basis = [];
-          if (parsed.words.length && b.first_name && parsed.words.includes(b.first_name)) { score += 12; basis.push('first name'); }
-          // Time is a tie-breaker only. On its own it would happily attach a
-          // cafe order to whichever session happened to be running.
-          if (score === 0) continue;
-          const gap = Math.abs(created - b.start);
-          pairs.push({ order: o, ticketName, booking: b, score, gap, basis: basis.join(' + ') });
-        }
-      }
-      pairs.sort((a, b) => (b.score - a.score) || (a.gap - b.gap));
-
-      const claimedOrders = new Set();
-      const byBooking = new Map();
-      for (const p of pairs) {
-        if (claimedOrders.has(p.order.id)) continue;
-        claimedOrders.add(p.order.id);
-        // Several tickets can belong to one booking, so accumulate.
-        const cur = byBooking.get(p.booking.booking_code) || { names: [], total: 0, basis: new Set(), pieces: 0, pieceCents: 0 };
-        cur.names.push(p.ticketName);
-        cur.total += (p.order.total_money?.amount || 0);
-        // Split bills add up rather than replace. Nobody pays for FEWER
-        // pieces than they took, so the sum is a floor, never a ceiling.
-        const pc = piecesOn(p.order);
-        cur.pieces += pc.n;
-        cur.pieceCents += pc.cents;
-        cur.basis.add(p.basis);
-        byBooking.set(p.booking.booking_code, cur);
-      }
-
-      const changes = [];
-      for (const [code, v] of byBooking) {
-        changes.push({
-          booking_code: code,
-          ticket_names: v.names,
-          tickets: v.names.length,
-          total_cents: v.total,
-          paid_pieces: v.pieces,
-          basis: Array.from(v.basis).join(', '),
+        .gte('session_start', new Date(since.getTime() - 6 * 60 * 60 * 1000).toISOString());
+      const prepared = (bookings || [])
+        .filter((b) => !/cancel/i.test(b.status || ''))
+        .map((b) => {
+          const words = String(b.customer_name || '').toLowerCase().replace(/[^a-z\s-]/g, '').split(/[\s-]+/).filter(Boolean);
+          const start = new Date(b.session_start).getTime();
+          return { ...b, first: words[0] || '', last: words.length > 1 ? words[words.length - 1] : '', start,
+            end: b.session_end ? new Date(b.session_end).getTime() : start + 2 * 60 * 60 * 1000 };
         });
-        if (!dryRun) {
-          await supabase.from('bookings').update({
-            live_ticket_name: v.names.join(' + '),
-            live_ticket_total_cents: v.total,
-            live_ticket_matched_at: new Date().toISOString(),
-            live_ticket_match_basis: Array.from(v.basis).join(', '),
-            paid_piece_count: v.pieces,
-            paid_piece_cents: v.pieceCents,
-            paid_ticket_count: v.names.length,
-            paid_pieces_at: new Date().toISOString(),
-          }).eq('studio_id', STUDIO_ID).eq('booking_code', code);
+
+      // A ticket opened up to an hour before or ninety minutes after the
+      // session belongs to it. Time only ever ranks; a match needs a name or
+      // the table on the card.
+      const EARLY = 60 * 60 * 1000, LATE = 90 * 60 * 1000;
+      const links = [];
+      const unmatched = [];
+      for (const x of useful) {
+        if (manual.has(x.o.id)) continue;
+        const parsed = parseTicketName(x.name);
+        const created = new Date(x.o.created_at).getTime();
+        const scored = [];
+        for (const b of prepared) {
+          if (created < b.start - EARLY || created > b.end + LATE) continue;
+          let score = 0; const basis = [];
+          if (b.first && parsed.words.includes(b.first)) { score += 12; basis.push('first name'); }
+          if (b.last && b.last.length >= 3 && parsed.words.includes(b.last)) { score += 14; basis.push('surname'); }
+          if (b.table_number && tablesAgree(x.name, b.table_number)) { score += 10; basis.push('table'); }
+          if (!score) continue;
+          scored.push({ b, score, gap: Math.abs(created - b.start), basis: basis.join(' + ') });
         }
+        scored.sort((p, q) => (q.score - p.score) || (p.gap - q.gap));
+        // Two bookings equally good is a guess, so it waits for a person.
+        if (!scored.length || (scored[1] && scored[1].score === scored[0].score)) {
+          unmatched.push(x);
+          continue;
+        }
+        links.push({
+          order_id: x.o.id, studio_id: STUDIO_ID, booking_code: scored[0].b.booking_code,
+          ticket_name: x.name || null, order_created_at: x.o.created_at, state: x.o.state,
+          total_cents: x.o.total_money?.amount || 0, pottery: x.pottery, basis: scored[0].basis,
+          manual: false, updated_at: new Date().toISOString(),
+        });
+      }
+      // Manual links still get their totals and state kept fresh.
+      const manualFresh = useful.filter((x) => manual.has(x.o.id)).map((x) => ({
+        order_id: x.o.id, state: x.o.state, total_cents: x.o.total_money?.amount || 0, pottery: x.pottery, updated_at: new Date().toISOString(),
+      }));
+
+      const touched = new Set(links.map((l) => l.booking_code));
+      if (!dryRun) {
+        // Tickets that no longer match anything let go of their old booking.
+        const unIds = unmatched.map((x) => x.o.id);
+        for (let i = 0; i < unIds.length; i += 200) {
+          const { data: old } = await supabase.from('till_ticket_links').delete()
+            .eq('studio_id', STUDIO_ID).eq('manual', false).in('order_id', unIds.slice(i, i + 200)).select('booking_code');
+          (old || []).forEach((l) => l.booking_code && touched.add(l.booking_code));
+        }
+        for (let i = 0; i < links.length; i += 100) {
+          const { data: prev } = await supabase.from('till_ticket_links').select('booking_code')
+            .in('order_id', links.slice(i, i + 100).map((l) => l.order_id));
+          (prev || []).forEach((l) => l.booking_code && touched.add(l.booking_code));
+          await supabase.from('till_ticket_links').upsert(links.slice(i, i + 100), { onConflict: 'order_id' });
+        }
+        for (const m of manualFresh) {
+          const { data: ml } = await supabase.from('till_ticket_links').update(m).eq('order_id', m.order_id).select('booking_code');
+          (ml || []).forEach((l) => l.booking_code && touched.add(l.booking_code));
+        }
+        for (const code of touched) await rollUp(code);
       }
 
       res.json({
         dry_run: dryRun,
-        named_tickets: orders.length,
-        tickets_matched: claimedOrders.size,
-        bookings_matched: byBooking.size,
-        unmatched_tickets: orders
-          .filter((o) => !claimedOrders.has(o.id))
-          .map((o) => o.ticket_name || o.source?.name)
-          .slice(0, 30),
-        changes: changes.slice(0, 60),
+        tickets_seen: useful.length,
+        tickets_matched: links.length,
+        bookings_matched: touched.size,
+        unmatched_tickets: unmatched.map((x) => x.name || '(no name)').slice(0, 30),
+        changes: links.slice(0, 60).map((l) => ({ ticket: l.ticket_name, booking_code: l.booking_code, basis: l.basis, pottery: l.pottery.length })),
       });
     } catch (err) {
       logger.error('match-tickets failed', err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+    }
+  });
+
+  // Tickets from a day that nothing claimed, for a person to place.
+  app.get('/api/spec/till/unmatched', async (req, res) => {
+    try {
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date || '') ? req.query.date : new Date().toISOString().slice(0, 10);
+      const headers = await squareHeaders();
+      if (!headers) return res.json({ tickets: [] });
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
+      const start = new Date(`${day}T00:00:00Z`); start.setUTCHours(start.getUTCHours() - 2);
+      const end = new Date(`${day}T23:59:59Z`);
+      const r = await axios.post('https://connect.squareup.com/v2/orders/search', {
+        location_ids: locationIds,
+        query: { filter: {
+          date_time_filter: { created_at: { start_at: start.toISOString(), end_at: end.toISOString() } },
+          state_filter: { states: ['OPEN', 'COMPLETED'] },
+        }, sort: { sort_field: 'CREATED_AT', sort_order: 'ASC' } },
+        limit: 500,
+      }, { headers });
+      const byId = await catalogueIndex();
+      const orders = (r.data.orders || [])
+        .map((o) => ({ o, name: o.ticket_name || o.source?.name || '', pottery: potteryOn(o, byId) }))
+        .filter((x) => x.name || x.pottery.length);
+      const ids = orders.map((x) => x.o.id);
+      const linked = new Set();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data } = await supabase.from('till_ticket_links').select('order_id, booking_code, manual')
+          .eq('studio_id', STUDIO_ID).in('order_id', ids.slice(i, i + 200));
+        (data || []).forEach((l) => { if (l.booking_code || l.manual) linked.add(l.order_id); });
+      }
+      res.json({
+        // Pottery, or a table at the studio. A name-only cafe order is
+        // somebody's coffee, not a booking to place.
+        tickets: orders.filter((x) => !linked.has(x.o.id) && (x.pottery.length || normTable(x.name))).map((x) => ({
+          order_id: x.o.id, name: x.name || null, created_at: x.o.created_at, state: x.o.state,
+          total_cents: x.o.total_money?.amount || 0, pottery: x.pottery,
+        })),
+      });
+    } catch (err) {
+      logger.error('till unmatched failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // A person puts a ticket on a booking (or takes it off, booking_code null).
+  app.post('/api/spec/till/link', async (req, res) => {
+    try {
+      const { order_id, booking_code = null, ticket_name = null, created_at = null, state = null, total_cents = 0, pottery = [] } = req.body || {};
+      if (!order_id) return res.status(400).json({ error: 'order_id is required' });
+      const { data: prev } = await supabase.from('till_ticket_links').select('booking_code').eq('order_id', order_id).maybeSingle();
+      await supabase.from('till_ticket_links').upsert({
+        order_id, studio_id: STUDIO_ID, booking_code, ticket_name, order_created_at: created_at, state,
+        total_cents, pottery: Array.isArray(pottery) ? pottery : [], basis: 'by hand', manual: true, updated_at: new Date().toISOString(),
+      }, { onConflict: 'order_id' });
+      for (const code of new Set([prev?.booking_code, booking_code].filter(Boolean))) await rollUp(code);
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error('till link failed', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 }
@@ -10340,11 +10532,41 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     const results = new Map();
     const imgCache = new Map();
     const todo = crops.filter((c) => (shortlist.get(c.key) || []).length);
+
+    // [9 Oct] LEARNING. A stock photo shows the plain bisque; what we are
+    // matching is a painted piece on a table. Every piece a person or the
+    // till has confirmed is a real painted example of its shape, so the
+    // newest one is shown next to the stock photo. The more tables that get
+    // confirmed, the better the comparison gets -- sizes especially.
+    const examples = new Map();
+    try {
+      const want = [...new Set(todo.flatMap((c) => (shortlist.get(c.key) || []).map((s) => s.square_item_id)))];
+      const skip = new Set(crops.map((c) => c.key));
+      for (let i = 0; i < want.length; i += 100) {
+        const { data: ex } = await supabase.from('pottery_pieces')
+          .select('id, square_item_id, reference_photo_url, photo_box')
+          .eq('studio_id', STUDIO_ID).eq('shape_confirmed', true)
+          .in('square_item_id', want.slice(i, i + 100))
+          .not('reference_photo_url', 'is', null).not('photo_box', 'is', null)
+          .order('updated_at', { ascending: false }).limit(300);
+        for (const e of ex || []) if (!skip.has(e.id) && !examples.has(e.square_item_id)) examples.set(e.square_item_id, e);
+      }
+    } catch (e) { logger.warn('[shapes] examples unavailable', e.message); }
+    const exampleImg = new Map();
+    const exampleFor = async (sid) => {
+      const e = examples.get(sid);
+      if (!e) return null;
+      if (!exampleImg.has(e.id)) {
+        try { exampleImg.set(e.id, await cropPiece(await fetchBuf(e.reference_photo_url), e.photo_box, 320)); }
+        catch { exampleImg.set(e.id, null); }
+      }
+      return exampleImg.get(e.id);
+    };
     for (let i = 0; i < todo.length; i += 4) {
       const batch = todo.slice(i, i + 4);
       const in2 = [{
         type: 'text',
-        text: `Each PIECE below is a painted pottery piece, shown next to up to four OPTIONS: catalogue photos of bisque shapes from the studio's range. Catalogue photos usually show the plain unpainted shape, sometimes an example paint job.\n\nFor each piece, decide which option is the SAME SHAPE, judging FORM only: silhouette, proportions, handle and spout shape, lids, feet, sculpted or moulded details, letters. Ignore colours and painted designs entirely.\n\nAnswer 0 if none of the options is the same shape. Confidence: high = clearly the same moulded shape; medium = very likely but the angle or a hidden part leaves some doubt; low = a guess. Do not inflate confidence -- a wrong shape is worse than no shape.`,
+        text: `Each PIECE below is a painted pottery piece, shown next to up to four OPTIONS: catalogue photos of bisque shapes from the studio's range. Catalogue photos usually show the plain unpainted shape, sometimes an example paint job. Some options also have a confirmed customer-painted example of that exact shape from an earlier table -- the best guide to size and proportion, since it was photographed the same way.\n\nFor each piece, decide which option is the SAME SHAPE, judging FORM only: silhouette, proportions, handle and spout shape, lids, feet, sculpted or moulded details, letters. Ignore colours and painted designs entirely.\n\nAnswer 0 if none of the options is the same shape. Confidence: high = clearly the same moulded shape; medium = very likely but the angle or a hidden part leaves some doubt; low = a guess. Do not inflate confidence -- a wrong shape is worse than no shape.`,
       }];
       for (let k = 0; k < batch.length; k++) {
         const c = batch[k];
@@ -10361,6 +10583,11 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
             } catch { in2.push({ type: 'text', text: '(no catalogue photo available for this option)' }); }
           } else {
             in2.push({ type: 'text', text: '(no catalogue photo available for this option)' });
+          }
+          const ex = await exampleFor(s.square_item_id);
+          if (ex) {
+            in2.push({ type: 'text', text: `PIECE ${k + 1}, OPTION ${j + 1}, a real customer-painted ${s.name} from an earlier table, confirmed. Same moulded shape, different paint:` });
+            in2.push({ type: 'image', data: ex.toString('base64'), mime_type: 'image/jpeg' });
           }
         }
       }

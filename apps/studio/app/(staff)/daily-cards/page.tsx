@@ -133,7 +133,7 @@ export default function DailyCardsPage() {
   const router = useRouter();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ pieces: ViewerPiece[]; start: number; title: string } | null>(null);
-  const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[]; booking: any; pricing?: { total_cents: number; priced: number; unsure: number } | null } | 'loading' | 'error'>>({});
+  const [tablePieces, setTablePieces] = useState<Record<string, { photo_url: string | null; pieces: any[]; booking: any; pricing?: { total_cents: number; priced: number; unsure: number } | null; till?: any } | 'loading' | 'error'>>({});
   // [9 Oct] Prices on the card. A shape with several sizes shows its range.
   const money = (c: number) => `£${(c / 100).toFixed(c % 100 ? 2 : 0)}`;
   const priceText = (sh: any) => !sh || !sh.price_cents ? '' : (sh.price_min_cents && sh.price_min_cents < sh.price_cents ? `${money(sh.price_min_cents)}–${money(sh.price_cents)}` : money(sh.price_cents));
@@ -172,7 +172,7 @@ export default function DailyCardsPage() {
     try {
       const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(code)}/table-pieces`);
       const d = r.ok ? await r.json() : null;
-      setTablePieces((t) => ({ ...t, [code]: d ? { photo_url: d.photo_url || null, pieces: Array.isArray(d.pieces) ? d.pieces : [], booking: d.booking || null, pricing: d.pricing || null } : 'error' }));
+      setTablePieces((t) => ({ ...t, [code]: d ? { photo_url: d.photo_url || null, pieces: Array.isArray(d.pieces) ? d.pieces : [], booking: d.booking || null, pricing: d.pricing || null, till: d.till || null } : 'error' }));
     } catch {
       setTablePieces((t) => ({ ...t, [code]: 'error' }));
     }
@@ -227,6 +227,33 @@ export default function DailyCardsPage() {
   const [selectedSessionIdx, setSelectedSessionIdx] = useState<number | null>(null);
 
   useEffect(() => { cardDateRef.current = cardDate; }, [cardDate]);
+  // [9 Oct] Till tickets nobody could place: a table code with no booking
+  // at that table, or pottery on a ticket with no name. One tap puts it on
+  // a booking; "Not a booking" hides it. Checked every two minutes.
+  const [tillLoose, setTillLoose] = useState<any[]>([]);
+  const [tillOpen, setTillOpen] = useState(false);
+  const loadTillLoose = useCallback(async () => {
+    try {
+      const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till/unmatched?date=${cardDateRef.current}`, { cache: 'no-store' });
+      const d = r.ok ? await r.json() : null;
+      setTillLoose(Array.isArray(d?.tickets) ? d.tickets : []);
+    } catch { /* keep what we had */ }
+  }, []);
+  useEffect(() => {
+    loadTillLoose();
+    const t = setInterval(loadTillLoose, 2 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [cardDate, loadTillLoose]);
+  const placeTicket = async (t: any, booking_code: string | null) => {
+    setTillLoose((xs) => xs.filter((x) => x.order_id !== t.order_id));
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till/link`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: t.order_id, booking_code, ticket_name: t.name, created_at: t.created_at, state: t.state, total_cents: t.total_cents, pottery: t.pottery }),
+      });
+      if (booking_code) setTablePieces((tp) => { const n = { ...tp }; delete n[booking_code]; return n; });
+    } catch { loadTillLoose(); }
+  };
 
   // Coming back: reopen the card that was open, on its day, scrolled to.
   const restoreCode = useRef<string | null>(null);
@@ -808,6 +835,40 @@ export default function DailyCardsPage() {
         )}
       </div>
 
+      {tillLoose.length > 0 && (
+        <div style={{ margin: '0 0 1rem', border: '1px solid #e2c9a0', background: '#fdf7ee', borderRadius: 8, padding: '0.6rem 0.8rem' }}>
+          <button onClick={() => setTillOpen((o) => !o)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, color: '#8a5a1a', fontSize: 'var(--text-sm)' }}>
+            {tillLoose.length} till ticket{tillLoose.length === 1 ? '' : 's'} not on a booking {tillOpen ? '▲' : '▼'}
+          </button>
+          {tillOpen && tillLoose.map((t) => (
+            <div key={t.order_id} style={{ borderTop: '1px solid #eedcbf', marginTop: '0.5rem', paddingTop: '0.5rem', fontSize: 'var(--text-sm)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <span><strong>{t.name || 'No name'}</strong> · {new Date(t.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}{t.state === 'OPEN' ? ' · open' : ' · paid'}</span>
+                <span style={{ fontWeight: 700 }}>{money(t.total_cents || 0)}</span>
+              </div>
+              {t.pottery?.length > 0 && (
+                <div style={{ color: 'var(--stone)', fontSize: 'var(--text-xs)', marginTop: '0.15rem' }}>
+                  {t.pottery.map((p: any) => `${p.qty > 1 ? p.qty + ' x ' : ''}${p.name}`).join(', ')}
+                </div>
+              )}
+              <select
+                defaultValue=""
+                onChange={(e) => { const v = e.target.value; if (v) placeTicket(t, v === '__none' ? null : v); }}
+                style={{ marginTop: '0.35rem', width: '100%', padding: '0.35rem', borderRadius: 6, border: '1px solid #ddd', fontSize: 'var(--text-sm)', background: 'white', color: 'var(--charcoal)' }}
+              >
+                <option value="" disabled>Put on a booking…</option>
+                {bookings.map((b) => (
+                  <option key={b.booking_code} value={b.booking_code}>
+                    {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} {b.customer_name}
+                  </option>
+                ))}
+                <option value="__none">Not a booking (cafe only)</option>
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
         {visibleBookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
@@ -1187,7 +1248,7 @@ export default function DailyCardsPage() {
                               {p.shape ? (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                                   <span style={{ color: 'var(--charcoal)' }}>{k + 1}. {p.shape.name}</span>
-                                  <span style={{ fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>{priceText(p.shape) || 'no price'}</span>
+                                  <span style={{ fontWeight: 700, color: 'var(--charcoal)', whiteSpace: 'nowrap' }}>{p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{priceText(p.shape) || 'no price'}</span>
                                 </div>
                               ) : (
                                 <div>
@@ -1213,6 +1274,29 @@ export default function DailyCardsPage() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--sand, #e8dccb)', marginTop: '0.4rem', paddingTop: '0.5rem', fontWeight: 700, color: 'var(--charcoal)' }}>
                               <span>Pottery{tp.pricing.unsure ? ` (${tp.pricing.unsure} still to check)` : ''}</span>
                               <span>{tp.pieces.some((p: any) => p.shape?.price_min_cents && p.shape.price_min_cents < p.shape.price_cents) ? 'from ' : ''}{money(tp.pricing.total_cents)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {tp.till && (
+                        <div style={{ maxWidth: 520, margin: '0.8rem auto 0', background: '#f6f3ee', borderRadius: 6, padding: '0.5rem 0.7rem', fontSize: 'var(--text-sm)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                            <span style={{ color: 'var(--charcoal)' }}>Till: {tp.till.tickets}</span>
+                            <span style={{ fontWeight: 700 }}>{money(tp.till.total_cents || 0)}</span>
+                          </div>
+                          {tp.till.pottery?.length > 0 && (
+                            <div style={{ color: 'var(--stone)', fontSize: 'var(--text-xs)', marginTop: '0.2rem' }}>
+                              Pottery rung up: {tp.till.pottery.map((p: any) => `${p.qty > 1 ? p.qty + ' x ' : ''}${p.name}`).join(', ')}
+                            </div>
+                          )}
+                          {tp.till.not_photographed?.length > 0 && (
+                            <div style={{ color: '#A8651A', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.25rem' }}>
+                              On the bill, not in the photo: {tp.till.not_photographed.map((p: any) => `${p.qty > 1 ? p.qty + ' x ' : ''}${p.name}`).join(', ')}
+                            </div>
+                          )}
+                          {tp.till.not_billed?.length > 0 && (
+                            <div style={{ color: '#A8651A', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.25rem' }}>
+                              In the photo, not on the bill: {tp.till.not_billed.map((p: any) => `${p.index}. ${p.name}`).join(', ')}
                             </div>
                           )}
                         </div>
