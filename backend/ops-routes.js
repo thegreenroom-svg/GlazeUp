@@ -92,7 +92,7 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
     const short = photographed.filter((b) => (b.party_size || 0) > (byBooking.get(b.booking_code) || []).length);
 
     const prices = await catalogPrices(pieces.map((p) => p.square_item_id));
-    let confirmedByPerson = 0, confirmedByTill = 0, guesses = 0, unknown = 0, valueCents = 0, billCents = 0;
+    let confirmedByPerson = 0, confirmedByTill = 0, guesses = 0, unknown = 0, handmade = 0, valueCents = 0, billCents = 0;
     for (const b of bookings) {
       const bill = new Map();
       (Array.isArray(b.till_pottery) ? b.till_pottery : []).forEach((r) => {
@@ -102,7 +102,7 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
         bill.set(r.square_item_id, a);
       });
       for (const p of byBooking.get(b.booking_code) || []) {
-        if (!p.square_item_id) { unknown++; continue; }
+        if (!p.square_item_id) { if (p.shape_confirmed) handmade++; else unknown++; continue; }
         const charged = bill.get(p.square_item_id)?.shift();
         if (charged) { billCents += charged; valueCents += charged; } else {
           const c = prices[p.square_item_id];
@@ -136,6 +136,7 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
       confirmed_by_person: confirmedByPerson,
       guesses,
       unknown,
+      handmade,
       pottery_value_gbp: Math.round(valueCents) / 100,
       of_which_from_bills_gbp: Math.round(billCents) / 100,
       ai_checked: scored.length,

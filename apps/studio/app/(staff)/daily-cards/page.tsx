@@ -204,6 +204,7 @@ export default function DailyCardsPage() {
     pieces.forEach((p: any) => {
       if (p.shape?.price_cents) { lo += p.shape.price_min_cents || p.shape.price_cents; hi += p.shape.price_cents; return; }
       if (p.shape) { atTill++; return; }
+      if (p.handmade) return;
       check++;
       const ps = (p.options || []).map((o: any) => o.price_cents).filter((x: number) => x > 0);
       if (ps.length) { lo += Math.min(...ps); hi += Math.max(...ps); }
@@ -216,9 +217,9 @@ export default function DailyCardsPage() {
     setTablePieces((t) => {
       const tp = t[code];
       if (!tp || tp === 'loading' || tp === 'error') return t;
-      const pieces = tp.pieces.map((p: any) => p.id === pieceId ? { ...p, shape, options: [], shape_confirmed: true } : p);
+      const pieces = tp.pieces.map((p: any) => p.id === pieceId ? { ...p, shape, options: [], shape_confirmed: true, shape_sure: !!shape, handmade: !shape } : p);
       let total = 0, priced = 0, unsure = 0;
-      pieces.forEach((p: any) => { if (p.shape?.price_cents) { total += p.shape.price_min_cents || p.shape.price_cents; priced++; } else unsure++; });
+      pieces.forEach((p: any) => { if (p.shape?.price_cents) { total += p.shape.price_min_cents || p.shape.price_cents; priced++; } else if (!p.handmade) unsure++; });
       return { ...t, [code]: { ...tp, pieces, pricing: { total_cents: total, priced, unsure } } };
     });
     let who: string | null = null;
@@ -1583,13 +1584,20 @@ export default function DailyCardsPage() {
                             <div key={p.id} style={{ padding: '0.3rem 0', fontSize: 'var(--text-sm)' }}>
                               {p.shape ? (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                                  <span style={{ color: 'var(--charcoal)' }}>{k + 1}. {p.shape.name}</span>
+                                  <span style={{ color: 'var(--charcoal)' }}>
+                                    {k + 1}. {p.shape.name}
+                                    {!p.shape_sure && (
+                                      <button onClick={() => confirmShape(b.booking_code, p.id, null)} style={{ marginLeft: '0.4rem', background: 'none', border: 'none', padding: 0, color: 'var(--stone)', fontSize: 'var(--text-xs)', textDecoration: 'underline', cursor: 'pointer' }}>
+                                        handmade?
+                                      </button>
+                                    )}
+                                  </span>
                                   <span style={{ fontWeight: priceText(p.shape) ? 700 : 500, color: priceText(p.shape) ? 'var(--charcoal)' : 'var(--stone)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{!p.shape_sure && <span title="Recognised from the photo, not yet checked against the till or by a person" style={{ color: 'var(--stone)', fontWeight: 600, fontSize: 'var(--text-xs)' }}>guess · </span>}{p.shape.from_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>till · </span>}{priceText(p.shape) || 'priced at the till'}</span>
                                 </div>
                               ) : (
                                 <div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                                    <span style={{ color: 'var(--stone)' }}>{k + 1}. {p.piece_type || 'Piece'}: {p.options?.length ? 'which is it? Tap one' : 'not recognised'}</span>
+                                    <span style={{ color: 'var(--stone)' }}>{k + 1}. {p.piece_type || 'Piece'}: {p.handmade ? 'handmade, painted here (no bisque price)' : p.options?.length ? 'which is it? Tap one' : 'not recognised'}</span>
                                     {(() => {
                                       const ps = (p.options || []).map((o: any) => o.price_cents).filter((x: number) => x > 0);
                                       return ps.length ? <span style={{ color: 'var(--stone)', fontWeight: 600, whiteSpace: 'nowrap' }}>{rangeText(Math.min(...ps), Math.max(...ps))}</span> : null;
@@ -1597,6 +1605,12 @@ export default function DailyCardsPage() {
                                   </div>
                                   {p.options?.length > 0 && (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.3rem' }}>
+                                      <button
+                                        onClick={() => confirmShape(b.booking_code, p.id, null)}
+                                        style={{ border: '1px solid var(--stone)', background: 'white', color: 'var(--stone)', borderRadius: 999, padding: '0.25rem 0.6rem', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' }}
+                                      >
+                                        Handmade
+                                      </button>
                                       {p.options.map((o: any) => (
                                         <button
                                           key={o.square_item_id}

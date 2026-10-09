@@ -60,6 +60,24 @@ export default function QuickCheckPage() {
     } finally { setBusy(false); }
   };
 
+  // [9 Oct] Daisy: Katrin Aneva's pieces were made in a workshop and only
+  // painted in the session. Not one of the bisque range: no shape, no price.
+  const settleHandmade = async () => {
+    if (!list) return;
+    const p = list[i];
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`${API}/api/spec/pieces/${p.id}/shape`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ square_item_id: null, confirmed_by: who }),
+      });
+      if (!r.ok) throw new Error();
+      setDone((d) => d + 1);
+      setI(i + 1);
+    } catch { setErr('Could not save that one. Try again.'); }
+    finally { setBusy(false); }
+  };
+
   if (!list) {
     return (
       <PageShell title="Quick check" subtitle="Settle the guessed shapes, one tap each">
@@ -134,6 +152,13 @@ export default function QuickCheckPage() {
             </>
           )}
 
+          <button
+            disabled={busy}
+            onClick={() => settleHandmade()}
+            style={{ display: 'block', width: '100%', marginTop: '0.6rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--stone)', background: 'white', color: '#6b625a', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'left' }}
+          >
+            Handmade in a workshop, just painted here (no bisque price)
+          </button>
           <button
             onClick={() => settle(null)}
             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.9rem', background: 'none', border: 'none', padding: 0, color: 'var(--stone)', fontWeight: 600, fontSize: 'var(--text-sm)' }}

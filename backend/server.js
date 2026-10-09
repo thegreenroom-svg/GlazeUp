@@ -270,7 +270,7 @@ app.get('/api/demo/bookings', async (req, res) => {
         if (p.square_item_id && !p.shape_confirmed && !charged) pc.guesses++;
         if (charged) pc.cents += charged;
         else if (p.square_item_id && priceOf[p.square_item_id]) pc.cents += priceOf[p.square_item_id];
-        else if (!p.square_item_id) pc.to_check++;
+        else if (!p.square_item_id && !p.shape_confirmed) pc.to_check++; // confirmed with no shape = handmade
       });
     }
 

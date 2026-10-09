@@ -5980,7 +5980,9 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
         p.options = !p.shape
           ? (Array.isArray(p.shape_candidates) ? p.shape_candidates : []).slice(0, 4).map((c) => shapeOf(c?.square_item_id, c?.name)).filter(Boolean)
           : [];
-        if (p.shape?.price_cents) { total += p.shape.price_min_cents || p.shape.price_cents; priced++; } else unsure++;
+        p.handmade = !p.square_item_id && !!p.shape_confirmed;
+        if (p.handmade) p.options = [];
+        if (p.shape?.price_cents) { total += p.shape.price_min_cents || p.shape.price_cents; priced++; } else if (!p.handmade) unsure++;
         delete p.shape_candidates;
       });
       // [9 Oct] Price gaps. A piece still to check counts at the cheapest to
@@ -11744,12 +11746,14 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
         square_item_id: sid,
         shape_confirmed: true,
         shape_confirmed_by: req.body?.confirmed_by || null,
-        shape_confidence: sid ? 'confirmed' : 'none',
+        // [9 Oct] No shape means made by hand (a workshop piece, painted
+        // here): not one of the bisque range, so no bisque price.
+        shape_confidence: sid ? 'confirmed' : 'handmade',
         shape_checked_at: new Date().toISOString(),
       }).eq('id', req.params.id).eq('studio_id', STUDIO_ID)
         .select('id, square_item_id, shape_confirmed, ai_square_item_id, ai_confidence').single();
       if (error) throw error;
-      if (sid) await recordOutcome(supabase, STUDIO_ID, data, sid, req.body?.confirmed_by || 'staff');
+      await recordOutcome(supabase, STUDIO_ID, data, sid || 'handmade', req.body?.confirmed_by || 'staff');
       res.json(data);
     } catch (err) {
       res.status(500).json({ error: err.message });
