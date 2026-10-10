@@ -6908,7 +6908,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
   function isStrongLink(l) {
     const basis = String(l.basis || '');
     if (/pottery|photo/i.test(basis)) return false;
-    return !!l.manual || /name|by hand/i.test(basis);
+    return !!l.manual || /name|by hand|paid together/i.test(basis);
   }
 
   // The till as a second opinion on shapes. Only ever settles a piece when
@@ -7132,10 +7132,15 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
       const ids = useful.map((x) => x.o.id);
       const manual = new Set();
       const manualTo = new Map();
+      const manualStrong = new Map(); // by hand, not by photo
       for (let i = 0; i < ids.length; i += 200) {
-        const { data } = await supabase.from('till_ticket_links').select('order_id, booking_code')
+        const { data } = await supabase.from('till_ticket_links').select('order_id, booking_code, basis')
           .eq('studio_id', STUDIO_ID).eq('manual', true).in('order_id', ids.slice(i, i + 200));
-        (data || []).forEach((l) => { manual.add(l.order_id); if (l.booking_code) manualTo.set(l.order_id, l.booking_code); });
+        (data || []).forEach((l) => {
+          manual.add(l.order_id);
+          if (l.booking_code) manualTo.set(l.order_id, l.booking_code);
+          if (l.booking_code && !/pottery|photo/i.test(l.basis || '')) manualStrong.set(l.order_id, l.booking_code);
+        });
       }
 
       const { data: bookings } = await supabase.from('bookings')
@@ -7258,6 +7263,46 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
           if (x.pottery.length) { const f = fitOf(x.pottery, code); if (f) claim(code, f.used); }
           links.push(linkOf(x, code, named[0].basis));
         } else rest.push(x);
+      }
+
+      // 1b. [10 Oct] PAID TOGETHER. Daisy: "when the girls till up the
+      //    tables, they usually do everything on the table in one go... the
+      //    bill may have been paid by three different people, the booking
+      //    may be in one name, but you can time check the till transaction."
+      //    Today's till bears it out: T6a zoe and T6a emma paid 17 seconds
+      //    apart, T4 eve, emma and dan within 44 seconds. Time alone is not
+      //    enough (other tables pay in the same minutes), so it is the same
+      //    table code AND paid within three minutes of a ticket already tied
+      //    to the booking by a name or by a person. Pottery plays no part,
+      //    so a link made this way can settle shapes like a name can.
+      {
+        const PAID_GAP = 3 * 60 * 1000;
+        const tableOf = (x) => { const t = normTable(x.name); return t ? `${t.num}${t.letter}` : null; };
+        const paidAt = (x) => (x.o.state === 'COMPLETED' && x.o.closed_at ? new Date(x.o.closed_at).getTime() : null);
+        const anchors = [];
+        for (const l of links) {
+          const x = useful.find((u) => u.o.id === l.order_id);
+          if (x && /name/i.test(l.basis || '')) anchors.push({ x, code: l.booking_code });
+        }
+        for (const x of useful) if (manualStrong.has(x.o.id)) anchors.push({ x, code: manualStrong.get(x.o.id) });
+        let grew = true;
+        while (grew && rest.length) {
+          grew = false;
+          for (let k = rest.length - 1; k >= 0; k--) {
+            const x = rest[k];
+            const t = tableOf(x); const at = paidAt(x);
+            if (!t || at === null) continue;
+            const near = anchors.filter((a) => tableOf(a.x) === t && paidAt(a.x) !== null && Math.abs(paidAt(a.x) - at) <= PAID_GAP);
+            const codes = [...new Set(near.map((a) => a.code))];
+            if (codes.length !== 1) continue; // none, or two bookings at one table code: leave it
+            const anchor = near.find((a) => a.code === codes[0]);
+            if (x.pottery.length) { const f = fitOf(x.pottery, codes[0]); if (f) claim(codes[0], f.used); }
+            links.push(linkOf(x, codes[0], `paid together with ${anchor.x.name || 'a named ticket'}`));
+            anchors.push({ x, code: codes[0] });
+            rest.splice(k, 1);
+            grew = true;
+          }
+        }
       }
 
       // 2. Elimination on the pottery, round and round until nothing new
