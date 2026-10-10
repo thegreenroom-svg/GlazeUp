@@ -333,6 +333,91 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
     } catch (err) { logger.error('[kiln-plan] failed', err.message); res.status(500).json({ error: err.message }); }
   });
 
+  // ---- KILN SHELVES BY COLLECTION DATE ---------------------------------
+  // [10 Oct] Daisy: "there's got to be a section kiln... for Lucy or
+  // whoever's packing the kilns and dip glazing... handwrite a date for
+  // collection on the shelf that items to be dip glazed and fired next
+  // for the collection date need to be placed on... always the option to
+  // add new shelf and new collection dates if that booking says so."
+  //
+  // One shelf per collection date. Each carries the pieces that go on it
+  // (with their photo, so they can be found on the painting racks), and
+  // where that shelf is: filling, on the shelf, dipped and in the kiln,
+  // out. Dates with nothing left to fire drop off; they belong to packing.
+  // Empty shelves added by hand stay listed until they are used or past.
+  app.get('/api/spec/kiln/shelves-by-date', async (req, res) => {
+    try {
+      const today = londonDay();
+      const studioDate = await studioCollectionDate();
+      const since = new Date(Date.now() - 45 * 86400000).toISOString();
+      const { data: bk } = await supabase.from('bookings')
+        .select('booking_code, customer_name, session_start, collection_date, collected_at, booking_type, status, collection_notes, fulfilment_method')
+        .eq('studio_id', STUDIO_ID).gte('session_start', since).is('collected_at', null);
+      const bookings = (bk || []).filter(isReal);
+      const codes = bookings.map((b) => b.booking_code);
+      const sd = await statusDates(codes);
+      const pieces = codes.length
+        ? await piecesFor(codes, 'id, booking_id, status, shelf_id, packed_at, returned_at, piece_type, description, reference_photo_url, photo_box, parts')
+        : [];
+      const { data: stages } = await supabase.from('collection_batches')
+        .select('collection_date, shelved_at, into_kiln_at, out_of_kiln_at, moved_by')
+        .eq('studio_id', STUDIO_ID).gte('collection_date', new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10));
+      const stageBy = new Map((stages || []).map((s) => [String(s.collection_date).slice(0, 10), s]));
+
+      const groups = new Map();
+      const groupFor = (date) => {
+        if (!groups.has(date)) groups.set(date, { date, stage: stageBy.get(date) || null, to_fire: 0, fired: 0, packed: 0, bookings: [] });
+        return groups.get(date);
+      };
+      for (const b of bookings) {
+        const ps = pieces.filter((p) => p.booking_id === b.booking_code && p.status !== 'damaged' && !['collected', 'returns'].includes(stageOf(p)));
+        if (!ps.length) continue;
+        const date = (sd[b.booking_code] || b.collection_date || (studioDate && b.session_start.slice(0, 10) < studioDate ? studioDate : null) || 'none').slice(0, 10);
+        const g = groupFor(date);
+        const c = { to_fire: 0, fired: 0, packed: 0 };
+        ps.forEach((p) => { c[stageOf(p)]++; });
+        g.to_fire += c.to_fire; g.fired += c.fired; g.packed += c.packed;
+        g.bookings.push({
+          booking_code: b.booking_code, customer_name: b.customer_name, session_start: b.session_start,
+          notes: b.collection_notes || null, postal: b.fulfilment_method === 'postal', ...c,
+          pieces: ps.map((p) => ({
+            id: p.id, piece_type: p.piece_type, description: p.description, parts: p.parts || 1,
+            reference_photo_url: p.reference_photo_url, photo_box: p.photo_box || null, stage: stageOf(p),
+          })),
+        });
+      }
+      // Shelves added by hand for a date nobody is on yet.
+      for (const [date, s] of stageBy) {
+        if (date >= today && !s.out_of_kiln_at && !groups.has(date)) groupFor(date);
+      }
+      const out = [...groups.values()]
+        // A shelf is the kiln's business until it is out and nothing is
+        // left to fire. After that it is packing's.
+        .filter((g) => g.to_fire > 0 || !g.stage?.out_of_kiln_at)
+        .filter((g) => g.to_fire > 0 || g.bookings.length === 0 || g.date === 'none' || g.date >= today)
+        .map((g) => ({
+          ...g,
+          bookings: g.bookings.sort((a, b) => String(a.session_start).localeCompare(String(b.session_start))),
+          days_left: g.date === 'none' ? null : Math.round((new Date(`${g.date}T12:00:00Z`) - new Date(`${today}T12:00:00Z`)) / 86400000),
+        }))
+        .sort((a, b) => (a.date === 'none' ? 1 : b.date === 'none' ? -1 : a.date.localeCompare(b.date)));
+      res.json({ today, shelves: out });
+    } catch (err) { logger.error('[kiln-shelves] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
+  // A new, empty shelf for a collection date. Never touches the stages of
+  // a date that already has a row.
+  app.post('/api/spec/kiln/shelf-dates', async (req, res) => {
+    try {
+      const date = String(req.body?.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Pick a date' });
+      const { error } = await supabase.from('collection_batches')
+        .upsert({ studio_id: STUDIO_ID, collection_date: date }, { onConflict: 'studio_id,collection_date', ignoreDuplicates: true });
+      if (error) throw error;
+      res.json({ ok: true, date });
+    } catch (err) { logger.error('[kiln-shelf-date] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
   // ---- OVERDUE ----------------------------------------------------------
   app.get('/api/spec/collections/overdue', async (req, res) => {
     try {

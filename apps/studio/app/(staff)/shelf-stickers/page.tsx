@@ -52,6 +52,11 @@ export default function ShelfStickersPage() {
     return d.toISOString().slice(0, 10);
   });
   const [copies, setCopies] = useState(2);
+  // [10 Oct] The Kiln page's "Label" button opens this on its shelf's date.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('date');
+    if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) setDate(q);
+  }, []);
   const [qr, setQr] = useState('');
 
   useEffect(() => {

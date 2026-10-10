@@ -9459,10 +9459,29 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
       // The pieces follow the batch. Out of the kiln means ready to
       // pack, which is the state the packing queue already reads.
       if (stage === 'out' && !undo) {
+        // [10 Oct] A booking's collection date lives in two places: the
+        // date set on the day (demo_app_session_status) and the booking's
+        // own. The day's one wins, as on the kiln shelves page; reading
+        // only the booking's own missed anyone whose date had been set or
+        // changed on the day, and left their pieces unfired on paper.
+        const { data: setOnDay } = await supabase
+          .from('demo_app_session_status').select('booking_code')
+          .eq('studio_id', STUDIO_ID).eq('collection_date', date);
         const { data: bookings } = await supabase
           .from('bookings').select('booking_code')
           .eq('studio_id', STUDIO_ID).eq('collection_date', date);
-        const codes = (bookings || []).map((b) => b.booking_code);
+        const own = (bookings || []).map((b) => b.booking_code);
+        // Own date says this one, but the day moved it elsewhere: not ours.
+        const movedAway = new Set();
+        for (let i = 0; i < own.length; i += 200) {
+          const { data: st } = await supabase.from('demo_app_session_status').select('booking_code, collection_date')
+            .eq('studio_id', STUDIO_ID).in('booking_code', own.slice(i, i + 200)).not('collection_date', 'is', null);
+          (st || []).forEach((s) => { if (String(s.collection_date).slice(0, 10) !== date) movedAway.add(s.booking_code); });
+        }
+        const codes = [...new Set([
+          ...own.filter((c) => !movedAway.has(c)),
+          ...(setOnDay || []).map((s) => s.booking_code),
+        ])];
         if (codes.length) {
           await supabase.from('pottery_pieces')
             .update({ status: 'ready', updated_at: new Date().toISOString() })

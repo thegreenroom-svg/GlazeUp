@@ -32,9 +32,13 @@ const STEPS = [
   // and doing it badly is invisible until packing day. It carries its
   // own technique -- loose spacing, 45 degrees down -- so it gets its
   // own screen where that guidance can be read rather than remembered.
-  { key: 'kiln',       n: 3, label: 'Out of the kiln', detail: 'Box it up and photograph each box',  href: '/out-of-kiln', icon: Boxes,   tint: '#7C5E4C' },
-  { key: 'packing',    n: 4, label: 'Packing',    detail: 'Find whose pottery is ready',       href: '/packing',    icon: Package, tint: '#9C5A3C' },
-  { key: 'collection', n: 5, label: 'Collection', detail: 'Print the card, hand pottery over',  href: '/collection', icon: Check,   tint: '#6E7A55' },
+  // [10 Oct] Daisy: "there's got to be a section kiln." The step between
+  // photographing and unloading: a shelf per collection date, what goes
+  // on it, and on the shelf, dipped, in the kiln.
+  { key: 'firing',     n: 3, label: 'Kiln',            detail: 'A shelf for each date, dip and fire', href: '/kiln',        icon: Flame,   tint: '#B8562E' },
+  { key: 'kiln',       n: 4, label: 'Out of the kiln', detail: 'Box it up and photograph each box',  href: '/out-of-kiln', icon: Boxes,   tint: '#7C5E4C' },
+  { key: 'packing',    n: 5, label: 'Packing',    detail: 'Find whose pottery is ready',       href: '/packing',    icon: Package, tint: '#9C5A3C' },
+  { key: 'collection', n: 6, label: 'Collection', detail: 'Print the card, hand pottery over',  href: '/collection', icon: Check,   tint: '#6E7A55' },
   // Daisy has now said three times that she cannot find something I
   // built, and the cause is mine: I kept adding entry points as small
   // text links buried inside other screens. The wall of boxes is a
