@@ -9937,6 +9937,16 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
   // Now each arrival starts the reader 20 seconds after the last photo
   // of a batch lands, and the reader keeps going until the queue is
   // empty. The tick stays as the safety net.
+  // [10 Oct] One photo conversion at a time. A full-size HEIC decode is
+  // the single biggest memory cost on the server; two at once tipped it
+  // over the 512MB limit.
+  let ingestChain = Promise.resolve();
+  const oneIngestAtATime = (fn) => {
+    const run = ingestChain.then(fn, fn);
+    ingestChain = run.catch(() => {});
+    return run;
+  };
+
   let kickTimer = null;
   const kickReader = () => {
     clearTimeout(kickTimer);
@@ -9974,11 +9984,54 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
 
       let buf = req.file.buffer || fs.readFileSync(req.file.path);
       cleanup();
-      // Stored as JPEG. iPads shoot HEIC; the Shortcut converts, but if
-      // one slips through, try here before giving up.
-      if (!(buf[0] === 0xff && buf[1] === 0xd8)) {
-        try { buf = await sharp(buf).rotate().withMetadata().jpeg({ quality: 88 }).toBuffer(); }
-        catch { return res.status(415).json({ error: 'Not a JPEG and could not be converted. Add "Convert Image to JPEG" before sending in the Shortcut.' }); }
+
+      // [10 Oct] Header only: size, format and the EXIF block, read without
+      // decoding the picture, so the checks below cost almost no memory.
+      let meta = {};
+      try { meta = await sharp(buf).metadata(); } catch { /* checked again below */ }
+
+      // [9 Oct] The real time the photo was taken: the camera's own stamp
+      // inside the photo, else the Shortcut's date text, else now. Before
+      // this every photo carried its upload time. See photo-time.js.
+      const takenRaw = String(req.body?.taken_at || '').trim();
+      const { at: taken, from: takenFrom } = photoTakenAt(buf, takenRaw, new Date(), meta.exif);
+      if (takenFrom === 'upload') logger.info('[ipad-ingest] no usable taken time', JSON.stringify(takenRaw).slice(0, 80));
+
+      // [10 Oct] THE SAME PHOTO, SENT AGAIN, IS NOT A NEW PHOTO.
+      // The iPad re-encodes a photo each time it sends it, so a resend
+      // arrives as different bytes and slipped past the hash check,
+      // costing a fresh AI read every time the camera closed. The camera's
+      // own timestamp, to the second, does not change between sends. Only
+      // trusted when it came from the camera itself: the Shortcut's date
+      // text can be minute-level, and two tables can share a minute.
+      // Checked before any conversion, so a resend costs no memory either.
+      if (takenFrom === 'camera') {
+        const { data: sameShot } = await supabase.from('backfill_photos').select('id, status')
+          .eq('studio_id', STUDIO_ID).eq('taken_at', taken.toISOString()).limit(1);
+        if (sameShot?.length) return res.json({ ok: true, duplicate: true, status: sameShot[0].status });
+      }
+
+      // [10 Oct] Render ran out of memory. The iPad sends full-size HEIC
+      // originals (12 megapixels), and two automation runs can land at
+      // once, so two full decodes were happening side by side on a 512MB
+      // server. Now one photo at a time, and each is stored at 2400px on
+      // its long side as JPEG: plenty for chalk tags and crops (the reader
+      // itself only looks at 1600px), and every later read of it costs a
+      // fraction of the memory too.
+      const isJpeg = buf[0] === 0xff && buf[1] === 0xd8;
+      const longSide = Math.max(meta.width || 0, meta.height || 0);
+      if (!isJpeg || !longSide || longSide > 2400) {
+        try {
+          const src = buf;
+          buf = await oneIngestAtATime(() => sharp(src, { limitInputPixels: 100e6 })
+            .rotate()
+            .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+            .withMetadata()
+            .jpeg({ quality: 85 })
+            .toBuffer());
+        } catch {
+          return res.status(415).json({ error: 'Not a photo the server could read. Add "Convert Image to JPEG" before sending in the Shortcut.' });
+        }
       }
 
       const hash = crypto.createHash('sha1').update(buf).digest('hex');
@@ -9986,25 +10039,6 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
         .eq('studio_id', STUDIO_ID).eq('content_hash', hash).maybeSingle();
       if (seen) return res.json({ ok: true, duplicate: true, status: seen.status });
 
-      // [9 Oct] The real time the photo was taken: the camera's own stamp
-      // inside the photo, else the Shortcut's date text, else now. Before
-      // this every photo carried its upload time. See photo-time.js.
-      const takenRaw = String(req.body?.taken_at || '').trim();
-      const { at: taken, from: takenFrom } = photoTakenAt(buf, takenRaw);
-      if (takenFrom === 'upload') logger.info('[ipad-ingest] no usable taken time', JSON.stringify(takenRaw).slice(0, 80));
-
-      // [10 Oct] THE SAME PHOTO, SENT AGAIN, IS NOT A NEW PHOTO.
-      // The iPad re-encodes a photo each time it sends it, so a resend
-      // arrives as different bytes and slipped past the hash check above,
-      // costing a fresh AI read every time the camera closed. The camera's
-      // own timestamp, to the second, does not change between sends. Only
-      // trusted when it came from the camera itself: the Shortcut's date
-      // text can be minute-level, and two tables can share a minute.
-      if (takenFrom === 'camera') {
-        const { data: sameShot } = await supabase.from('backfill_photos').select('id, status')
-          .eq('studio_id', STUDIO_ID).eq('taken_at', taken.toISOString()).limit(1);
-        if (sameShot?.length) return res.json({ ok: true, duplicate: true, status: sameShot[0].status });
-      }
       const day = taken.toLocaleDateString('en-CA', { timeZone: 'Europe/London' }); // YYYY-MM-DD
       const filename = `ipad/${day}/${hash.slice(0, 16)}.jpg`;
       const storage_path = `backfill/${STUDIO_ID}/${filename}`;

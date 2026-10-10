@@ -56,6 +56,29 @@ export function exifTakenAt(buf) {
   return null;
 }
 
+// [10 Oct] The same camera time, read from an EXIF block on its own --
+// what sharp's metadata() hands back for any format, HEIC included,
+// without decoding the picture. Lets the server spot a resent photo
+// before spending any memory converting it. The block is wrapped in a
+// minimal JPEG APP1 segment so the reader above does the work.
+export function exifBlockTakenAt(exif) {
+  try {
+    if (!exif || exif.length < 8) return null;
+    // Find where the TIFF data starts. JPEG blocks begin "Exif\0\0"; HEIC
+    // blocks can carry a 4-byte offset first. Look in the first 32 bytes.
+    let tiff = -1;
+    for (let i = 0; i < Math.min(32, exif.length - 4); i++) {
+      const sig = exif.toString('latin1', i, i + 4);
+      if (sig === 'MM\0*' || sig === 'II*\0') { tiff = i; break; }
+    }
+    if (tiff < 0) return null;
+    const body = Buffer.concat([Buffer.from('Exif\0\0', 'ascii'), exif.subarray(tiff)]);
+    if (body.length + 2 > 0xffff) return null;
+    const len = Buffer.alloc(2); len.writeUInt16BE(body.length + 2);
+    return exifTakenAt(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe1]), len, body]));
+  } catch { return null; }
+}
+
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
 
 // iOS Shortcuts date text: "9 Oct 2026 at 15:20", "9 October 2026, 15:20:11",
@@ -81,9 +104,9 @@ export function shortcutTakenAt(raw) {
 
 // The time a photo was taken, and where that came from. A time in the
 // future, or more than 60 days back, is not believed.
-export function photoTakenAt(buf, raw, now = new Date()) {
+export function photoTakenAt(buf, raw, now = new Date(), exifBlock = null) {
   const ok = (d) => d && !isNaN(d) && d.getTime() <= now.getTime() + 10 * 60000 && d.getTime() > now.getTime() - 60 * 86400000;
-  const e = exifTakenAt(buf);
+  const e = exifTakenAt(buf) || exifBlockTakenAt(exifBlock);
   if (ok(e)) return { at: e, from: 'camera' };
   const s = shortcutTakenAt(raw);
   if (ok(s)) return { at: s, from: 'shortcut' };
