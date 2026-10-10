@@ -1,6 +1,7 @@
 import multer from 'multer';
 import { returnsWaitingFor } from './returns-match.js';
 import { photoTakenAt } from './photo-time.js';
+import heicDecode from 'heic-decode';
 import { readCardQr, measure, learnSizes, sizeFit, sizeWords, cmFromName } from './table-vision.js';
 // ============================================================================
 // SPEC ROUTES PART 2 — COMMERCIAL + CUSTOMER-FACING
@@ -10148,6 +10149,26 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // decoding the picture, so the checks below cost almost no memory.
       let meta = {};
       try { meta = await sharp(buf).metadata(); } catch { /* checked again below */ }
+      const isHeif = (b) => meta.format === 'heif' || /ftyp(heic|heix|hevc|mif1|msf1)/.test(b.toString('latin1', 4, 12));
+      // One stored copy: JPEG, 2400px on the long side at most. HEIC goes
+      // through its own decoder (see below); anything else through sharp.
+      const toStored = (src) => oneIngestAtATime(async () => {
+        if (isHeif(src)) {
+          const { width, height, data } = await heicDecode({ buffer: src });
+          return sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } })
+            .removeAlpha()
+            .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+            .withMetadata({ icc: 'p3' })
+            .jpeg({ quality: 85 })
+            .toBuffer();
+        }
+        return sharp(src, { limitInputPixels: 100e6 })
+          .rotate()
+          .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+          .withMetadata()
+          .jpeg({ quality: 85 })
+          .toBuffer();
+      });
 
       // [9 Oct] The real time the photo was taken: the camera's own stamp
       // inside the photo, else the Shortcut's date text, else now. Before
@@ -10175,16 +10196,14 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           // for a shot we converted ourselves, it replaces our copy in
           // place, so the pieces already made from it keep working and
           // simply show the right colours. No AI read: nothing new to read.
+          // [10 Oct] HEIC now decodes correctly too, so a resent HEIC from the
+          // Camera automation repairs a pink copy as well as the 15:25 JPEG.
           const isJpegNow = buf[0] === 0xff && buf[1] === 0xd8;
           const bad = (sameShot || []).filter((r) => r.converted_on_server && r.storage_path);
-          if (isJpegNow && bad.length) {
+          if ((isJpegNow || isHeif(buf)) && bad.length) {
             try {
               const long = Math.max(meta.width || 0, meta.height || 0);
-              const good = long > 2400
-                ? await oneIngestAtATime(() => sharp(buf, { limitInputPixels: 100e6 }).rotate()
-                  .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
-                  .withMetadata().jpeg({ quality: 85 }).toBuffer())
-                : buf;
+              const good = isJpegNow && long && long <= 2400 ? buf : await toStored(buf);
               const stamp = Date.now();
               for (const r of bad) {
                 const { error: upErr } = await supabase.storage.from('booking-photos')
@@ -10218,17 +10237,19 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // itself only looks at 1600px), and every later read of it costs a
       // fraction of the memory too.
       const isJpeg = buf[0] === 0xff && buf[1] === 0xd8;
-      const convertedOnServer = !isJpeg;
+      // HEIC now converts correctly; only other formats are still marked as
+      // worth replacing when the iPad's own JPEG of the same shot arrives.
+      const convertedOnServer = !isJpeg && !isHeif(buf);
       const longSide = Math.max(meta.width || 0, meta.height || 0);
       if (!isJpeg || !longSide || longSide > 2400) {
         try {
-          const src = buf;
-          buf = await oneIngestAtATime(() => sharp(src, { limitInputPixels: 100e6 })
-            .rotate()
-            .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
-            .withMetadata()
-            .jpeg({ quality: 85 })
-            .toBuffer());
+          // [10 Oct] HEIC through its own decoder. The server's image library
+          // opens iPad HEIC files but shifts the colours to pink and teal
+          // (Thea, Morag, Hannah, Ella, Louise, Megan...). heic-decode carries
+          // a current libheif and gives the colours back exactly (tested on
+          // known red, green, blue and yellow stripes). Apple photos are
+          // Display P3, so they are tagged as such rather than converted.
+          buf = await toStored(buf);
         } catch {
           return res.status(415).json({ error: 'Not a photo the server could read. Add "Convert Image to JPEG" before sending in the Shortcut.' });
         }
