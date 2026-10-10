@@ -9931,6 +9931,33 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
   // anything else. Now any file field and any type is accepted (the
   // contents are checked below), and a failure says what went wrong.
   const ingestUpload = multer({ dest: 'uploads', limits: { fileSize: 50 * 1024 * 1024 } }).any();
+  // [10 Oct] READ PHOTOS AS THEY ARRIVE. Daisy: photos were reaching the
+  // server but taking up to ten minutes to reach their cards, because
+  // they waited for the five-minute tick and then went a few at a time.
+  // Now each arrival starts the reader 20 seconds after the last photo
+  // of a batch lands, and the reader keeps going until the queue is
+  // empty. The tick stays as the safety net.
+  let kickTimer = null;
+  const kickReader = () => {
+    clearTimeout(kickTimer);
+    kickTimer = setTimeout(async () => {
+      const url = `http://localhost:${process.env.PORT || 3001}/api/spec/backfill/run`;
+      for (let round = 0; round < 15; round++) {
+        try {
+          const r = await fetch(url, { method: 'POST' });
+          const d = await r.json().catch(() => ({}));
+          // Another run already going (the tick): give it time, then
+          // carry on with whatever it left.
+          if (d.busy) { await new Promise((ok) => setTimeout(ok, 30000)); continue; }
+          if (!r.ok || d.stalled || !d.processed || !d.remaining) break;
+        } catch (err) {
+          logger.error('[ipad-ingest] reader kick failed', err.message);
+          break;
+        }
+      }
+    }, 20000);
+  };
+
   app.post('/api/spec/backfill/ingest', (req, res, next) => {
     ingestUpload(req, res, (err) => {
       if (err) return res.status(400).json({ error: `Photo could not be read: ${err.message}` });
@@ -9965,6 +9992,19 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       const takenRaw = String(req.body?.taken_at || '').trim();
       const { at: taken, from: takenFrom } = photoTakenAt(buf, takenRaw);
       if (takenFrom === 'upload') logger.info('[ipad-ingest] no usable taken time', JSON.stringify(takenRaw).slice(0, 80));
+
+      // [10 Oct] THE SAME PHOTO, SENT AGAIN, IS NOT A NEW PHOTO.
+      // The iPad re-encodes a photo each time it sends it, so a resend
+      // arrives as different bytes and slipped past the hash check above,
+      // costing a fresh AI read every time the camera closed. The camera's
+      // own timestamp, to the second, does not change between sends. Only
+      // trusted when it came from the camera itself: the Shortcut's date
+      // text can be minute-level, and two tables can share a minute.
+      if (takenFrom === 'camera') {
+        const { data: sameShot } = await supabase.from('backfill_photos').select('id, status')
+          .eq('studio_id', STUDIO_ID).eq('taken_at', taken.toISOString()).limit(1);
+        if (sameShot?.length) return res.json({ ok: true, duplicate: true, status: sameShot[0].status });
+      }
       const day = taken.toLocaleDateString('en-CA', { timeZone: 'Europe/London' }); // YYYY-MM-DD
       const filename = `ipad/${day}/${hash.slice(0, 16)}.jpg`;
       const storage_path = `backfill/${STUDIO_ID}/${filename}`;
@@ -9985,6 +10025,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
         const now = new Date().toISOString();
         await supabase.from('job_runs').upsert({ job: 'backfill-ingest', last_ok_at: now, last_try_at: now, last_error: null, updated_at: now }, { onConflict: 'job' });
       } catch { /* health only */ }
+      if (!insErr) kickReader();
       res.json({ ok: true, queued: !insErr, day });
     } catch (err) {
       cleanup();
@@ -10052,6 +10093,21 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
     return (created || []).length;
   }
 
+  // [10 Oct] ONE READER AT A TIME. Photos are now read the moment they
+  // arrive as well as on the five-minute tick, so two runs could meet.
+  // The claim step lets a second run re-claim a row the first has just
+  // claimed, which would pay for the same photo twice. A run that finds
+  // another already going simply says so and leaves it to that one.
+  let backfillBusy = false;
+  app.post('/api/spec/backfill/run', (req, res, next) => {
+    if (backfillBusy) return res.json({ busy: true, processed: 0, matched: 0, unmatched: 0, failed: 0, remaining: null });
+    backfillBusy = true;
+    const release = () => { backfillBusy = false; };
+    res.on('finish', release);
+    res.on('close', release);
+    next();
+  });
+
   app.post('/api/spec/backfill/run', async (req, res) => {
     const DIR = BACKFILL_DIR;
     try {
@@ -10097,6 +10153,9 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       const { data: readyRows } = await supabase
         .from('backfill_photos').select('id, filename, status, processed_at, storage_path, taken_at')
         .eq('studio_id', STUDIO_ID).in('status', ['pending', 'processing'])
+        // [10 Oct] Newest first, so today's tables reach their cards
+        // before any older photo the iPad happens to send again.
+        .order('taken_at', { ascending: false, nullsFirst: false })
         .order('filename', { ascending: true }).limit(60);
       const pending = (readyRows || []).filter(
         (r) => r.status === 'pending' || (r.processed_at && r.processed_at < staleBefore)
