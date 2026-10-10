@@ -10087,9 +10087,49 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // text can be minute-level, and two tables can share a minute.
       // Checked before any conversion, so a resend costs no memory either.
       if (takenFrom === 'camera') {
-        const { data: sameShot } = await supabase.from('backfill_photos').select('id, status')
-          .eq('studio_id', STUDIO_ID).eq('taken_at', taken.toISOString()).limit(1);
-        if (sameShot?.length) return res.json({ ok: true, duplicate: true, status: sameShot[0].status });
+        const { data: sameShot } = await supabase.from('backfill_photos').select('id, status, storage_path, converted_on_server')
+          .eq('studio_id', STUDIO_ID).eq('taken_at', taken.toISOString());
+        if (sameShot?.length) {
+          // [10 Oct] PINK PHOTOS, PUT RIGHT. The Camera automation sends the
+          // original HEIC, and the server's HEIC conversion shifts the
+          // colours (pink and teal). The 15:25 automation sends the iPad's
+          // own JPEG of the same shots, which is right. When that arrives
+          // for a shot we converted ourselves, it replaces our copy in
+          // place, so the pieces already made from it keep working and
+          // simply show the right colours. No AI read: nothing new to read.
+          const isJpegNow = buf[0] === 0xff && buf[1] === 0xd8;
+          const bad = (sameShot || []).filter((r) => r.converted_on_server && r.storage_path);
+          if (isJpegNow && bad.length) {
+            try {
+              const long = Math.max(meta.width || 0, meta.height || 0);
+              const good = long > 2400
+                ? await oneIngestAtATime(() => sharp(buf, { limitInputPixels: 100e6 }).rotate()
+                  .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+                  .withMetadata().jpeg({ quality: 85 }).toBuffer())
+                : buf;
+              const stamp = Date.now();
+              for (const r of bad) {
+                const { error: upErr } = await supabase.storage.from('booking-photos')
+                  .upload(r.storage_path, good, { contentType: 'image/jpeg', upsert: true });
+                if (upErr) throw upErr;
+                await supabase.from('backfill_photos').update({ converted_on_server: false }).eq('id', r.id);
+                // Same address, new picture: a version on the end so phones
+                // and the CDN fetch it again rather than the pink copy.
+                const { data: pub } = supabase.storage.from('booking-photos').getPublicUrl(r.storage_path);
+                const { data: ps } = await supabase.from('pottery_pieces').select('id, reference_photo_url')
+                  .eq('studio_id', STUDIO_ID).like('reference_photo_url', `${pub.publicUrl}%`);
+                for (const pc of ps || []) {
+                  await supabase.from('pottery_pieces').update({ reference_photo_url: `${pub.publicUrl}?v=${stamp}` }).eq('id', pc.id);
+                }
+              }
+              logger.info(`[ipad-ingest] replaced ${bad.length} server-converted photo(s) with the iPad's own JPEG`);
+              return res.json({ ok: true, duplicate: true, repaired: bad.length });
+            } catch (err) {
+              logger.error('[ipad-ingest] could not replace a converted photo', err.message);
+            }
+          }
+          return res.json({ ok: true, duplicate: true, status: sameShot[0].status });
+        }
       }
 
       // [10 Oct] Render ran out of memory. The iPad sends full-size HEIC
@@ -10100,6 +10140,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // itself only looks at 1600px), and every later read of it costs a
       // fraction of the memory too.
       const isJpeg = buf[0] === 0xff && buf[1] === 0xd8;
+      const convertedOnServer = !isJpeg;
       const longSide = Math.max(meta.width || 0, meta.height || 0);
       if (!isJpeg || !longSide || longSide > 2400) {
         try {
@@ -10131,6 +10172,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       const { error: insErr } = await supabase.from('backfill_photos').insert({
         studio_id: STUDIO_ID, filename, storage_path, status: 'pending',
         taken_at: taken.toISOString(), source: 'ipad', content_hash: hash,
+        converted_on_server: convertedOnServer,
       });
       // Two copies of the same photo racing each other: the second loses
       // on the unique index, which is the right outcome.
