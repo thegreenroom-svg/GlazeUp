@@ -6889,7 +6889,26 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     };
     if (ls.length && !b.arrived_at) upd.arrived_at = ls[0].order_created_at;
     await supabase.from('bookings').update(upd).eq('studio_id', STUDIO_ID).eq('booking_code', code);
-    if (pottery.length) await reconcile(code, pottery);
+    // [10 Oct] Daisy: "the till may be splitting the bill... between two or
+    // three people on the table. So that may be not the best way to count
+    // back to the elimination." Only a ticket tied to this booking by a
+    // name or by a person can settle a shape. A ticket tied to it because
+    // its pottery looked like the photo's guesses cannot: the guess chose
+    // the ticket, so the ticket agreeing with the guess proves nothing
+    // (33 of 34 till confirmations were exactly that). Those still price
+    // the piece, through till_pottery above.
+    const strong = [];
+    ls.filter(isStrongLink).forEach((l) => (l.pottery || []).forEach((p) => {
+      const cur = strong.find((x) => x.square_item_id === p.square_item_id && x.cents === p.cents);
+      if (cur) cur.qty += p.qty; else strong.push({ ...p });
+    }));
+    if (strong.length) await reconcile(code, strong);
+  }
+  // By a person, or by the customer's name on the ticket. Not by pottery.
+  function isStrongLink(l) {
+    const basis = String(l.basis || '');
+    if (/pottery|photo/i.test(basis)) return false;
+    return !!l.manual || /name|by hand/i.test(basis);
   }
 
   // The till as a second opinion on shapes. Only ever settles a piece when
@@ -6903,6 +6922,14 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     pottery.forEach((p) => left.set(p.square_item_id, (left.get(p.square_item_id) || 0) + p.qty));
     const now = new Date().toISOString();
     let settled = false;
+    // [10 Oct] A split bill. If these tickets account for fewer pieces than
+    // were photographed (handmade ones aside), the rest was paid on a
+    // ticket under someone else's name. Then "what is left on the bill"
+    // is not what is left on the table, so nothing is settled by
+    // elimination: only a piece whose own recognised shape is on the bill.
+    const billed = pottery.reduce((n, p) => n + (p.qty || 0), 0);
+    const onTable = (pieces || []).filter((p) => !(p.shape_confirmed && !p.square_item_id)).length;
+    const wholeBill = billed >= onTable;
     const confirm = async (id, sid) => {
       settled = true;
       const { data: done } = await supabase.from('pottery_pieces').update({
@@ -6929,6 +6956,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     // nobody has used: the AI was wrong, and that item is the likely
     // answer. Scored as wrong (so "very likely" is not trusted blindly),
     // but the shape itself is left for the photo check below or a person.
+    if (!wholeBill) return settled;
     {
       const spare = [...left.entries()].filter(([, n]) => n > 0);
       if (offBill.length === 1 && spare.length === 1 && spare[0][1] === 1) {
@@ -7056,9 +7084,14 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
   // For recognition: settle what the till can before paying for more.
   app.locals.reconcileTill = async (code) => {
     try {
-      const { data: b } = await supabase.from('bookings').select('till_pottery')
-        .eq('studio_id', STUDIO_ID).eq('booking_code', code).maybeSingle();
-      const pottery = Array.isArray(b?.till_pottery) ? b.till_pottery : [];
+      // [10 Oct] Only tickets tied by a name or a person (see rollUp).
+      const { data: links } = await supabase.from('till_ticket_links')
+        .select('pottery, basis, manual').eq('studio_id', STUDIO_ID).eq('booking_code', code);
+      const pottery = [];
+      (links || []).filter(isStrongLink).forEach((l) => (l.pottery || []).forEach((p) => {
+        const cur = pottery.find((x) => x.square_item_id === p.square_item_id && x.cents === p.cents);
+        if (cur) cur.qty += p.qty; else pottery.push({ ...p });
+      }));
       return pottery.length ? await reconcile(code, pottery) : false;
     } catch (e) { logger.warn('[till] reconcile failed', e.message); return false; }
   };
