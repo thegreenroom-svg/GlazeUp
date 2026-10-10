@@ -9580,8 +9580,9 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
       const stage = String(req.body?.stage || '');
       const by = (req.body?.by || 'staff').toString().slice(0, 60);
 
-      const column = { shelved: 'shelved_at', kiln: 'into_kiln_at', out: 'out_of_kiln_at' }[stage];
-      if (!column) return res.status(400).json({ error: 'stage must be shelved, kiln or out' });
+      // [10 Oct] Dipping is its own step now, between the shelf and the kiln.
+      const column = { shelved: 'shelved_at', dipped: 'dipped_at', kiln: 'into_kiln_at', out: 'out_of_kiln_at' }[stage];
+      if (!column) return res.status(400).json({ error: 'stage must be shelved, dipped, kiln or out' });
 
       // Undo is a real need, not a nicety: the commonest mistake is
       // scanning the wrong shelf's sticker, and it should cost one tap
@@ -9589,6 +9590,14 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
       const undo = req.body?.undo === true;
       const patch = { studio_id: STUDIO_ID, collection_date: date, moved_by: by };
       patch[column] = undo ? null : new Date().toISOString();
+      // Into the kiln records which kiln(s) and the programme.
+      if (stage === 'kiln') {
+        if (undo) { patch.kilns = null; patch.fire_program = null; } else {
+          const kilns = (Array.isArray(req.body?.kilns) ? req.body.kilns : []).map((k) => String(k).trim().slice(0, 40)).filter(Boolean).slice(0, 6);
+          if (kilns.length) patch.kilns = kilns;
+          if (req.body?.fire_program) patch.fire_program = String(req.body.fire_program).slice(0, 60);
+        }
+      }
 
       const { error } = await supabase
         .from('collection_batches')

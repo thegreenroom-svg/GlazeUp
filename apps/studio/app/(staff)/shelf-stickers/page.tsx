@@ -116,7 +116,9 @@ export default function ShelfStickersPage() {
         </div>
         <p style={{ fontSize: 'var(--text-xs)', color: '#6b625a', margin: '0.5rem 0 0', lineHeight: 1.45 }}>
           One per shelf edge holding this batch. They are all the same label — the date is what matters,
-          not which shelf, because the shelves get broken up when the kiln is loaded.
+          not which shelf, because the shelves get broken up when the kiln is loaded. The same label
+          works all the way through: scanned before firing it opens the shelf on the Kiln page (on the
+          shelf, dipped, into the kiln, out); once it is out of the kiln it opens the collection check.
         </p>
       </div>
 
@@ -134,7 +136,7 @@ export default function ShelfStickersPage() {
           <div key={n} className="sticker">
             <img className="qr" src={qr} alt="" />
             <div className="txt">
-              <p className="kicker">COLLECTION</p>
+              <p className="kicker">KILN SHELF · COLLECT</p>
               {/* The date is the label. Most of the time nobody scans
                   anything -- they want to know which shelf is which
                   from across the studio. */}

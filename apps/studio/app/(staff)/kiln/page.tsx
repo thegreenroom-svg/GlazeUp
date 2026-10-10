@@ -33,15 +33,32 @@ interface Booking {
   booking_code: string; customer_name: string; session_start: string; notes: string | null; postal: boolean;
   to_fire: number; fired: number; packed: number; pieces: Piece[];
 }
-interface Stage { shelved_at: string | null; into_kiln_at: string | null; out_of_kiln_at: string | null; moved_by: string | null }
+interface Stage {
+  shelved_at: string | null; dipped_at: string | null; into_kiln_at: string | null; out_of_kiln_at: string | null; moved_by: string | null;
+  kilns: string[] | null; fire_program: string | null; plan_fire_date: string | null;
+}
 interface Shelf { date: string; days_left: number | null; stage: Stage | null; to_fire: number; fired: number; packed: number; left_out: number; left_out_in_kiln: number; bookings: Booking[] }
 
-type Step = 'shelved' | 'kiln' | 'out';
-const STEPS: { key: Step; col: keyof Stage; doLabel: string; doneLabel: string }[] = [
+// [10 Oct] Dipping is its own step: shelf, dip, kiln, out.
+type Step = 'shelved' | 'dipped' | 'kiln' | 'out';
+const STEPS: { key: Step; col: 'shelved_at' | 'dipped_at' | 'into_kiln_at' | 'out_of_kiln_at'; doLabel: string; doneLabel: string }[] = [
   { key: 'shelved', col: 'shelved_at', doLabel: 'All on the shelf', doneLabel: 'On the shelf' },
-  { key: 'kiln', col: 'into_kiln_at', doLabel: 'Dipped, into the kiln', doneLabel: 'Dipped and in the kiln' },
+  { key: 'dipped', col: 'dipped_at', doLabel: 'Dip in glaze', doneLabel: 'Dipped' },
+  { key: 'kiln', col: 'into_kiln_at', doLabel: 'Into the kiln', doneLabel: 'In the kiln' },
   { key: 'out', col: 'out_of_kiln_at', doLabel: 'Out of the kiln', doneLabel: 'Out of the kiln' },
 ];
+
+// What a good dip looks like, as a reminder at the moment of doing it.
+// Ticks are a guide, not a gate: the button works whatever is ticked.
+const DIP_CHECKS = [
+  'Glaze stirred right through, nothing settled at the bottom',
+  'Each piece dipped in one smooth go, 2 to 3 seconds, evenly coated',
+  'Feet and bases wiped clean where they will touch the kiln shelf',
+  'Lids dipped on their own, rims wiped where lid and pot meet',
+  'Thin spots and drips touched up, all touch dry before loading',
+];
+const KILNS = ['Kiln 1', 'Kiln 2'];
+const PROGRAMS = ['Glaze firing', 'Re-fire', 'Test firing'];
 
 const chalk = (date: string) =>
   new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/,/g, '').toUpperCase();
@@ -66,6 +83,11 @@ export default function KilnPage() {
   const [leftSel, setLeftSel] = useState<Set<string>>(new Set());
   const [scan, setScan] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
   const camRef = useRef<HTMLInputElement>(null);
+  // [10 Oct] The dip checklist, the kiln details, and the planned firing day.
+  const [dip, setDip] = useState<{ date: string; ticks: Set<number> } | null>(null);
+  const [kilnPick, setKilnPick] = useState<{ kilns: Set<string>; program: string }>({ kilns: new Set(['Kiln 1']), program: 'Glaze firing' });
+  const [planning, setPlanning] = useState<string | null>(null);
+  const [planVal, setPlanVal] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -79,6 +101,24 @@ export default function KilnPage() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+  // [10 Oct] The shelf label's QR opens this page on its shelf.
+  const [focus, setFocus] = useState<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('date');
+    if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) { setFocus(q); setOpen(q); }
+  }, []);
+  useEffect(() => {
+    if (focus && shelves) setTimeout(() => document.getElementById(`shelf-${focus}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  }, [focus, shelves]);
+
+  const planFire = async (date: string, plan: string | null) => {
+    setBusy(`plan-${date}`); setErr(null);
+    try {
+      await post('/api/spec/kiln/plan-date', { date, plan_fire_date: plan });
+      setPlanning(null);
+      await load();
+    } catch { setErr('Could not save the firing day. Try again.'); } finally { setBusy(null); }
+  };
 
   const step = async (date: string, stage: Step, undo = false) => {
     setBusy(date); setErr(null);
@@ -128,7 +168,7 @@ export default function KilnPage() {
     setBusy(date); setErr(null);
     try {
       if (leftIds.length) await post('/api/spec/kiln/left-out', { piece_ids: leftIds });
-      await post(`/api/spec/batch/${date}/move`, { stage: 'kiln', by: who() });
+      await post(`/api/spec/batch/${date}/move`, { stage: 'kiln', by: who(), kilns: Array.from(kilnPick.kilns), fire_program: kilnPick.program });
       setFit(null); setLeftSel(new Set()); setScan({ busy: false, note: null });
       await load();
     } catch { setErr('Could not save that. Try again.'); } finally { setBusy(null); }
@@ -195,9 +235,12 @@ export default function KilnPage() {
         const isNone = s.date === 'none';
         const isNext = next?.date === s.date;
         const pieces = s.bookings.reduce((n, b) => n + b.pieces.length, 0);
-        const done = STEPS.filter((x) => s.stage?.[x.col]);
-        const todo = isNone ? null : STEPS.find((x) => !s.stage?.[x.col]);
-        const last = done[done.length - 1];
+        // The next step is the one after the furthest done, so a shelf that
+        // went straight into the kiln is not asked to be dipped afterwards.
+        let reached = -1;
+        STEPS.forEach((x, i) => { if (s.stage?.[x.col]) reached = i; });
+        const todo = isNone ? null : STEPS[reached + 1] || null;
+        const last = reached >= 0 ? STEPS[reached] : undefined;
         const late = s.days_left !== null && s.days_left <= 3 && !s.stage?.into_kiln_at && s.to_fire > 0;
         const expanded = open === s.date;
         return (
@@ -238,15 +281,57 @@ export default function KilnPage() {
                 {isNext && last && (
                   <p style={{ fontSize: 'var(--text-xs)', color: '#3D7A4A', fontWeight: 600, marginTop: '0.15rem' }}>{last.doneLabel}</p>
                 )}
+                {s.stage?.into_kiln_at && !s.stage?.out_of_kiln_at && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: '#B8562E', fontWeight: 700, marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Flame size={12} />
+                    {(s.stage.kilns || []).join(' + ') || 'In the kiln'}{s.stage.fire_program ? ` · ${s.stage.fire_program}` : ''}
+                    {` · since ${new Date(s.stage.into_kiln_at).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                  </p>
+                )}
               </div>
             </div>
+
+            {/* [10 Oct] The day this shelf is planned to be fired. Defaults to
+                two open days before collection; the technician can slide it. */}
+            {!isNone && !s.stage?.into_kiln_at && (() => {
+              const plan = s.stage?.plan_fire_date ? String(s.stage.plan_fire_date).slice(0, 10) : null;
+              const suggested = fireBy(s.date);
+              const shown = plan || suggested;
+              return (
+                <div style={{ padding: '0 0.9rem 0.6rem' }}>
+                  <button onClick={() => { setPlanning(planning === s.date ? null : s.date); setPlanVal(shown); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', minHeight: 40, padding: '0 0.7rem', borderRadius: 10, border: `1px ${plan ? 'solid' : 'dashed'} #e3c9b4`, background: plan ? '#fbf3ea' : 'white', color: '#8a4a2a', fontSize: 'var(--text-sm)', fontWeight: 600, textAlign: 'left' }}>
+                    <Flame size={14} />
+                    <span style={{ flex: 1 }}>{plan ? 'Fire on' : 'Fire by'} {dayName(shown)}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: '#A8651A' }}>{planning === s.date ? 'close' : plan ? 'change' : 'plan'}</span>
+                  </button>
+                  {planning === s.date && (
+                    <div style={{ marginTop: '0.45rem' }}>
+                      <DateSlider value={planVal} onChange={setPlanVal} max={s.date} mark={suggested} busy={busy === `plan-${s.date}`} />
+                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: '0.35rem' }}>
+                        <button disabled={busy === `plan-${s.date}` || !planVal} onClick={() => planFire(s.date, planVal)}
+                          style={{ flex: 1, minHeight: 42, borderRadius: 10, border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                          {busy === `plan-${s.date}` ? 'Saving' : `Fire on ${dayName(planVal || shown)}`}
+                        </button>
+                        {plan && (
+                          <button onClick={() => planFire(s.date, null)} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600, padding: 0 }}>
+                            clear plan
+                          </button>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 11, color: '#8a8178', marginTop: 4 }}>Dashed day: the latest it should go in, two open days before collection.</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Only the next step is offered, with an undo for the last one
                 done -- the same rule as the shelf sticker's page. */}
             {!isNone && (
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', padding: '0 0.9rem 0.7rem' }}>
                 {todo && s.bookings.length > 0 && (
-                  <button disabled={busy === s.date} onClick={() => (todo.key === 'kiln' ? setFit({ date: s.date, picking: false }) : step(s.date, todo.key))}
+                  <button disabled={busy === s.date} onClick={() => (todo.key === 'kiln' ? setFit({ date: s.date, picking: false }) : todo.key === 'dipped' ? setDip({ date: s.date, ticks: new Set() }) : step(s.date, todo.key))}
                     style={{ flex: '1 1 180px', minHeight: 44, borderRadius: 'var(--radius-md)', border: 'none', background: todo.key === 'kiln' ? '#B8562E' : 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
                     {busy === s.date ? <Loader size={15} className="animate-spin" /> : todo.key === 'kiln' ? <Flame size={15} /> : <Check size={15} />}
                     {todo.doLabel}
@@ -265,13 +350,61 @@ export default function KilnPage() {
               </div>
             )}
 
+            {dip?.date === s.date && (
+              <div style={{ margin: '0 0.9rem 0.8rem', padding: '0.75rem', borderRadius: 'var(--radius-md)', background: '#f2f6f8', border: '1px solid #d6e2e8' }}>
+                <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>Dipping this shelf</p>
+                <p style={{ fontSize: 'var(--text-xs)', color: '#6b625a', marginTop: '0.15rem' }}>Tick as you go, or just tap Done when the shelf is dipped.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.55rem' }}>
+                  {DIP_CHECKS.map((c, i) => {
+                    const on = dip.ticks.has(i);
+                    return (
+                      <button key={i} onClick={() => setDip((d) => { if (!d) return d; const t = new Set(d.ticks); if (t.has(i)) t.delete(i); else t.add(i); return { ...d, ticks: t }; })}
+                        style={{ display: 'flex', gap: '0.55rem', alignItems: 'flex-start', textAlign: 'left', border: 'none', background: on ? '#e3efe6' : 'white', borderRadius: 10, padding: '0.55rem 0.65rem', fontSize: 'var(--text-sm)', color: 'var(--charcoal)', lineHeight: 1.35 }}>
+                        <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: `2px solid ${on ? '#3D7A4A' : '#b9c7cf'}`, background: on ? '#3D7A4A' : 'white', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {on && <Check size={14} />}
+                        </span>
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.65rem' }}>
+                  <button disabled={busy === s.date} onClick={async () => { await step(s.date, 'dipped'); setDip(null); }}
+                    style={{ flex: 1, minHeight: 46, borderRadius: 'var(--radius-md)', border: 'none', background: '#3D7A4A', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                    {busy === s.date ? 'Saving' : 'Done, the shelf is dipped'}
+                  </button>
+                  <button onClick={() => setDip(null)} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
             {fit?.date === s.date && (() => {
               const toFire = s.bookings.flatMap((b) => b.pieces.map((p, i) => ({ p, i, b })).filter((x) => x.p.stage === 'to_fire'));
               return (
                 <div style={{ margin: '0 0.9rem 0.8rem', padding: '0.75rem', borderRadius: 'var(--radius-md)', background: '#fbf3ea', border: '1px solid #ecd9c3' }}>
                   {!fit.picking ? (
                     <>
-                      <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>Did everything on this shelf fit in the kiln?</p>
+                      <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>Which kiln?</p>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                        {KILNS.map((k) => {
+                          const on = kilnPick.kilns.has(k);
+                          return (
+                            <button key={k} onClick={() => setKilnPick((cur) => { const n = new Set(cur.kilns); if (n.has(k)) n.delete(k); else n.add(k); return { ...cur, kilns: n }; })}
+                              style={{ minHeight: 40, padding: '0 0.9rem', borderRadius: 999, border: `2px solid ${on ? '#B8562E' : '#e3c9b4'}`, background: on ? '#B8562E' : 'white', color: on ? 'white' : '#8a4a2a', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                              {k}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.45rem' }}>
+                        {PROGRAMS.map((pg) => (
+                          <button key={pg} onClick={() => setKilnPick((cur) => ({ ...cur, program: pg }))}
+                            style={{ minHeight: 34, padding: '0 0.75rem', borderRadius: 999, border: `1px solid ${kilnPick.program === pg ? '#8a4a2a' : '#e3c9b4'}`, background: kilnPick.program === pg ? '#f6e4d6' : 'white', color: '#8a4a2a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>
+                            {pg}
+                          </button>
+                        ))}
+                      </div>
+                      <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)', marginTop: '0.8rem' }}>Did everything on this shelf fit in?</p>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
                         <button disabled={busy === s.date} onClick={() => intoKiln(s.date, [])}
                           style={{ flex: '1 1 160px', minHeight: 44, borderRadius: 'var(--radius-md)', border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
@@ -396,11 +529,10 @@ export default function KilnPage() {
                 {b.notes && <p style={{ fontSize: 'var(--text-xs)', color: '#b03a2e', fontWeight: 600, marginTop: '0.15rem' }}>{b.notes}</p>}
                 {moving === b.booking_code && (
                   <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.4rem', flexWrap: 'wrap' }}>
-                    <input type="date" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}
-                      style={{ minHeight: 40, padding: '0 0.5rem', borderRadius: 8, border: '1px solid #d8cfc3', color: '#2b2622', background: 'white', fontSize: 'var(--text-sm)' }} />
+                    <div style={{ width: '100%' }}><DateSlider value={moveTo} onChange={setMoveTo} mark={s.date === 'none' ? undefined : s.date} /></div>
                     <button disabled={busy === b.booking_code || !moveTo || moveTo === s.date} onClick={() => changeDate(b.booking_code)}
                       style={{ minHeight: 40, padding: '0 0.9rem', borderRadius: 8, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', opacity: !moveTo || moveTo === s.date ? 0.5 : 1 }}>
-                      {busy === b.booking_code ? 'Saving' : 'Move to that shelf'}
+                      {busy === b.booking_code ? 'Saving' : moveTo && moveTo !== s.date ? `Move to the ${dayName(moveTo)} shelf` : 'Pick a day above'}
                     </button>
                   </div>
                 )}
@@ -437,11 +569,10 @@ export default function KilnPage() {
           <Plus size={15} /> Add a shelf for another date
         </p>
         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.45rem', flexWrap: 'wrap' }}>
-          <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
-            style={{ minHeight: 40, padding: '0 0.5rem', borderRadius: 8, border: '1px solid #d8cfc3', color: '#2b2622', background: 'white', fontSize: 'var(--text-sm)' }} />
+          <div style={{ width: '100%' }}><DateSlider value={newDate} onChange={setNewDate} existing={shelves.map((x) => x.date)} /></div>
           <button disabled={!newDate || busy === 'new'} onClick={addShelf}
             style={{ minHeight: 40, padding: '0 0.9rem', borderRadius: 8, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', opacity: newDate ? 1 : 0.5 }}>
-            {busy === 'new' ? 'Adding' : 'Add shelf'}
+            {busy === 'new' ? 'Adding' : newDate ? `Add a shelf for ${dayName(newDate)}` : 'Pick a day above'}
           </button>
         </div>
       </div>
@@ -467,14 +598,13 @@ export default function KilnPage() {
 // came out of the kiln. Closed days are shaded. Tap anything to jump to that
 // shelf.
 const OPEN = new Set([0, 3, 4, 5, 6]); // Sun, Wed-Sat
-const FIRE_BY_DAYS = 2;
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const addDays = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return isoDay(d); };
 
 function KilnCalendar({ shelves, onPick }: { shelves: Shelf[]; onPick: (date: string) => void }) {
   const today = isoDay(new Date());
   const days = Array.from({ length: 21 }, (_, i) => addDays(today, i - 2));
-  type Mark = { date: string; kind: 'collect' | 'fireby' | 'in' | 'out' | 'left'; label: string };
+  type Mark = { date: string; kind: 'collect' | 'fireby' | 'plan' | 'dip' | 'in' | 'out' | 'left'; label: string };
   const marks = new Map<string, Mark[]>();
   const put = (day: string, m: Mark) => { if (!marks.has(day)) marks.set(day, []); marks.get(day)!.push(m); };
   for (const s of shelves) {
@@ -482,17 +612,21 @@ function KilnCalendar({ shelves, onPick }: { shelves: Shelf[]; onPick: (date: st
     const pieces = s.bookings.reduce((n, b) => n + b.pieces.length, 0);
     put(s.date, { date: s.date, kind: 'collect', label: `Collect ${pieces}` });
     if (!s.stage?.into_kiln_at) {
-      let fb = addDays(s.date, -FIRE_BY_DAYS);
+      const plan = s.stage?.plan_fire_date ? String(s.stage.plan_fire_date).slice(0, 10) : null;
+      let fb = plan || fireBy(s.date);
       if (fb < today) fb = today;
-      put(fb, { date: s.date, kind: 'fireby', label: `Fire ${chalk(s.date).split(' ').slice(1).join(' ')}` });
+      put(fb, { date: s.date, kind: plan ? 'plan' : 'fireby', label: `${plan ? 'Fire' : 'Fire by'} ${chalk(s.date).split(' ').slice(1).join(' ')}` });
     }
+    if (s.stage?.dipped_at && !s.stage?.into_kiln_at) put(isoDay(new Date(s.stage.dipped_at)), { date: s.date, kind: 'dip', label: 'Dipped' });
     if (s.stage?.into_kiln_at) put(isoDay(new Date(s.stage.into_kiln_at)), { date: s.date, kind: 'in', label: 'In kiln' });
     if (s.stage?.out_of_kiln_at) put(isoDay(new Date(s.stage.out_of_kiln_at)), { date: s.date, kind: 'out', label: 'Out' });
     if (s.left_out > s.left_out_in_kiln) put(today, { date: s.date, kind: 'left', label: `${s.left_out - s.left_out_in_kiln} left out` });
   }
   const style: Record<Mark['kind'], React.CSSProperties> = {
     collect: { background: '#2f3330', color: '#f4f1ea' },
-    fireby: { background: 'white', color: '#B8562E', border: '1px solid #B8562E' },
+    fireby: { background: 'white', color: '#B8562E', border: '1px dashed #B8562E' },
+    plan: { background: '#fbe3d3', color: '#8a3a16', border: '1px solid #B8562E' },
+    dip: { background: '#e3eef3', color: '#2d5566', border: '1px solid #b9cfd9' },
     in: { background: '#B8562E', color: 'white' },
     out: { background: '#3D7A4A', color: 'white' },
     left: { background: '#fff1cc', color: '#8a5a00', border: '1px solid #f0d49a' },
@@ -535,7 +669,7 @@ function KilnCalendar({ shelves, onPick }: { shelves: Shelf[]; onPick: (date: st
         })}
       </div>
       <p style={{ fontSize: 10.5, color: '#8a8178', padding: '0.45rem 0.8rem 0', lineHeight: 1.4 }}>
-        <b style={{ color: '#2f3330' }}>Collect</b> day · <b style={{ color: '#B8562E' }}>Fire</b> by, {FIRE_BY_DAYS} days before · <b style={{ color: '#B8562E' }}>In kiln</b> and <b style={{ color: '#3D7A4A' }}>Out</b> when it happened. Tap to jump to the shelf.
+        <b style={{ color: '#2f3330' }}>Collect</b> day · <b style={{ color: '#B8562E' }}>Fire</b> planned (dashed: the latest it should go in) · <b style={{ color: '#2d5566' }}>Dipped</b>, <b style={{ color: '#B8562E' }}>In kiln</b> and <b style={{ color: '#3D7A4A' }}>Out</b> when they happened. Tap to jump to the shelf.
       </p>
     </div>
   );
@@ -653,6 +787,73 @@ function PieceViewer({ booking, index, date, onIndex, onClose }: {
           <button aria-label="Next piece" disabled={index >= booking.pieces.length - 1} onClick={() => onIndex(index + 1)} style={{ ...btn, opacity: index >= booking.pieces.length - 1 ? 0.35 : 1 }}><ChevronRight size={20} /></button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// [10 Oct] DATES BY SLIDING. Daisy: "sliders on calendar date choosing". The
+// iPad's date box is fiddly with clay on your hands, and opens blank. This is
+// a strip of days to swipe and tap, with a slider underneath to scrub weeks
+// at a time. Closed days are shaded but can still be picked; Saturdays (the
+// usual collection day) are marked; shelves that already exist get a dot.
+const OPEN_DAYS = new Set([0, 3, 4, 5, 6]); // Sun, Wed-Sat
+const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const plusDays = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return isoOf(d); };
+function dayName(iso: string) {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/,/g, '');
+}
+// The latest sensible firing day: two open days before collection.
+function fireBy(collect: string) {
+  let d = collect; let n = 0;
+  while (n < 2) { d = plusDays(d, -1); if (OPEN_DAYS.has(new Date(`${d}T12:00:00`).getDay())) n++; }
+  return d;
+}
+
+function DateSlider({ value, onChange, max, mark, existing, busy }: {
+  value: string; onChange: (iso: string) => void; max?: string; mark?: string; existing?: string[]; busy?: boolean;
+}) {
+  const today = isoOf(new Date());
+  const span = 56;
+  const days = Array.from({ length: span }, (_, i) => plusDays(today, i)).filter((d) => !max || d <= max);
+  const strip = useRef<HTMLDivElement>(null);
+  const TILE = 58;
+  const idx = Math.max(0, days.indexOf(value));
+  useEffect(() => {
+    strip.current?.scrollTo({ left: Math.max(0, idx * (TILE + 6) - (strip.current.clientWidth - TILE) / 2), behavior: 'smooth' });
+  }, [idx]);
+  const has = new Set(existing || []);
+  return (
+    <div style={{ opacity: busy ? 0.6 : 1 }}>
+      <div ref={strip} style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '2px 2px 6px', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x proximity' }}>
+        {days.map((d, i) => {
+          const dt = new Date(`${d}T12:00:00`);
+          const on = d === value;
+          const closed = !OPEN_DAYS.has(dt.getDay());
+          const sat = dt.getDay() === 6;
+          const first = i === 0 || dt.getDate() === 1;
+          return (
+            <button key={d} disabled={busy} onClick={() => onChange(d)}
+              style={{
+                flex: `0 0 ${TILE}px`, minHeight: 66, borderRadius: 10, scrollSnapAlign: 'center', padding: '0.3rem 0',
+                border: on ? '2px solid var(--clay)' : d === mark ? '2px dashed #8a8178' : '1px solid #e6ddd2',
+                background: on ? 'var(--clay)' : closed ? '#f3efe9' : 'white', color: on ? 'white' : 'var(--charcoal)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1, position: 'relative',
+              }}>
+              <span style={{ fontSize: 10, fontWeight: 700, opacity: on ? 0.9 : 0.6 }}>{d === today ? 'TODAY' : dt.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase()}</span>
+              <span style={{ fontSize: 19, fontWeight: 800 }}>{dt.getDate()}</span>
+              <span style={{ fontSize: 9.5, fontWeight: 600, opacity: 0.7 }}>{first ? dt.toLocaleDateString('en-GB', { month: 'short' }) : closed ? 'closed' : sat ? 'collect' : ''}</span>
+              {has.has(d) && <span style={{ position: 'absolute', top: 4, right: 5, width: 6, height: 6, borderRadius: 3, background: on ? 'white' : 'var(--clay)' }} />}
+            </button>
+          );
+        })}
+      </div>
+      {days.length > 7 && (
+        <input type="range" min={0} max={days.length - 1} step={1} value={idx} disabled={busy}
+          onChange={(e) => onChange(days[parseInt(e.target.value, 10)])}
+          aria-label="Slide to pick a day"
+          style={{ width: '100%', accentColor: 'var(--clay)', marginTop: 2 }} />
+      )}
     </div>
   );
 }

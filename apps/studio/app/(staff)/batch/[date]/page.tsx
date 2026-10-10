@@ -90,9 +90,16 @@ export default function BatchPage() {
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/batch/${date}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setBatch(d))
+      .then((d) => {
+        // [10 Oct] One label for the whole journey. Until the shelf is out of
+        // the kiln, the kiln technician is the one scanning it, so it opens
+        // that shelf on the Kiln page (shelf, dip, kiln, out). Out of the
+        // kiln, it is collection's: this page.
+        if (d && !d.stage?.out_of_kiln_at) { router.replace(`/kiln?date=${date}`); return; }
+        if (d) setBatch(d);
+      })
       .catch(() => {});
-  }, [date]);
+  }, [date, router]);
 
   const pretty = date ? new Date(date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
 

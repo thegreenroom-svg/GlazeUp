@@ -360,7 +360,7 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
         ? await piecesFor(codes, 'id, booking_id, status, shelf_id, packed_at, returned_at, piece_type, description, reference_photo_url, photo_box, parts, left_out_at, left_out_in_kiln_at')
         : [];
       const { data: stages } = await supabase.from('collection_batches')
-        .select('collection_date, shelved_at, into_kiln_at, out_of_kiln_at, moved_by')
+        .select('collection_date, shelved_at, dipped_at, into_kiln_at, out_of_kiln_at, moved_by, kilns, fire_program, plan_fire_date')
         .eq('studio_id', STUDIO_ID).gte('collection_date', new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10));
       const stageBy = new Map((stages || []).map((s) => [String(s.collection_date).slice(0, 10), s]));
 
@@ -445,6 +445,20 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
       if (error) throw error;
       res.json({ ok: true, updated: (data || []).length });
     } catch (err) { logger.error('[kiln-leftovers] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
+  // [10 Oct] The day the technician plans to fire a shelf (null clears it).
+  // Only that column is written, so the shelf's stages are untouched.
+  app.post('/api/spec/kiln/plan-date', async (req, res) => {
+    try {
+      const date = String(req.body?.date || '').slice(0, 10);
+      const plan = req.body?.plan_fire_date ? String(req.body.plan_fire_date).slice(0, 10) : null;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (plan && !/^\d{4}-\d{2}-\d{2}$/.test(plan))) return res.status(400).json({ error: 'Dates like 2026-10-17' });
+      const { error } = await supabase.from('collection_batches')
+        .upsert({ studio_id: STUDIO_ID, collection_date: date, plan_fire_date: plan }, { onConflict: 'studio_id,collection_date' });
+      if (error) throw error;
+      res.json({ ok: true });
+    } catch (err) { logger.error('[kiln-plan-date] failed', err.message); res.status(500).json({ error: err.message }); }
   });
 
   // A new, empty shelf for a collection date. Never touches the stages of
