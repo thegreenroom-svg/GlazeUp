@@ -357,7 +357,7 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
       const codes = bookings.map((b) => b.booking_code);
       const sd = await statusDates(codes);
       const pieces = codes.length
-        ? await piecesFor(codes, 'id, booking_id, status, shelf_id, packed_at, returned_at, piece_type, description, reference_photo_url, photo_box, parts')
+        ? await piecesFor(codes, 'id, booking_id, status, shelf_id, packed_at, returned_at, piece_type, description, reference_photo_url, photo_box, parts, left_out_at, left_out_in_kiln_at')
         : [];
       const { data: stages } = await supabase.from('collection_batches')
         .select('collection_date, shelved_at, into_kiln_at, out_of_kiln_at, moved_by')
@@ -366,7 +366,7 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
 
       const groups = new Map();
       const groupFor = (date) => {
-        if (!groups.has(date)) groups.set(date, { date, stage: stageBy.get(date) || null, to_fire: 0, fired: 0, packed: 0, bookings: [] });
+        if (!groups.has(date)) groups.set(date, { date, stage: stageBy.get(date) || null, to_fire: 0, fired: 0, packed: 0, left_out: 0, left_out_in_kiln: 0, bookings: [] });
         return groups.get(date);
       };
       for (const b of bookings) {
@@ -377,12 +377,14 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
         const c = { to_fire: 0, fired: 0, packed: 0 };
         ps.forEach((p) => { c[stageOf(p)]++; });
         g.to_fire += c.to_fire; g.fired += c.fired; g.packed += c.packed;
+        ps.forEach((p) => { if (p.left_out_at) { g.left_out++; if (p.left_out_in_kiln_at) g.left_out_in_kiln++; } });
         g.bookings.push({
           booking_code: b.booking_code, customer_name: b.customer_name, session_start: b.session_start,
           notes: b.collection_notes || null, postal: b.fulfilment_method === 'postal', ...c,
           pieces: ps.map((p) => ({
             id: p.id, piece_type: p.piece_type, description: p.description, parts: p.parts || 1,
-            reference_photo_url: p.reference_photo_url, photo_box: p.photo_box || null, stage: stageOf(p),
+            reference_photo_url: p.reference_photo_url, photo_box: p.photo_box || null,
+            stage: p.left_out_at && stageOf(p) === 'to_fire' ? (p.left_out_in_kiln_at ? 'left_out_in_kiln' : 'left_out') : stageOf(p),
           })),
         });
       }
@@ -403,6 +405,46 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
         .sort((a, b) => (a.date === 'none' ? 1 : b.date === 'none' ? -1 : a.date.localeCompare(b.date)));
       res.json({ today, shelves: out });
     } catch (err) { logger.error('[kiln-shelves] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
+  // [10 Oct] Daisy: "two kilns were filled on that collection date, but
+  // 8 pieces had to be left out because they were too tall... left on a
+  // shelf." Pieces left out stay on their date's shelf with their own
+  // dip-and-fire, and are not marked fired when the main load comes out.
+  app.post('/api/spec/kiln/left-out', async (req, res) => {
+    try {
+      const ids = (Array.isArray(req.body?.piece_ids) ? req.body.piece_ids : []).map(String).slice(0, 300);
+      const undo = req.body?.undo === true;
+      if (!ids.length) return res.json({ ok: true, updated: 0 });
+      const patch = undo ? { left_out_at: null, left_out_in_kiln_at: null } : { left_out_at: new Date().toISOString(), left_out_in_kiln_at: null };
+      const { data, error } = await supabase.from('pottery_pieces').update(patch)
+        .eq('studio_id', STUDIO_ID).in('id', ids).neq('status', 'collected').select('id');
+      if (error) throw error;
+      res.json({ ok: true, updated: (data || []).length });
+    } catch (err) { logger.error('[kiln-left-out] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
+  // The left-out pieces' own firing: into the kiln, then out (ready to
+  // pack, like any other piece out of the kiln).
+  app.post('/api/spec/kiln/leftovers', async (req, res) => {
+    try {
+      const ids = (Array.isArray(req.body?.piece_ids) ? req.body.piece_ids : []).map(String).slice(0, 300);
+      const stage = String(req.body?.stage || '');
+      const undo = req.body?.undo === true;
+      if (!ids.length || !['kiln', 'out'].includes(stage)) return res.status(400).json({ error: 'piece_ids and stage (kiln or out) needed' });
+      const now = new Date().toISOString();
+      let q;
+      if (stage === 'kiln') {
+        q = supabase.from('pottery_pieces').update({ left_out_in_kiln_at: undo ? null : now })
+          .eq('studio_id', STUDIO_ID).in('id', ids).not('left_out_at', 'is', null);
+      } else {
+        q = supabase.from('pottery_pieces').update({ status: 'ready', left_out_at: null, left_out_in_kiln_at: null, updated_at: now })
+          .eq('studio_id', STUDIO_ID).in('id', ids).not('left_out_in_kiln_at', 'is', null).neq('status', 'collected');
+      }
+      const { data, error } = await q.select('id');
+      if (error) throw error;
+      res.json({ ok: true, updated: (data || []).length });
+    } catch (err) { logger.error('[kiln-leftovers] failed', err.message); res.status(500).json({ error: err.message }); }
   });
 
   // A new, empty shelf for a collection date. Never touches the stages of

@@ -4164,6 +4164,66 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
 // out themselves by re-running single-piece checks five times.
 // ============================================================================
 export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp) {
+  // [10 Oct] LEFT ON THE SHELF. Daisy: "screen the whole shelf going
+  // into the dip process with the camera again... pieces are left out,
+  // please photograph the shelf with remaining." One photo of what is
+  // still on a collection-date shelf after the kilns are loaded; which of
+  // that shelf's pieces are in it. These are unfired, so they look as
+  // they did when painted and described -- an easier match than the
+  // fired-piece search below. The answer only pre-ticks the list; a
+  // person confirms before anything is saved.
+  app.post('/api/spec/kiln/left-out/photo', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+      let ids = [];
+      try { ids = JSON.parse(req.body?.piece_ids || '[]').map(String).slice(0, 80); } catch { /* none */ }
+      if (!ids.length) return res.status(400).json({ error: 'No pieces to look for' });
+      const { data: pieces } = await supabase.from('pottery_pieces')
+        .select('id, description, piece_type').eq('studio_id', STUDIO_ID).in('id', ids);
+      const list = (pieces || []).filter((p) => p.description || p.piece_type);
+      if (!list.length) return res.json({ found: [] });
+
+      const shot = await forGemini(sharp, fs.readFileSync(req.file.path), logger, req.file.mimetype, 1600);
+      try { fs.unlinkSync(req.file.path); } catch { /* temp */ }
+      const pieceList = list.map((p, i) => `${i + 1}. [id: ${p.id}] ${p.description || p.piece_type}`).join('\n');
+      const input = [
+        {
+          type: 'text',
+          text: `This photo shows a shelf of painted, UNFIRED pottery that was left behind when the kiln was loaded. Below are the pieces that belonged on this shelf, each described when it was painted:\n\n${pieceList}\n\nThey have not been fired, so they look as described. For EACH piece in the list, say whether it is on the shelf in this photo. Most of the list went into the kiln and will NOT be here. Be strict: a wrong match is worse than not found.`,
+        },
+        { type: 'image', data: shot.buffer.toString('base64'), mime_type: shot.mimeType || 'image/jpeg' },
+      ];
+      const responseSchema = {
+        type: 'object',
+        properties: { results: { type: 'array', items: { type: 'object', properties: {
+          id: { type: 'string' }, found: { type: 'boolean' }, confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+        }, required: ['id', 'found'] } } },
+        required: ['results'],
+      };
+      let aiRes, modelUsed;
+      try {
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input, response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+        }));
+      } catch (err) {
+        logger.error('kiln left-out photo: Gemini failed', err.response?.data || err.message);
+        return res.status(500).json({ error: friendlyGeminiError(err) });
+      }
+      const usage = extractGeminiUsage(aiRes.data);
+      if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'kiln-left-out-gemini', usage, modelUsed);
+      let parsed = {};
+      try { parsed = JSON.parse(((extractGeminiText(aiRes.data) || '').match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { /* none */ }
+      const known = new Set(list.map((p) => p.id));
+      const found = (parsed.results || []).filter((r) => r.found && known.has(r.id) && r.confidence !== 'low').map((r) => r.id);
+      res.json({ found, looked_for: list.length });
+    } catch (err) {
+      logger.error('kiln left-out photo failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/spec/bookings/:code/find-all-on-table', upload.single('photo'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
@@ -9488,7 +9548,9 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
             .eq('studio_id', STUDIO_ID)
             .in('booking_id', codes)
             .neq('status', 'collected')
-            .is('packed_at', null);
+            .is('packed_at', null)
+            // [10 Oct] Left out of this firing: still unfired on the shelf.
+            .is('left_out_at', null);
         }
       }
 
