@@ -142,7 +142,7 @@ export default function BookingPage() {
             const due = !b.collected_at && b.days_to_collect != null && b.days_to_collect <= 0;
             return <button style={due ? { ...btn, background: 'var(--clay)', color: 'white', border: 'none' } : btn} onClick={() => router.push(`/collection?code=${encodeURIComponent(b.booking_code)}`)}><Printer size={15} /> {due ? 'Hand over' : 'Collection card'}</button>;
           })()}
-          {day && <button style={btn} onClick={() => router.push(`/daily-cards?date=${day}&code=${encodeURIComponent(b.booking_code)}&open=1`)}><Printer size={15} /> Day card</button>}
+          {day && <button style={btn} onClick={() => router.push(`/daily-cards?date=${day}&code=${encodeURIComponent(b.booking_code)}&open=1`)}><Printer size={15} /> Table card</button>}
         </div>
       </div>
 

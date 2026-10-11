@@ -1659,9 +1659,7 @@ export default function DailyCardsPage() {
                             onPick={show}
                           />
                         </div>
-                      ) : (
-                        <p style={{ color: 'var(--stone)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>Not photographed yet.</p>
-                      )}
+                      ) : null}
                       {tp.pieces.length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem', justifyContent: 'center' }}>
                           {tp.pieces.map((p: any, k: number) => (
@@ -1767,14 +1765,20 @@ export default function DailyCardsPage() {
                           )}
                         </div>
                       )}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                        <button onClick={() => openSheet(b, '/floor')} style={actionBtn(true)}>
-                          <Camera size={16} /> {tp.photo_url ? 'Table photo & returns' : 'Photograph the table'}
-                        </button>
-                        <button onClick={() => openSheet(b, '/collection')} style={actionBtn(false)}>
-                          <Printer size={16} /> Collection card
-                        </button>
-                      </div>
+                      {/* [11 Oct] Only once there is a photo: before that the
+                          big "Photograph the table" button above is the one
+                          thing to do, and a second copy of it (plus a
+                          collection card for pottery not yet made) was noise. */}
+                      {tp.photo_url && (
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                          <button onClick={() => openSheet(b, '/floor')} style={actionBtn(true)}>
+                            <Camera size={16} /> Table photo &amp; returns
+                          </button>
+                          <button onClick={() => openSheet(b, '/collection')} style={actionBtn(false)}>
+                            <Printer size={16} /> Collection card
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
