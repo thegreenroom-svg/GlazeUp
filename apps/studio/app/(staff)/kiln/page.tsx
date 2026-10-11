@@ -222,6 +222,15 @@ export default function KilnPage() {
 
   return (
     <PageShell title="Kiln" subtitle="One shelf for each collection date">
+      {/* [11 Oct] The kiln's other screens live here now, off the menu. */}
+      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+        {([['Kiln plan', '/kiln-plan'], ['Shelf labels', '/shelf-stickers'], ['Out of the kiln', '/out-of-kiln']] as const).map(([label, href]) => (
+          <button key={href} onClick={() => router.push(href)}
+            style={{ minHeight: 38, padding: '0 0.8rem', borderRadius: 999, border: '1px solid #e6ddd2', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+            {label}
+          </button>
+        ))}
+      </div>
       <p style={{ color: '#6b625a', fontSize: 'var(--text-sm)', lineHeight: 1.5, marginBottom: '0.8rem' }}>
         Chalk the date on the shelf, or print its label. Put that date&apos;s pieces on it, then dip and fire the shelf due first.
       </p>

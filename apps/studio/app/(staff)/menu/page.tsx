@@ -24,91 +24,45 @@ import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Sea
 // copy of it. The floor photography, kiln shelf and packing screens are
 // the ones that have been debugged all week -- reimplementing them inside
 // a modal would throw that away to gain nothing.
-const STEPS = [
-  { key: 'cards',   n: 1, label: 'Print cards',           detail: 'Booking references for today',      href: '/daily-cards', icon: Printer, tint: '#8C6A4A' },
-  { key: 'table',   n: 2, label: 'Photograph the table',  detail: 'All pieces clear, QR code in shot', href: '/floor',       icon: Camera,  tint: '#A8763E' },
-  // Unloading is its own step in the day, not a variant of packing: it
-  // happens hours or days earlier, usually by whoever opened the kiln,
-  // and doing it badly is invisible until packing day. It carries its
-  // own technique -- loose spacing, 45 degrees down -- so it gets its
-  // own screen where that guidance can be read rather than remembered.
-  // [10 Oct] Daisy: "there's got to be a section kiln." The step between
-  // photographing and unloading: a shelf per collection date, what goes
-  // on it, and on the shelf, dipped, in the kiln.
-  { key: 'firing',     n: 3, label: 'Kiln',            detail: 'A shelf for each date, dip and fire', href: '/kiln',        icon: Flame,   tint: '#B8562E' },
-  { key: 'kiln',       n: 4, label: 'Out of the kiln', detail: 'Box it up and photograph each box',  href: '/out-of-kiln', icon: Boxes,   tint: '#7C5E4C' },
-  { key: 'packing',    n: 5, label: 'Packing',    detail: 'Find whose pottery is ready',       href: '/packing',    icon: Package, tint: '#9C5A3C' },
-  { key: 'collection', n: 6, label: 'Collection', detail: 'Print the card, hand pottery over',  href: '/collection', icon: Check,   tint: '#6E7A55' },
-  // Daisy has now said three times that she cannot find something I
-  // built, and the cause is mine: I kept adding entry points as small
-  // text links buried inside other screens. The wall of boxes is a
-  // place she wants to GO, not a footnote on the packing screen, so it
-  // gets a tile like everything else she reaches for.
+// [11 Oct] Daisy: "Do we need all the other menu items now? Or can it all
+// just work off this one landing page?" Not quite one page -- the booking
+// page answers everything about ONE booking, but loading a kiln or packing
+// the wall works across many -- but four places, not twenty-three tiles.
+// Each place's lesser screens hang off it as small links, so nothing is
+// lost, and every old page still works at its own address.
+type Link = { label: string; href: string };
+const STEPS: { key: string; label: string; detail: string; href: string; icon: typeof Printer; tint: string; also: Link[] }[] = [
+  { key: 'cards', label: 'Today', detail: 'The cards. Photograph each table; done ones open their booking', href: '/daily-cards', icon: Printer, tint: '#8C6A4A',
+    also: [{ label: 'Photograph a table', href: '/floor' }, { label: 'Table total', href: '/table-total' }] },
+  { key: 'firing', label: 'Kiln', detail: 'A shelf for each date: dip, fire, out', href: '/kiln', icon: Flame, tint: '#B8562E',
+    also: [{ label: 'Kiln plan', href: '/kiln-plan' }, { label: 'Shelf labels', href: '/shelf-stickers' }, { label: 'Out of the kiln', href: '/out-of-kiln' }] },
+  { key: 'packing', label: 'Collect', detail: 'Whose pottery is ready, pack it, hand it over', href: '/packing', icon: Package, tint: '#9C5A3C',
+    also: [{ label: 'Hand over', href: '/collection' }, { label: 'Wall of shelves', href: '/shelves' }, { label: 'Returns shelf', href: '/returns' }, { label: 'Overdue', href: '/overdue' }] },
+  { key: 'find', label: 'Find', detail: 'Any name or date, opens the booking', href: '/find', icon: Search, tint: '#4F6D7A', also: [] },
 ];
 
-// [6 Sep] Daisy: "it's all looking very messy... rationalise the
-// navigation again and consolidate."
-//
-// The mess was structural, and mine. This screen is a NUMBERED list,
-// which promises "do these in order today". Steps 1 to 5 genuinely are
-// that -- print, photograph, unload, pack, hand over -- and they happen
-// in that order every open day.
-//
-// Then I bolted three more onto the end and numbered them 6, 7 and 8,
-// because a tile was the only shape available and each one had a real
-// reason to be reachable. But the shelf wall, the booking search and
-// the photo backfill are not steps in a day. Nobody does them after
-// collection. Numbering them said they were part of the sequence, so
-// the sequence stopped meaning anything and the screen just read as a
-// list of eight things.
-//
-// Two lists now, because there are two kinds of thing. The day in
-// order, then the tools you reach for when something needs finding or
-// fixing. Same destinations, no invented ordering, and the tools are
-// visibly secondary rather than competing with the work.
-// [5 Oct] Daisy: "whole thing is now too just busy."
-//
-// Seventeen tiles, four of them added today. The pitch was five steps,
-// and five steps is still true -- but the Anytime list had grown into a
-// wall that made the five read as merely the top of a list of seventeen.
-//
-// Anytime is now only the four a member of staff on the floor actually
-// goes to. Everything else is back of house and sits behind one line.
-//
-// Nothing is removed. Hiding things people need is how we got here, when
-// I kept burying entry points inside other screens. A labelled line is
-// findable; a tile competing with sixteen others is not.
+// Things someone has to sort out. Quiet, under one line.
 const TOOLS = [
-  { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
-  { key: 'returns',  label: 'Returns shelf',        detail: 'Coming back to finish',                  href: '/returns',  icon: RotateCcw, tint: '#A8651A' },
-  { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
   { key: 'quick-check', label: 'Quick check',        detail: 'Settle the guessed shapes, one tap each', href: '/quick-check', icon: CheckCircle2, tint: '#3D7A4A' },
-  { key: 'kiln-plan', label: 'Kiln plan',            detail: 'What still needs firing for each date', href: '/kiln-plan', icon: Flame, tint: '#B8562E' },
-  { key: 'overdue',  label: 'Overdue collections',  detail: 'Past their date, pottery still here',  href: '/overdue',  icon: Clock,     tint: '#8C4A4A' },
-  { key: 'stickers',   label: 'Shelf stickers',       detail: 'QR labels for each collection date',   href: '/shelf-stickers', icon: QrCode, tint: '#6B7A5F' },
+  { key: 'backfill', label: 'Backfill from photos', detail: 'iPad photos that need a look', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
+  { key: 'other-items', label: 'Unknown items',       detail: 'Deleted from Square, waiting to be named', href: '/other-items', icon: HelpCircle, tint: '#A8651A' },
+  { key: 'piece-check', label: 'All accounted for?',   detail: 'Paid for, against photographed',        href: '/piece-check', icon: AlertTriangle, tint: '#E0A23C' },
 ];
 
-// Back of house. Real work, but not floor work -- nobody reaches for
-// the takings or the job monitor between tables.
+// The office: owner only.
 const BACKROOM = [
-  { key: 'total',    label: 'Table total',          detail: 'Photograph the table, see what everyone owes', href: '/table-total', icon: Calculator, tint: '#2E7D6B' },
+  { key: 'owner',    label: 'The numbers',          detail: 'Takings, records and where it comes from', href: '/owner', icon: TrendingUp, tint: '#2E7D6B' },
   { key: 'stock',    label: 'Stock',                detail: 'Every shape, price and how many are in', href: '/stock', icon: Tags, tint: '#B87946' },
   { key: 'shapes',   label: 'Shape recognition',    detail: 'Which shape each painted piece is', href: '/recognition', icon: ScanSearch, tint: '#5B6E8C' },
-  { key: 'owner',    label: 'The numbers',          detail: 'Takings, records and where it comes from', href: '/owner', icon: TrendingUp, tint: '#2E7D6B' },
-  { key: 'piece-check', label: 'All accounted for?',   detail: 'Paid for, against photographed',        href: '/piece-check', icon: AlertTriangle, tint: '#E0A23C' },
   { key: 'heartbeat',  label: 'Is everything running?', detail: 'The jobs that keep the numbers honest', href: '/heartbeat', icon: Activity, tint: '#3D7A4A' },
-  { key: 'other-items', label: 'Unknown items',       detail: 'Deleted from Square, waiting to be named', href: '/other-items', icon: HelpCircle, tint: '#A8651A' },
-  { key: 'backfill', label: 'Backfill from photos', detail: 'Tables photographed outside the app', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
-
 ];
-
 
 // [6 Oct] Owner-only screens: the money, the job monitor and the data
 // fixes. Hidden from staff PINs so the menu is just their work. This only
 // hides tiles -- the pages themselves are not locked, so it is tidiness,
 // not security. Roles match PinGate's ADMIN_ROLES.
 const OWNER_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
-const OWNER_ONLY = new Set(['owner', 'heartbeat', 'other-items', 'backfill', 'piece-check']);
+const OWNER_ONLY = new Set(['other-items', 'backfill', 'piece-check']);
 
 export default function StudioHome() {
   const [showBackroom, setShowBackroom] = useState(false);
@@ -120,7 +74,9 @@ export default function StudioHome() {
       setIsOwner(!!role && OWNER_ROLES.includes(role));
     } catch { /* leave everything showing */ }
   }, []);
-  const backroom = BACKROOM.filter((t) => isOwner || !OWNER_ONLY.has(t.key));
+  const backroom = isOwner ? BACKROOM : [];
+  const tools = TOOLS.filter((t) => isOwner || !OWNER_ONLY.has(t.key));
+  const [showTools, setShowTools] = useState(false);
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
   // From the app review: the tiles said what each step IS but nothing
@@ -138,7 +94,7 @@ export default function StudioHome() {
   // network fetch reads as broken, and this studio's wifi has been the
   // slowest part of every test this week.
   useEffect(() => {
-    [...STEPS, ...TOOLS].forEach((s) => router.prefetch(s.href));
+    STEPS.forEach((s) => { router.prefetch(s.href); s.also.forEach((l) => router.prefetch(l.href)); });
   }, [router]);
 
   const open = (step: { key: string; href: string }) => {
@@ -152,7 +108,7 @@ export default function StudioHome() {
     <div style={{ padding: '1rem 0.9rem 2rem' }}>
       <div style={{ marginBottom: '1.4rem' }}>
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>The Kiln Cafe</h1>
-        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Five steps, start to finish.</p>
+        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Four places. Everything else hangs off them.</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -160,8 +116,8 @@ export default function StudioHome() {
           const Icon = step.icon;
           const isOpening = opening === step.key;
           return (
+            <div key={step.key}>
             <motion.button
-              key={step.key}
               onClick={() => open(step)}
               disabled={!!opening}
               animate={isOpening ? { scale: 1.04, opacity: 0.92 } : { scale: 1, opacity: opening ? 0.35 : 1 }}
@@ -180,7 +136,6 @@ export default function StudioHome() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.45rem' }}>
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 800, opacity: 0.7 }}>{step.n}</span>
                   <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>{step.label}</span>
                 </div>
                 <div style={{ fontSize: 'var(--text-sm)', opacity: 0.82, marginTop: '0.1rem' }}>{step.detail}</div>
@@ -188,8 +143,7 @@ export default function StudioHome() {
               {(() => {
                 if (!counts) return null;
                 const n = step.key === 'cards' ? counts.today_bookings
-                  : step.key === 'packing' ? counts.to_pack
-                  : step.key === 'collection' ? counts.due_collection
+                  : step.key === 'packing' ? (counts.to_pack || 0) + (counts.due_collection || 0)
                   : null;
                 if (!n) return null;
                 return (
@@ -199,6 +153,17 @@ export default function StudioHome() {
                 );
               })()}
             </motion.button>
+            {step.also.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', margin: '0.45rem 0 0 0.2rem' }}>
+                {step.also.map((l) => (
+                  <button key={l.href} onClick={() => open({ key: l.href, href: l.href })} disabled={!!opening}
+                    style={{ minHeight: 34, padding: '0 0.75rem', borderRadius: 999, border: '1px solid #e6ddd2', background: 'white', color: 'var(--charcoal)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            </div>
           );
         })}
       </div>
@@ -206,11 +171,20 @@ export default function StudioHome() {
       {/* Deliberately quieter than the steps above: smaller, paler, no
           numbers. These are places to go when something needs finding
           or fixing, not work waiting to be done today. */}
-      <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '1.6rem 0 0.6rem' }}>
-        Anytime
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {TOOLS.map((tool) => {
+      <button
+        onClick={() => setShowTools((v) => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%',
+          background: 'none', border: 'none', padding: '1.6rem 0 0.6rem',
+          cursor: 'pointer', color: '#999', fontSize: 'var(--text-xs)',
+          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+        }}
+      >
+        Needs a look
+        <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>{showTools ? '\u2212' : '+'}</span>
+      </button>
+      {showTools && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {tools.map((tool) => {
           const Icon = tool.icon;
           return (
             <motion.button
@@ -237,11 +211,11 @@ export default function StudioHome() {
             </motion.button>
           );
         })}
-      </div>
+      </div>}
 
       {/* One line, not eight tiles. Everything here is still one tap away,
           it has just stopped shouting over the work. */}
-      <button
+      {backroom.length > 0 && <button
         onClick={() => setShowBackroom((v) => !v)}
         style={{
           display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%',
@@ -250,10 +224,10 @@ export default function StudioHome() {
           fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
         }}
       >
-        Back of house
+        Office
         <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>{showBackroom ? '\u2212' : '+'}</span>
-      </button>
-      {showBackroom && (
+      </button>}
+      {showBackroom && backroom.length > 0 && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {backroom.map((tool) => {
           const Icon = tool.icon;
