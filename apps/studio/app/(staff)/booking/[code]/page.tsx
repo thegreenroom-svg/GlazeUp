@@ -13,7 +13,7 @@ import { PageShell } from '@/components/PageShell';
 import { PhotoWithBoxes, PieceThumb, pieceColour, PieceBox } from '@/components/PieceBoxes';
 import { PieceViewer } from '@/components/PieceViewer';
 import { DateSlider, dayName } from '@/components/DateSlider';
-import { Calendar, Camera, Flame, Mail, Package, Phone, Printer, Receipt, Truck } from 'lucide-react';
+import { Calendar, Camera, ChevronLeft, Flame, Mail, Package, Phone, Printer, Receipt, Truck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -105,6 +105,13 @@ export default function BookingPage() {
 
   return (
     <PageShell title={b.customer_name} subtitle={sessionLine}>
+      {/* [11 Oct] Daisy: a way back. Everything on this page saves as it is
+          done, so Back is all that is needed. */}
+      <button
+        onClick={() => { if (window.history.length > 1) router.back(); else router.push(day ? `/daily-cards?date=${day}` : '/daily-cards'); }}
+        style={{ ...btn, position: 'sticky', top: 8, zIndex: 5, marginBottom: '0.8rem', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+        <ChevronLeft size={17} /> Back
+      </button>
       {notice && <p style={{ ...card, color: '#C0392B', fontWeight: 700 }}>{notice}</p>}
 
       {/* Status and contact */}
