@@ -37,11 +37,18 @@ type NextStep = 'photo' | 'handover' | null;
 // the booking has none of its own saved.
 function cardStatus(
   b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[]; is_wheel?: boolean; session_start?: string; session_end?: string | null; status?: string | null; party_of?: string | null; live_ticket_name?: string | null },
-  fallbackDate?: string | null
+  fallbackDate?: string | null,
+  // [11 Oct] Daisy: the red old bookings just have no photos because they
+  // are from before the iPad automation. A whole day with not one photo is
+  // a day the camera did not exist for, so nothing on it needs chasing.
+  prePhotos = false
 ): { label: string; colour: string; next: NextStep; hint?: string } {
   const today = new Date().toLocaleDateString('en-CA');
   if (b.collected_at) return { label: 'Collected', colour: '#3d7a4a', next: null, hint: 'All done.' };
   const photos = b.photo_count || 0;
+  if (prePhotos && !photos) {
+    return { label: 'Painted', colour: '#8a8178', next: null, hint: 'From before table photos began, so there is no photo to show.' };
+  }
   // [11 Oct] Two bookings in one name at the same time are one party; the
   // pieces go on one of them, and this card just says so.
   if (b.party_of && !photos) return { label: 'Same party', colour: '#4a6a8a', next: null, hint: 'Booked as two tables in one name. The pieces are on the other booking.' };
@@ -444,7 +451,11 @@ export default function DailyCardsPage() {
       // own. Now syncs every single load, first or not. The isFirstLoad
       // distinction below (known-codes tracking vs "what's new" diffing)
       // is untouched -- still correct either way.
-      try {
+      // [11 Oct] Sync with Square when the page opens, the date changes, or
+      // someone taps refresh -- not on every 60-second tick from every open
+      // tab. The server runs its own sync every five minutes regardless, so
+      // the tick only needs to re-read what is already here.
+      if (isFirstLoad) try {
         const syncRes = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
@@ -466,7 +477,9 @@ export default function DailyCardsPage() {
       
       // Fetch bookings for the selected date
       const dateStr = cardDateRef.current;
-      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`);
+      // [11 Oct] The day being shown plus two weeks before it (for the
+      // morning check), rather than "the newest 250 whatever the day".
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings?date=${encodeURIComponent(dateStr)}&days=14`);
       // A failed fetch keeps the cards already on screen rather than
       // emptying them (and then calling everything "new" next minute).
       if (!res.ok) throw new Error(`bookings HTTP ${res.status}`);
@@ -706,7 +719,7 @@ export default function DailyCardsPage() {
   const earlierDone = isToday && selectedSessionIdx === null ? sessionFiltered.filter(isEarlierDone) : [];
   const matchesFilter = (b: Booking) => {
     if (filter === 'all') return true;
-    const st = cardStatus(b, collectDate);
+    const st = cardStatus(b, collectDate, prePhotos);
     if (filter === 'nophoto') return st.label === 'No photo yet';
     if (filter === 'check') return (b.to_check || 0) + (b.guesses || 0) > 0;
     if (filter === 'ready') return st.label === 'Ready to collect';
@@ -722,10 +735,14 @@ export default function DailyCardsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, collectingList, sessionFiltered, showEarlier, earlierDone.length, filter]);
   // The day at a glance, for the summary bar.
+  // The whole shown day predates the iPad photos: not one booking has one.
+  const prePhotos = useMemo(
+    () => !isToday && bookings.length > 0 && bookings.every((b) => !(b.photo_count || 0) && !b.collected_at),
+    [isToday, bookings]);
   const dayCounts = useMemo(() => {
     const c = { all: bookings.length, photographed: 0, nophoto: 0, check: 0, ready: 0, wheel: 0 };
     bookings.forEach((b) => {
-      const st = cardStatus(b, collectDate);
+      const st = cardStatus(b, collectDate, prePhotos);
       if ((b.photo_count || 0) > 0) c.photographed++;
       if (st.label === 'No photo yet') c.nophoto++;
       if ((b.to_check || 0) + (b.guesses || 0) > 0) c.check++;
@@ -734,7 +751,7 @@ export default function DailyCardsPage() {
     });
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, collectDate]);
+  }, [bookings, collectDate, prePhotos]);
 
   // [9 Oct] Daisy: Thea Priest and Debbie Curtis were booked into the
   // Lounge but were on the pottery wheel. A card can be switched to a wheel
@@ -963,7 +980,11 @@ export default function DailyCardsPage() {
         {view === 'painting' && isToday && (() => {
           const todayStr = new Date().toLocaleDateString('en-CA');
           const dayOf = (x: Booking) => new Date(x.session_start).toLocaleDateString('en-CA');
-          const prevDay = allBookings.map(dayOf).filter((d) => d < todayStr).sort().pop();
+          // Only days the camera actually ran: a day with zero photos is
+          // from before the automation, and "0 of 14 photographed" on it
+          // would be a false alarm every morning.
+          const photoDays = Array.from(new Set(allBookings.filter((x) => (x.photo_count || 0) > 0).map(dayOf)));
+          const prevDay = photoDays.filter((d) => d < todayStr).sort().pop();
           if (!prevDay) return null;
           const prev = allBookings.filter((x) => dayOf(x) === prevDay && !/cancel/i.test(x.status || ''));
           if (!prev.length) return null;
@@ -1165,7 +1186,7 @@ export default function DailyCardsPage() {
           // press but the card itself (it opens the booking). The printed
           // layout is still there for printing, just hidden on screen.
           const done = !compact && view === 'painting' && openCode !== b.booking_code && isDone(b);
-          const st0 = cardStatus(b, collectDate);
+          const st0 = cardStatus(b, collectDate, prePhotos);
           const photos0 = b.photo_count || 0;
           return (
             <React.Fragment key={b.booking_code}>
@@ -1194,7 +1215,7 @@ export default function DailyCardsPage() {
               </div>
             )}
             {done && (() => {
-              const st = cardStatus(b, collectDate);
+              const st = cardStatus(b, collectDate, prePhotos);
               const thumbs = b.thumbs || [];
               const due = b.collection_date ? new Date(`${String(b.collection_date).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : null;
               const room = b.is_wheel ? 'Wheel' : roomOf(b.space_name);
@@ -1305,7 +1326,7 @@ export default function DailyCardsPage() {
                   across the top: the status, the pieces and what they
                   come to, and the room. Screen only. */}
               {(() => {
-                const st = cardStatus(b, collectDate);
+                const st = cardStatus(b, collectDate, prePhotos);
                 const photos = b.photo_count || 0;
                 const bits: string[] = [];
                 if (photos) bits.push(`${photos} piece${photos === 1 ? '' : 's'}`);
@@ -1616,7 +1637,7 @@ export default function DailyCardsPage() {
                   and the next things to do. Screen only, never printed. */}
               <div className="no-print" style={{ padding: '0 1rem 1rem' }} onClick={(e) => e.stopPropagation()}>
                 {(() => {
-                  const st = cardStatus(b, collectDate);
+                  const st = cardStatus(b, collectDate, prePhotos);
                   return (
                     <div style={{ marginTop: '0.8rem' }}>
                       {st.hint && (

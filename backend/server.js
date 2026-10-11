@@ -193,14 +193,37 @@ app.get('/api/demo/bookings', async (req, res) => {
     // Show all real bookings, most recent first. (Earlier version filtered
     // to today-onward only, which hid most of the 209 real bookings since
     // most are in the past -- Daisy asked to see everything.)
-    const { data, error } = await supabase
+    // [11 Oct] DAY-AWARE. This used to be "the newest 250 bookings" whatever
+    // day the cards were showing: about twelve days of history, after which
+    // an older day silently came up empty, and every refresh carried the
+    // whole 250-row payload. With ?date=YYYY-MM-DD it returns that London
+    // day plus the `days` before it (default 14, for the morning check and
+    // for stepping back through the week); without it, the old behaviour.
+    let q = supabase
       .from('bookings')
       .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at, till_pottery, wheel, live_ticket_name')
       .eq('studio_id', DEMO_STUDIO_ID)
       // Cancelled in Square: not a card. (No-shows stay, so the day reads true.)
       .or('status.is.null,status.neq.cancelled')
-      .order('session_start', { ascending: false })
-      .limit(250);
+      .order('session_start', { ascending: false });
+    const dateQ = String(req.query.date || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateQ)) {
+      const back = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 0), 60);
+      const londonStart = (ymd) => {
+        // Midnight in London for a YYYY-MM-DD, as a UTC instant.
+        const guess = new Date(`${ymd}T00:00:00Z`).getTime();
+        const london = new Date(new Date(guess).toLocaleString('en-US', { timeZone: 'Europe/London' })).getTime();
+        const utc = new Date(new Date(guess).toLocaleString('en-US', { timeZone: 'UTC' })).getTime();
+        return new Date(guess - (london - utc));
+      };
+      const start = londonStart(dateQ);
+      const from = new Date(start.getTime() - back * 86400000);
+      const to = new Date(start.getTime() + 86400000);
+      q = q.gte('session_start', from.toISOString()).lt('session_start', to.toISOString()).limit(1000);
+    } else {
+      q = q.limit(250);
+    }
+    const { data, error } = await q;
     if (error) throw error;
 
     // collection_date can now be set at print time (before a session even
