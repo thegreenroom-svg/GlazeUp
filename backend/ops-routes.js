@@ -597,6 +597,98 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
     } catch (err) { logger.error('[kiln-shelf-date] failed', err.message); res.status(500).json({ error: err.message }); }
   });
 
+  // ---- COLLECT, ON ONE SCREEN ------------------------------------------
+  // [11 Oct] Daisy: merge Packing, Collection, Overdue and the returns
+  // shelf into one Collect screen. Every booking still holding pottery,
+  // sorted into where it stands: hand over (packed, due), to pack (out of
+  // the kiln), still in the kiln process (with a warning when its date is
+  // close), and how many are waiting on the returns shelf.
+  app.get('/api/spec/collect/board', async (req, res) => {
+    try {
+      const today = londonDay();
+      const since = new Date(Date.now() - 180 * 86400000).toISOString();
+      const { data: bk } = await supabase.from('bookings')
+        .select('booking_code, customer_name, customer_phone, session_start, collection_date, collected_at, booking_type, status, fulfilment_method')
+        .eq('studio_id', STUDIO_ID).gte('session_start', since).is('collected_at', null);
+      const bookings = (bk || []).filter(isReal);
+      const codes = bookings.map((b) => b.booking_code);
+      const pieces = codes.length ? await piecesFor(codes, 'id, booking_id, status, shelf_id, packed_at, returned_at, fulfilment, damaged, last_seen_box_number, reference_photo_url, photo_box') : [];
+      const sd = await statusDates(codes);
+      const daysTo = (d) => Math.round((new Date(`${d}T12:00:00Z`) - new Date(`${today}T12:00:00Z`)) / 86400000);
+      const handOver = [], toPack = [], inKiln = [];
+      let returnsWaiting = 0;
+      for (const b of bookings) {
+        const all = pieces.filter((p) => p.booking_id === b.booking_code && p.status !== 'collected');
+        returnsWaiting += all.filter((p) => p.returned_at || p.fulfilment === 'return_visit').length;
+        const live = all.filter((p) => !p.returned_at && p.fulfilment !== 'return_visit' && !p.damaged && p.status !== 'damaged');
+        if (!live.length) continue;
+        const due = String(sd[b.booking_code] || b.collection_date || '').slice(0, 10) || null;
+        const packed = live.filter((p) => p.packed_at).length;
+        const out = live.filter((p) => p.packed_at || p.shelf_id || p.status === 'ready').length;
+        const boxes = [...new Set(live.map((p) => p.last_seen_box_number).filter(Boolean))];
+        const first = live.find((p) => p.reference_photo_url);
+        const row = {
+          booking_code: b.booking_code, customer_name: b.customer_name, phone: b.customer_phone || null,
+          painted: b.session_start, due, days: due ? daysTo(due) : null,
+          pieces: live.length, packed, out, boxes,
+          postal: b.fulfilment_method === 'postal' || live.some((p) => p.fulfilment === 'post'),
+          thumb: first ? { url: first.reference_photo_url, box: first.photo_box || null } : null,
+        };
+        if (packed === live.length) handOver.push(row);
+        else if (out === live.length) toPack.push(row);
+        else inKiln.push(row);
+      }
+      const byDue = (a, b) => String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(a.painted || '').localeCompare(String(b.painted || ''));
+      handOver.sort(byDue); toPack.sort(byDue); inKiln.sort(byDue);
+      res.json({
+        today,
+        hand_over: handOver,
+        to_pack: toPack,
+        // Only the ones that need attention: due within two days (or past)
+        // and not out of the kiln yet. The rest are just on their way.
+        kiln_late: inKiln.filter((r) => r.days != null && r.days <= 2),
+        in_kiln_count: inKiln.length,
+        returns_waiting: returnsWaiting,
+      });
+    } catch (err) { logger.error('[collect-board] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
+  // ---- NEEDS A LOOK: HOW MANY ------------------------------------------
+  // [11 Oct] One list of things someone has to sort out. Counts only, cheap
+  // enough for the menu badge; each section's own page has the detail.
+  app.get('/api/spec/needs-a-look/counts', async (req, res) => {
+    try {
+      const since = new Date(Date.now() - 14 * 86400000).toISOString();
+      const [g, bf, other, settled, pc] = await Promise.all([
+        supabase.from('pottery_pieces').select('id, booking_id', { count: 'exact' })
+          .eq('studio_id', STUDIO_ID).not('archived', 'is', true).not('shape_confirmed', 'is', true)
+          .not('reference_photo_url', 'is', null).not('photo_box', 'is', null).gte('created_at', since).limit(1),
+        supabase.from('backfill_photos').select('id', { count: 'exact', head: true })
+          .eq('studio_id', STUDIO_ID).in('status', ['unmatched', 'failed']),
+        supabase.from('revenue_other_items').select('square_item_id').eq('studio_id', STUDIO_ID).eq('catalog_missing', true).limit(20000),
+        supabase.from('square_category_overrides').select('square_item_id').eq('studio_id', STUDIO_ID).eq('guessed', false).limit(20000),
+        supabase.from('bookings').select('booking_code, paid_piece_count').eq('studio_id', STUDIO_ID)
+          .not('paid_piece_count', 'is', null).gt('paid_piece_count', 0).order('session_start', { ascending: false }).limit(400),
+      ]);
+      const done = new Set((settled.data || []).map((r) => r.square_item_id));
+      const unknown = new Set((other.data || []).map((r) => r.square_item_id).filter((id) => id && !done.has(id))).size;
+      let short = 0;
+      const paid = pc.data || [];
+      if (paid.length) {
+        const found = new Map();
+        const codes = paid.map((b) => b.booking_code);
+        for (let i = 0; i < codes.length; i += 200) {
+          const { data } = await supabase.from('pottery_pieces').select('booking_id').eq('studio_id', STUDIO_ID)
+            .neq('archived', true).in('booking_id', codes.slice(i, i + 200));
+          (data || []).forEach((p) => found.set(p.booking_id, (found.get(p.booking_id) || 0) + 1));
+        }
+        short = paid.filter((b) => (found.get(b.booking_code) || 0) < b.paid_piece_count).length;
+      }
+      const counts = { shapes: g.count || 0, backfill: bf.count || 0, unknown_items: unknown, short_pieces: short };
+      res.json({ ...counts, total: Object.values(counts).reduce((a, b) => a + b, 0) });
+    } catch (err) { logger.error('[needs-a-look] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
   // ---- OVERDUE ----------------------------------------------------------
   app.get('/api/spec/collections/overdue', async (req, res) => {
     try {

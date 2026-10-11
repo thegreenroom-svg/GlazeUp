@@ -36,18 +36,12 @@ const STEPS: { key: string; label: string; detail: string; href: string; icon: t
     also: [{ label: 'Photograph a table', href: '/floor' }, { label: 'Table total', href: '/table-total' }] },
   { key: 'firing', label: 'Kiln', detail: 'A shelf for each date: dip, fire, out', href: '/kiln', icon: Flame, tint: '#B8562E',
     also: [{ label: 'Kiln plan', href: '/kiln-plan' }, { label: 'Shelf labels', href: '/shelf-stickers' }, { label: 'Out of the kiln', href: '/out-of-kiln' }] },
-  { key: 'packing', label: 'Collect', detail: 'Whose pottery is ready, pack it, hand it over', href: '/packing', icon: Package, tint: '#9C5A3C',
-    also: [{ label: 'Hand over', href: '/collection' }, { label: 'Wall of shelves', href: '/shelves' }, { label: 'Returns shelf', href: '/returns' }, { label: 'Overdue', href: '/overdue' }] },
+  { key: 'packing', label: 'Collect', detail: 'Hand over, pack, and what is overdue', href: '/collect', icon: Package, tint: '#9C5A3C',
+    also: [{ label: 'Wall of shelves', href: '/shelves' }, { label: 'Returns shelf', href: '/returns' }] },
   { key: 'find', label: 'Find', detail: 'Any name or date, opens the booking', href: '/find', icon: Search, tint: '#4F6D7A', also: [] },
 ];
 
-// Things someone has to sort out. Quiet, under one line.
-const TOOLS = [
-  { key: 'quick-check', label: 'Quick check',        detail: 'Settle the guessed shapes, one tap each', href: '/quick-check', icon: CheckCircle2, tint: '#3D7A4A' },
-  { key: 'backfill', label: 'Backfill from photos', detail: 'iPad photos that need a look', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
-  { key: 'other-items', label: 'Unknown items',       detail: 'Deleted from Square, waiting to be named', href: '/other-items', icon: HelpCircle, tint: '#A8651A' },
-  { key: 'piece-check', label: 'All accounted for?',   detail: 'Paid for, against photographed',        href: '/piece-check', icon: AlertTriangle, tint: '#E0A23C' },
-];
+// [11 Oct] The "needs a look" piles are one page now: /needs-a-look.
 
 // The office: owner only.
 const BACKROOM = [
@@ -62,7 +56,6 @@ const BACKROOM = [
 // hides tiles -- the pages themselves are not locked, so it is tidiness,
 // not security. Roles match PinGate's ADMIN_ROLES.
 const OWNER_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
-const OWNER_ONLY = new Set(['other-items', 'backfill', 'piece-check']);
 
 export default function StudioHome() {
   const [showBackroom, setShowBackroom] = useState(false);
@@ -75,8 +68,12 @@ export default function StudioHome() {
     } catch { /* leave everything showing */ }
   }, []);
   const backroom = isOwner ? BACKROOM : [];
-  const tools = TOOLS.filter((t) => isOwner || !OWNER_ONLY.has(t.key));
-  const [showTools, setShowTools] = useState(false);
+  const [look, setLook] = useState<{ shapes: number; total: number } | null>(null);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/needs-a-look/counts`)
+      .then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setLook(d); }).catch(() => {});
+  }, []);
+  const lookCount = look ? (isOwner ? look.total : look.shapes) : 0;
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
   // From the app review: the tiles said what each step IS but nothing
@@ -179,47 +176,16 @@ export default function StudioHome() {
       {/* Deliberately quieter than the steps above: smaller, paler, no
           numbers. These are places to go when something needs finding
           or fixing, not work waiting to be done today. */}
-      <button
-        onClick={() => setShowTools((v) => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%',
-          background: 'none', border: 'none', padding: '1.6rem 0 0.6rem',
-          cursor: 'pointer', color: '#999', fontSize: 'var(--text-xs)',
-          fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
-        }}
-      >
-        Needs a look
-        <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>{showTools ? '\u2212' : '+'}</span>
+      {/* [11 Oct] One list, one button, with how many things are waiting. */}
+      <button onClick={() => open({ key: 'needs-a-look', href: '/needs-a-look' })} disabled={!!opening}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', marginTop: '1.4rem', padding: '0.85rem 0.9rem', borderRadius: 'var(--radius-md)', border: '1px solid #ece5db', background: 'white', color: 'var(--charcoal)', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 'var(--radius-md)', background: '#E0A23C', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={17} /></span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700 }}>Needs a look</span>
+          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>{isOwner ? 'Shapes, iPad photos, missing pieces, unknown items' : 'Guessed shapes to confirm'}</span>
+        </span>
+        {lookCount > 0 && <span style={{ flexShrink: 0, minWidth: 28, height: 28, padding: '0 0.5rem', borderRadius: 14, background: '#E0A23C', color: 'white', fontWeight: 800, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{lookCount}</span>}
       </button>
-      {showTools && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {tools.map((tool) => {
-          const Icon = tool.icon;
-          return (
-            <motion.button
-              key={tool.key}
-              onClick={() => open(tool)}
-              disabled={!!opening}
-              animate={opening === tool.key ? { scale: 1.03, opacity: 0.92 } : { scale: 1, opacity: opening ? 0.35 : 1 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-              whileTap={{ scale: 0.985 }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%',
-                padding: '0.8rem 0.9rem', borderRadius: 'var(--radius-md)',
-                border: '1px solid #ece5db', background: 'white', color: 'var(--charcoal)',
-                cursor: opening ? 'default' : 'pointer', textAlign: 'left',
-              }}
-            >
-              <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 'var(--radius-md)', background: tool.tint, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={17} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--text-base)', fontWeight: 700 }}>{tool.label}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: '#777' }}>{tool.detail}</div>
-              </div>
-            </motion.button>
-          );
-        })}
-      </div>}
 
       {/* One line, not eight tiles. Everything here is still one tap away,
           it has just stopped shouting over the work. */}
