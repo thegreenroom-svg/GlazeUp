@@ -6789,6 +6789,35 @@ const NOUN_STOP = new Set(['with', 'and', 'the', 'for', 'large', 'small', 'mediu
 const nounsOf = (s) => String(s || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z\s]/g, ' ')
   .split(/\s+/).filter((w) => w.length >= 3 && !NOUN_STOP.has(w))
   .map((w) => (w.endsWith('es') && /(ch|sh|x|ss)es$/.test(w) ? w.slice(0, -2) : w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w));
+// [11 Oct] WHAT KIND OF THING IT IS -- mug, plate, bowl -- worked out
+// from words alone, for free. Daisy: "we're not trying to identify any
+// random shapes ... everything is effectively on the database." Used to
+// pair a table's pieces with its till lines, and to show the AI only the
+// part of the range a piece could be. Order matters: "butter dish" is a
+// box before it is a dish.
+const KIND_WORDS = [
+  ['bauble', /\b(bauble|ornament|decoration)s?\b/],
+  ['mug', /\b(mug|cup|tumbler|beaker|tankard)s?\b/],
+  ['jug', /\b(jug|pitcher)s?\b/],
+  ['box', /\b(box|boxes|bank|jar|pot|butter|lidded|caddy|money)s?\b/],
+  ['planter', /\bplanters?\b/],
+  ['lantern', /\b(lantern|house|tealight)s?\b/],
+  ['vase', /\bvases?\b/],
+  ['bowl', /\bbowls?\b/],
+  ['plate', /\b(plate|platter|saucer|coupe)s?\b/],
+  ['tray', /\b(tray|trinket|dish|dishes)\b/],
+  ['figure', /\b(figurine|figure|animal|statue)s?\b/],
+];
+const KIND_BY_CATEGORY = [
+  [/animal|big bisque/i, 'figure'], [/money/i, 'box'], [/planter/i, 'planter'], [/mug|cup/i, 'mug'],
+  [/plate|platter/i, 'plate'], [/bowl/i, 'bowl'], [/vase/i, 'vase'], [/trinket/i, 'tray'],
+];
+export function kindOf(text, category = null) {
+  const t = String(text || '').toLowerCase();
+  for (const [k, re] of KIND_WORDS) if (re.test(t)) return k;
+  if (category) for (const [re, k] of KIND_BY_CATEGORY) if (re.test(category)) return k;
+  return null;
+}
 const normTable = (s) => {
   const m = String(s || '').toUpperCase().match(/^\s*(?:T|L|TABLE)?\s*(\d{1,2})\s*([A-Z])?\b/);
   return m ? { num: parseInt(m[1], 10), letter: m[2] || '' } : null;
@@ -6821,11 +6850,11 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     const byId = new Map();
     for (let from = 0; ; from += 1000) {
       const { data } = await supabase.from('piece_catalogue')
-        .select('square_item_id, name, price_cents, variations')
+        .select('square_item_id, name, category, price_cents, variations')
         .eq('studio_id', STUDIO_ID).range(from, from + 999);
       for (const c of data || []) {
         if (!c.square_item_id) continue;
-        const shape = { square_item_id: c.square_item_id, name: c.name };
+        const shape = { square_item_id: c.square_item_id, name: c.name, category: c.category || null };
         byId.set(c.square_item_id, shape);
         for (const v of (Array.isArray(c.variations) ? c.variations : [])) if (v && v.id) byId.set(v.id, shape);
       }
@@ -6904,7 +6933,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
   const tillLookTried = new Map(); // piece id + till items left -> when tried
   async function reconcile(code, pottery) {
     const { data: pieces } = await supabase.from('pottery_pieces')
-      .select('id, square_item_id, shape_candidates, shape_confirmed, shape_confidence, reference_photo_url, photo_box, ai_square_item_id, ai_confidence')
+      .select('id, piece_type, description, square_item_id, shape_candidates, shape_confirmed, shape_confidence, reference_photo_url, photo_box, ai_square_item_id, ai_confidence')
       .eq('studio_id', STUDIO_ID).eq('booking_id', code).not('archived', 'is', true);
     const left = new Map();
     pottery.forEach((p) => left.set(p.square_item_id, (left.get(p.square_item_id) || 0) + p.qty));
@@ -6968,6 +6997,42 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         await confirm(p.id, hits[0]);
         p.square_item_id = hits[0];
       }
+    }
+    // [11 Oct] FREE PAIRING, before any AI. The bill is this table's whole
+    // bill, so every line on it is one of the pieces in the photo. Where
+    // only one kind of thing could be a given line -- the one mug on the
+    // bill and the one mug on the table -- they are the same piece. Same
+    // for several of one kind when the bill has them all as one shape (two
+    // Tray plates). And the last piece left against the last line left is
+    // that line. No AI call for any of these; they are priced, and left for
+    // a person or a later look to confirm.
+    {
+      const idx = await catalogueIndex();
+      const kindOfLine = (sid) => { const c = idx.get(sid); return c ? kindOf(c.name, c.category) : null; };
+      const assign = async (p, sid) => {
+        settled = true;
+        left.set(sid, (left.get(sid) || 0) - 1);
+        p.square_item_id = sid;
+        await supabase.from('pottery_pieces').update({ square_item_id: sid, shape_confidence: 'till-kind', shape_checked_at: now })
+          .eq('id', p.id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true).is('square_item_id', null);
+      };
+      const open = (pieces || []).filter((p) => !p.square_item_id && !p.shape_confirmed);
+      const byKind = new Map();
+      for (const p of open) {
+        const k = kindOf(p.piece_type) || kindOf(p.description);
+        if (!k) continue;
+        if (!byKind.has(k)) byKind.set(k, []);
+        byKind.get(k).push(p);
+      }
+      for (const [k, ps] of byKind) {
+        const units = [];
+        for (const [sid, n] of left) if (n > 0 && kindOfLine(sid) === k) for (let i = 0; i < n; i++) units.push(sid);
+        if (!units.length || ps.length > units.length || new Set(units).size !== 1) continue;
+        for (const p of ps) await assign(p, units[0]);
+      }
+      const stillOpen = open.filter((p) => !p.square_item_id);
+      const linesLeft = [...left.entries()].filter(([, n]) => n > 0);
+      if (stillOpen.length === 1 && linesLeft.length === 1 && linesLeft[0][1] === 1) await assign(stillOpen[0], linesLeft[0][0]);
     }
     // [9 Oct] Daisy: "check prices again ... against till ring up so at
     // least eliminate prices charged." Pieces still unknown are compared,
@@ -11599,13 +11664,24 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     const hot = sellingTop(st);
     const out = new Map();
     if (!shapes.length || !crops.length) return out;
-    const sheetsNow = contactSheets(shapes);
+    const sheetsAll = contactSheets(shapes);
 
     // Pass 1: shortlist from names AND, once built, the stock photos.
-    const list = shapes.map((s, i) => `${i + 1}. ${s.name} (${catLabel(s.category)})${hot.has(s.square_item_id) ? ' [selling now]' : ''}`).join('\n');
+    // [11 Oct] CHEAPER. When every piece in the call says what kind of
+    // thing it is (mug, plate, bowl...), only that part of the range is
+    // listed -- by its usual number, so nothing else changes -- and the
+    // big stock-photo sheets are left out of this first pass. The stock
+    // photos still decide the answer in pass 2, four options at a time.
+    // That first call was about 30,000 tokens each; this is a few hundred.
+    const kindsWanted = crops.map((c) => kindOf(c.piece_type) || kindOf(c.description));
+    const narrow = kindsWanted.every(Boolean) ? new Set(kindsWanted) : null;
+    const inRange = (sh) => !narrow || narrow.has(kindOf(sh.name, sh.category)) || !kindOf(sh.name, sh.category);
+    const listed = shapes.map((sh, i) => ({ sh, i })).filter(({ sh }) => inRange(sh));
+    const list = listed.map(({ sh, i }) => `${i + 1}. ${sh.name} (${catLabel(sh.category)})${hot.has(sh.square_item_id) ? ' [selling now]' : ''}`).join('\n');
     // The test set turns the painted-example sheets off: they are built
     // from confirmed pieces, which is exactly the answer key.
-    const exNow = opts.noExampleSheets ? [] : exampleSheets(shapes);
+    const exNow = (opts.noExampleSheets || narrow) ? [] : exampleSheets(shapes);
+    const sheetsNow = narrow ? [] : sheetsAll;
     const in1 = [{
       type: 'text',
       text: `These are painted pottery pieces from a paint-your-own pottery studio. Every piece started as a plain white bisque shape from the studio's range, listed below by number.\n\nFor each piece, pick up to FOUR shapes from the list that it could be, best first, judging by FORM only: overall silhouette, proportions, handles, spouts, lids, feet, sculpted or moulded details, and any letter or number it forms. Ignore the paint completely -- colours and painted designs are the customer's, not part of the shape.${sheetsNow.length ? `\n\nNames can be unhelpful, so STOCK PHOTO SHEETS follow the list: grids of the plain bisque shapes, 8 per row, with the shape number at each position given in words under each sheet. Look through the photos as well as the names -- a shape whose photo matches the piece belongs on the shortlist even if its name does not suggest it.` : ''}\n\nIf the piece is clearly not from this range (wheel-thrown, hand-built, or nothing listed is close), return an empty list for it rather than forcing a match.\n\nSHAPES:\n${list}`,
@@ -11866,12 +11942,17 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
   async function sweep({ photos = 3, booking_code = null } = {}) {
     if (!KEY()) return { error: 'GEMINI_API_KEY not configured' };
     let q = supabase.from('pottery_pieces')
-      .select('id, piece_type, description, reference_photo_url, photo_box, booking_id, size_ref, size_rel, size_cm, square_item_id')
+      .select('id, piece_type, description, reference_photo_url, photo_box, booking_id, size_ref, size_rel, size_cm, square_item_id, created_at')
       .eq('studio_id', STUDIO_ID)
       .not('reference_photo_url', 'is', null)
       .not('archived', 'is', true)
       .not('shape_confirmed', 'is', true);
-    q = booking_code ? q.eq('booking_id', booking_code) : q.is('shape_checked_at', null);
+    // [11 Oct] The till goes first. A table is usually tilled up around the
+    // time its photo is taken, and the ticket-matching run links it within
+    // minutes; once linked, most pieces are settled from the bill for free.
+    // So the automatic run leaves a photo alone for its first 40 minutes.
+    q = booking_code ? q.eq('booking_id', booking_code)
+      : q.is('shape_checked_at', null).lt('created_at', new Date(Date.now() - 40 * 60000).toISOString());
     const { data, error } = await q.order('created_at', { ascending: false }).limit(booking_code ? 50 : 60);
     if (error) throw error;
     const groups = new Map();
