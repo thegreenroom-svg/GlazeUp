@@ -42,7 +42,7 @@ export default function OverduePage() {
           <div key={r.booking_code} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.85rem', marginBottom: '0.45rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'baseline' }}>
               <button
-                onClick={() => router.push(`/daily-cards?date=${r.painted.slice(0, 10)}&code=${encodeURIComponent(r.booking_code)}&open=1`)}
+                onClick={() => router.push(`/booking/${encodeURIComponent(r.booking_code)}`)}
                 style={{ background: 'none', border: 'none', padding: 0, fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-md)', textAlign: 'left', cursor: 'pointer' }}
               >
                 {r.customer_name}

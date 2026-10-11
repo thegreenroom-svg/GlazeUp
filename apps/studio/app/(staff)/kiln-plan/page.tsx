@@ -64,7 +64,7 @@ export default function KilnPlanPage() {
                 {g.bookings.map((b) => (
                   <button
                     key={b.booking_code}
-                    onClick={() => router.push(`/daily-cards?date=${b.session_start.slice(0, 10)}&code=${encodeURIComponent(b.booking_code)}&open=1`)}
+                    onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
                     style={{ display: 'flex', width: '100%', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.9rem', background: 'none', border: 'none', borderBottom: '1px solid #f4efe8', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
                   >
                     <span style={{ color: 'var(--charcoal)' }}>{b.customer_name} <span style={{ color: 'var(--stone)', fontSize: 'var(--text-xs)' }}>{new Date(b.session_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span></span>

@@ -1519,6 +1519,12 @@ export default function DailyCardsPage() {
                 >
                   <Printer size={14} /> Print
                 </button>
+                <a
+                  href={`/booking/${encodeURIComponent(b.booking_code)}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', marginLeft: '0.4rem', padding: '0.4rem 0.9rem', borderRadius: 999, border: '1px solid var(--clay)', background: 'transparent', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', textDecoration: 'none' }}
+                >
+                  Booking
+                </a>
 
                 {openCode === b.booking_code && (() => {
                   const tp = tablePieces[b.booking_code];

@@ -3191,28 +3191,15 @@ export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
       if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
         return res.status(400).json({ error: 'collection_date must be an ISO date string (YYYY-MM-DD)' });
       }
-      const { data: existing } = await supabase
+      // [11 Oct] The status table is keyed on booking_code alone (there is
+      // no id column), so the old select-then-insert path hit a duplicate
+      // key for any booking that already had a row. One upsert does both.
+      const result = await supabase
         .from('demo_app_session_status')
-        .select('id')
-        .eq('booking_code', req.params.code)
-        .eq('studio_id', STUDIO_ID)
+        .upsert({ studio_id: STUDIO_ID, booking_code: req.params.code, collection_date: raw }, { onConflict: 'booking_code' })
+        .select('booking_code, collection_date')
         .maybeSingle();
-
-      let result;
-      if (existing) {
-        result = await supabase
-          .from('demo_app_session_status')
-          .update({ collection_date: raw })
-          .eq('id', existing.id)
-          .select('booking_code, collection_date')
-          .maybeSingle();
-      } else {
-        result = await supabase
-          .from('demo_app_session_status')
-          .insert({ studio_id: STUDIO_ID, booking_code: req.params.code, collection_date: raw })
-          .select('booking_code, collection_date')
-          .maybeSingle();
-      }
+      await supabase.from('bookings').update({ collection_date: raw }).eq('studio_id', STUDIO_ID).eq('booking_code', req.params.code);
       if (result.error) throw result.error;
       res.json(result.data);
     } catch (err) {

@@ -186,7 +186,7 @@ export default function BatchPage() {
       {problems.map((b) => (
         <div key={b.booking_code} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem', marginBottom: '0.6rem' }}>
           <button
-            onClick={() => router.push(`/packing?code=${encodeURIComponent(b.booking_code)}`)}
+            onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
             style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--charcoal)' }}
           >
             {b.customer_name}
@@ -232,7 +232,7 @@ export default function BatchPage() {
       {showReady && ready.map((b) => (
         <button
           key={b.booking_code}
-          onClick={() => router.push(`/packing?code=${encodeURIComponent(b.booking_code)}`)}
+          onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
           style={{ display: 'flex', justifyContent: 'space-between', width: '100%', textAlign: 'left', background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-sm)', padding: '0.55rem 0.7rem', marginTop: '0.4rem', cursor: 'pointer' }}
         >
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{b.customer_name}</span>

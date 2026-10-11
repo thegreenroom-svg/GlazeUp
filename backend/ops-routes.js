@@ -447,6 +447,129 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
     } catch (err) { logger.error('[kiln-leftovers] failed', err.message); res.status(500).json({ error: err.message }); }
   });
 
+  // ---- ONE BOOKING, EVERYTHING ABOUT IT --------------------------------
+  // [11 Oct] Daisy: "one booking page that everything links to." A booking's
+  // story was spread across the cards, the kiln shelves, packing, backfill
+  // and the till links. This gathers it: who and when, every piece with its
+  // photo, shape, price and where it is now, the table photos, the tickets
+  // that paid for it, its kiln shelf, the iPad photos read for it, a dated
+  // timeline, and the customer's other visits.
+  app.get('/api/spec/bookings/:code/page', async (req, res) => {
+    try {
+      const code = String(req.params.code || '');
+      const { data: b } = await supabase.from('bookings').select('*').eq('studio_id', STUDIO_ID).eq('booking_code', code).maybeSingle();
+      if (!b) return res.status(404).json({ error: 'No booking with that code' });
+      const { data: day } = await supabase.from('demo_app_session_status')
+        .select('collection_date, finished_at, finished_by, payment_method, collection_method, split_bill_count')
+        .eq('studio_id', STUDIO_ID).eq('booking_code', code).maybeSingle();
+      const collectDate = String(day?.collection_date || b.collection_date || '').slice(0, 10) || null;
+
+      const { data: ps } = await supabase.from('pottery_pieces')
+        .select('id, piece_type, description, status, parts, parts_seen, reference_photo_url, reference_photo_taken_at, photo_box, square_item_id, shape_confidence, shape_confirmed, shape_confirmed_by, packed_at, returned_at, left_out_at, left_out_in_kiln_at, last_seen_at, last_seen_box_number, shelf_id, damaged, archived, notes, fulfilment, size_cm, created_at')
+        .eq('studio_id', STUDIO_ID).eq('booking_id', code).order('created_at', { ascending: true });
+      const pieces = (ps || []).filter((p) => !p.archived);
+      const ids = [...new Set(pieces.map((p) => p.square_item_id).filter(Boolean))];
+      const cat = await catalogPrices(ids);
+      const stageName = (p) => {
+        if (p.damaged || p.status === 'damaged') return 'damaged';
+        if (p.status === 'collected') return b.collected_at ? 'collected' : 'packed';
+        if (p.packed_at) return 'packed';
+        if (p.returned_at) return 'returns shelf';
+        if (p.left_out_at) return p.left_out_in_kiln_at ? 'left out, now in the kiln' : 'left out, on the shelf';
+        if (p.status === 'ready' || p.shelf_id) return 'out of the kiln';
+        return 'waiting for the kiln';
+      };
+      const piecesOut = pieces.map((p) => {
+        const handmade = p.shape_confirmed && !p.square_item_id;
+        return {
+          id: p.id, piece_type: p.piece_type, description: p.description, parts: p.parts || 1, parts_seen: p.parts_seen || 0,
+          photo: p.reference_photo_url, box: p.photo_box || null, taken_at: p.reference_photo_taken_at,
+          shape: p.square_item_id ? (cat[p.square_item_id]?.name || 'Shape') : handmade ? 'Handmade' : null,
+          price_cents: p.square_item_id ? (cat[p.square_item_id]?.price_cents || 0) : 0,
+          shape_sure: !!p.shape_confirmed, shape_how: p.shape_confirmed_by || p.shape_confidence || null,
+          stage: stageName(p), box_number: p.last_seen_box_number || null, notes: p.notes || null, size_cm: p.size_cm || null,
+          postal: p.fulfilment === 'post',
+        };
+      });
+      const photos = [...new Set(pieces.map((p) => p.reference_photo_url).filter(Boolean))].map((url) => ({
+        url, taken_at: pieces.find((p) => p.reference_photo_url === url)?.reference_photo_taken_at || null,
+        pieces: piecesOut.map((p, i) => ({ ...p, n: i + 1 })).filter((p) => p.photo === url),
+      }));
+
+      const { data: tickets } = await supabase.from('till_ticket_links')
+        .select('order_id, ticket_name, order_created_at, state, total_cents, pottery, basis, manual')
+        .eq('studio_id', STUDIO_ID).eq('booking_code', code).order('order_created_at', { ascending: true });
+
+      let shelf = null;
+      if (collectDate) {
+        const { data: st } = await supabase.from('collection_batches')
+          .select('collection_date, shelved_at, dipped_at, into_kiln_at, out_of_kiln_at, kilns, fire_program, plan_fire_date')
+          .eq('studio_id', STUDIO_ID).eq('collection_date', collectDate).maybeSingle();
+        shelf = st || { collection_date: collectDate };
+      }
+
+      const { data: shots } = await supabase.from('backfill_photos')
+        .select('id, created_at, taken_at, status, tag_name, pieces_created, error_message')
+        .eq('studio_id', STUDIO_ID).eq('booking_code', code).order('taken_at', { ascending: true });
+
+      // Other visits: same email, or same name when there is no email.
+      let others = [];
+      {
+        let q = supabase.from('bookings').select('booking_code, customer_name, session_start, status, collected_at, booking_type')
+          .eq('studio_id', STUDIO_ID).neq('booking_code', code).order('session_start', { ascending: false }).limit(12);
+        q = b.customer_email ? q.eq('customer_email', b.customer_email) : q.eq('customer_name', b.customer_name);
+        const { data: o } = await q;
+        others = (o || []).filter(isReal);
+      }
+
+      const tl = [];
+      const add = (at, what, who) => { if (at) tl.push({ at, what, who: who || null }); };
+      add(b.created_at, 'Booked');
+      add(b.arrived_at, 'Arrived');
+      const firstPhoto = pieces.map((p) => p.reference_photo_taken_at).filter(Boolean).sort()[0];
+      add(firstPhoto, `Table photographed, ${pieces.length} piece${pieces.length === 1 ? '' : 's'}`);
+      (tickets || []).forEach((t) => add(t.order_created_at, `Ticket opened: ${t.ticket_name || 'unnamed'}`));
+      add(day?.finished_at, 'Session finished', day?.finished_by);
+      if (shelf) {
+        add(shelf.shelved_at, `On the ${collectDate} kiln shelf`);
+        add(shelf.dipped_at, 'Dipped in glaze');
+        add(shelf.into_kiln_at, `Into the kiln${shelf.kilns?.length ? ` (${shelf.kilns.join(' + ')})` : ''}`);
+        add(shelf.out_of_kiln_at, 'Out of the kiln');
+      }
+      const packedAt = pieces.map((p) => p.packed_at).filter(Boolean).sort().pop();
+      add(packedAt, 'Packed');
+      add(b.ready_email_sent_at, 'Told it is ready (email)');
+      add(b.collected_at, 'Collected');
+      tl.sort((x, y) => String(x.at).localeCompare(String(y.at)));
+
+      const today = londonDay();
+      res.json({
+        booking: {
+          booking_code: b.booking_code, customer_name: b.customer_name, email: b.customer_email || null, phone: b.customer_phone || null,
+          session_start: b.session_start, session_end: b.session_end, space: b.space_name || b.room || null, table: b.table_number || null,
+          party_size: b.party_size || null, notes: b.notes || null, collection_notes: b.collection_notes || null,
+          status: b.status || null, booking_type: b.booking_type || null, wheel: !!b.wheel, postal: b.fulfilment_method === 'postal',
+          shipping: b.fulfilment_method === 'postal' ? [b.shipping_address_line1, b.shipping_address_line2, b.shipping_city, b.shipping_postcode].filter(Boolean).join(', ') : null,
+          arrived_at: b.arrived_at, collected_at: b.collected_at, ready_email_sent_at: b.ready_email_sent_at,
+          collection_date: collectDate,
+          days_to_collect: collectDate ? Math.round((new Date(`${collectDate}T12:00:00Z`) - new Date(`${today}T12:00:00Z`)) / 86400000) : null,
+          paid_piece_count: b.paid_piece_count, paid_ticket_count: b.paid_ticket_count, payment: day?.payment_method || null,
+        },
+        pieces: piecesOut,
+        photos,
+        total_cents: piecesOut.reduce((t, p) => t + (p.price_cents || 0), 0),
+        tickets: (tickets || []).map((t) => ({
+          ticket_name: t.ticket_name, at: t.order_created_at, state: t.state, total_cents: t.total_cents || 0,
+          pottery: t.pottery || [], basis: t.manual ? 'by hand' : t.basis,
+        })),
+        shelf,
+        backfill: shots || [],
+        timeline: tl,
+        others,
+      });
+    } catch (err) { logger.error('[booking-page] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
   // [10 Oct] The day the technician plans to fire a shelf (null clears it).
   // Only that column is written, so the shelf's stages are untouched.
   app.post('/api/spec/kiln/plan-date', async (req, res) => {
