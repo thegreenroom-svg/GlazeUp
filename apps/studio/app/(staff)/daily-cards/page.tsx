@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams } from 'next/navigation';
-import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Camera, Loader, LayoutGrid, List as ListIcon } from 'lucide-react';
+import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Camera, Loader, LayoutGrid, List as ListIcon, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { EmptyState } from '@/components/EmptyState';
 
@@ -186,6 +186,8 @@ export default function DailyCardsPage() {
   // Collecting view needs bookings painted on other days.
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [view, setView] = useState<'painting' | 'collecting'>('painting');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [ydayDone, setYdayDone] = useState(false);
   // Every booking for the day shows as a card by default; finished
   // sessions can still be folded away with the button.
   const [showEarlier, setShowEarlier] = useState(true);
@@ -735,6 +737,30 @@ export default function DailyCardsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, collectingList, sessionFiltered, showEarlier, earlierDone.length, filter]);
   // The day at a glance, for the summary bar.
+  // [11 Oct] THE MORNING CHECK, as one line rather than a banner. The last
+  // day the camera actually ran: how many tables it got, and by name the
+  // ones that came (paid, or marked here) and have no photo.
+  const yesterday = useMemo(() => {
+    if (!isToday) return null;
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const dayOf = (x: Booking) => new Date(x.session_start).toLocaleDateString('en-CA');
+    const photoDays = Array.from(new Set(allBookings.filter((x) => (x.photo_count || 0) > 0).map(dayOf)));
+    const day = photoDays.filter((d) => d < todayStr).sort().pop();
+    if (!day) return null;
+    const prev = allBookings.filter((x) => dayOf(x) === day && !/cancel/i.test(x.status || ''));
+    const painting = prev.filter((x) => !x.is_wheel && x.status !== 'no_show');
+    if (!painting.length) return null;
+    const missing = painting.filter((x) => !(x.photo_count || 0) && (x.live_ticket_name || x.arrived_at));
+    const noShow = painting.filter((x) => !(x.photo_count || 0) && !x.live_ticket_name && !x.arrived_at).length;
+    return {
+      day,
+      label: new Date(`${day}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }),
+      got: painting.filter((x) => (x.photo_count || 0) > 0).length,
+      of: painting.length - noShow,
+      missing, noShow,
+    };
+  }, [isToday, allBookings]);
+
   // The whole shown day predates the iPad photos: not one booking has one.
   const prePhotos = useMemo(
     () => !isToday && bookings.length > 0 && bookings.every((b) => !(b.photo_count || 0) && !b.collected_at),
@@ -909,14 +935,25 @@ export default function DailyCardsPage() {
             Today
           </button>
           <button
+            onClick={() => { setSearchOpen((v) => !v); if (searchOpen) { setQ(''); setResults(null); } }}
+            aria-label="Find a booking"
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', padding: '0.5rem 0.6rem', backgroundColor: searchOpen ? 'var(--clay)' : '#f0f0f0', color: searchOpen ? 'white' : '#333', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            <Search size={17} />
+          </button>
+          <button
             onClick={() => router.push('/menu')}
-            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 0.8rem', backgroundColor: 'white', border: '1px solid var(--clay)', borderRadius: '6px', cursor: 'pointer', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 0.8rem', backgroundColor: 'white', border: '1px solid var(--clay)', borderRadius: '6px', cursor: 'pointer', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
           >
             <LayoutGrid size={15} /> Menu
           </button>
         </div>
 
-        {/* Any booking, any day: name, phone, email, table or code. */}
+        {/* [11 Oct] Daisy: "this looks very very busy". The search box was a
+            full band of screen on a page where the first thing anyone wants
+            is the bookings. It is behind the magnifier in the row above now,
+            and opens in place when it is wanted. */}
+        {searchOpen && (
         <div style={{ position: 'relative', marginBottom: '0.8rem' }}>
           <input
             value={q}
@@ -946,9 +983,10 @@ export default function DailyCardsPage() {
             </div>
           )}
         </div>
+        )}
 
-        {/* Same cards, different pile. */}
-        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        {/* Same cards, different pile. One row that scrolls, not two that wrap. */}
+        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.8rem', overflowX: 'auto', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
           {([
             ['painting', `Painting${bookings.length ? ` (${bookings.length})` : ''}`],
             ['collecting', `Collecting${collectingList.length ? ` (${collectingList.length})` : ''}`],
@@ -956,7 +994,7 @@ export default function DailyCardsPage() {
             <button
               key={v}
               onClick={() => setView(v)}
-              style={{ padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid var(--clay)', background: view === v ? 'var(--clay)' : 'white', color: view === v ? 'white' : 'var(--clay)' }}
+              style={{ flexShrink: 0, padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid var(--clay)', background: view === v ? 'var(--clay)' : 'white', color: view === v ? 'white' : 'var(--clay)' }}
             >
               {label}
             </button>
@@ -967,103 +1005,82 @@ export default function DailyCardsPage() {
             <button
               key={href}
               onClick={() => router.push(href)}
-              style={{ padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid #d8cbbc', background: 'white', color: '#8a8178' }}
+              style={{ flexShrink: 0, padding: '0.55rem 1rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-sm)', border: '1px solid #d8cbbc', background: 'white', color: '#8a8178' }}
             >
               {label}
             </button>
           ))}
         </div>
 
-        {/* [11 Oct] THE MORNING CHECK. On today's page, the last open day at a
-            glance: how many tables, how many photographed, and by name the
-            ones that came (paid or marked here) but have no photo. */}
-        {view === 'painting' && isToday && (() => {
-          const todayStr = new Date().toLocaleDateString('en-CA');
-          const dayOf = (x: Booking) => new Date(x.session_start).toLocaleDateString('en-CA');
-          // Only days the camera actually ran: a day with zero photos is
-          // from before the automation, and "0 of 14 photographed" on it
-          // would be a false alarm every morning.
-          const photoDays = Array.from(new Set(allBookings.filter((x) => (x.photo_count || 0) > 0).map(dayOf)));
-          const prevDay = photoDays.filter((d) => d < todayStr).sort().pop();
-          if (!prevDay) return null;
-          const prev = allBookings.filter((x) => dayOf(x) === prevDay && !/cancel/i.test(x.status || ''));
-          if (!prev.length) return null;
-          const painting = prev.filter((x) => !x.is_wheel && x.status !== 'no_show');
-          const photographed = painting.filter((x) => (x.photo_count || 0) > 0).length;
-          const missing = painting.filter((x) => !(x.photo_count || 0) && (x.live_ticket_name || x.arrived_at));
-          const noShow = painting.filter((x) => !(x.photo_count || 0) && !x.live_ticket_name && !x.arrived_at).length;
-          const label = new Date(`${prevDay}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
-          const ok = missing.length === 0;
-          return (
-            <div style={{ marginBottom: '0.9rem', background: ok ? '#eef6ef' : '#fdf1ec', border: `1px solid ${ok ? '#cfe5d3' : '#f0cfc4'}`, borderRadius: 'var(--radius-md)', padding: '0.65rem 0.8rem', fontSize: 'var(--text-sm)' }}>
-              <div style={{ fontWeight: 800, color: ok ? '#2E7D32' : '#b03a2e' }}>
-                {label}: {photographed} of {painting.length - noShow} tables photographed
-              </div>
-              <div style={{ color: '#6b625a', marginTop: '0.15rem' }}>
-                {ok ? 'Every table that came has its photo.' : 'Came but no photo: '}
-                {missing.map((x, k) => (
-                  <span key={x.booking_code}>{k ? ', ' : ''}<a href={`/booking/${encodeURIComponent(x.booking_code)}`} style={{ color: '#b03a2e', fontWeight: 700 }}>{x.customer_name}</a></span>
-                ))}
-                {noShow > 0 && <span>{ok ? ' ' : '. '}{noShow} probably did not come.</span>}
-              </div>
-              <button onClick={() => setCardDate(prevDay)} style={{ marginTop: '0.35rem', border: 'none', background: 'none', padding: 0, color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-xs)', cursor: 'pointer' }}>See {label.split(' ')[0]}'s cards ›</button>
-            </div>
-          );
-        })()}
-
-        {/* [9 Oct] One bar: the day at a glance, tap to filter. Replaces the
-            stacked session buttons and the finished-sessions toggle. */}
+        {/* [11 Oct] ONE LINE OF CONTROLS. This was three: the filter chips
+            and photographed count, then the session picker, finished-sessions
+            toggle and AI cost, then Print, Select all and refresh. It scrolls
+            sideways rather than stacking, so the bookings start near the top
+            of the screen. The AI cost moved to The numbers, where the week's
+            spend already lives. */}
         {view === 'painting' && bookings.length > 0 && (
-          <div style={{ marginBottom: '0.9rem' }}>
-            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {([
-                ['all', `All ${dayCounts.all}`, '#8a8178'],
-                ['nophoto', `No photo ${dayCounts.nophoto}`, '#b03a2e'],
-                ['ready', `Ready ${dayCounts.ready}`, '#b8860b'],
-                ['wheel', `Wheel ${dayCounts.wheel}`, '#6a5a8a'],
-              ] as const).filter(([k]) => k === 'all' || (dayCounts as any)[k] > 0).map(([k, label, colour]) => (
-                <button
-                  key={k}
-                  onClick={() => setFilter(filter === k ? 'all' : k)}
-                  style={{ padding: '0.35rem 0.75rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-xs)', border: `1px solid ${colour}`, background: filter === k ? colour : 'white', color: filter === k ? 'white' : colour }}
-                >
-                  {label}
-                </button>
-              ))}
-              <span style={{ fontSize: 'var(--text-xs)', color: '#8a8178', marginLeft: '0.2rem' }}>{dayCounts.photographed} photographed</span>
+          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginBottom: '0.9rem', overflowX: 'auto', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
+            <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: '#6b625a', fontWeight: 700 }}>
+              {dayCounts.all} booking{dayCounts.all === 1 ? '' : 's'} · {dayCounts.photographed} photographed
+            </span>
+            {([
+              ['nophoto', `No photo ${dayCounts.nophoto}`, '#b03a2e'],
+              ['ready', `Ready ${dayCounts.ready}`, '#b8860b'],
+              ['wheel', `Wheel ${dayCounts.wheel}`, '#6a5a8a'],
+            ] as const).filter(([k]) => (dayCounts as Record<string, number>)[k] > 0).map(([k, label, colour]) => (
               <button
-                onClick={toggleList}
-                aria-label={listView ? 'Show as cards' : 'Show as a list'}
-                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.7rem', borderRadius: 6, border: '1px solid #d8cbbc', background: 'white', color: '#6b625a', fontSize: 'var(--text-xs)', fontWeight: 700 }}
+                key={k}
+                onClick={() => setFilter(filter === k ? 'all' : k)}
+                style={{ flexShrink: 0, padding: '0.3rem 0.7rem', borderRadius: 999, fontWeight: 700, fontSize: 'var(--text-xs)', border: `1px solid ${colour}`, background: filter === k ? colour : 'white', color: filter === k ? 'white' : colour }}
               >
-                {listView ? <><LayoutGrid size={13} /> Cards</> : <><ListIcon size={13} /> List</>}
+                {label}
               </button>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.45rem' }}>
-              {sessionTimes.length > 1 && (
-                <select
-                  value={selectedSessionIdx === null ? '' : String(selectedSessionIdx)}
-                  onChange={(e) => setSelectedSessionIdx(e.target.value === '' ? null : Number(e.target.value))}
-                  style={{ padding: '0.3rem 0.5rem', borderRadius: 6, border: '1px solid #d8cbbc', background: 'white', fontSize: 'var(--text-xs)', color: '#333' }}
-                >
-                  <option value="">All sessions ({sessionTimes.length})</option>
-                  {sessionTimes.map((t, i) => (
-                    <option key={t} value={i}>{new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</option>
-                  ))}
-                </select>
-              )}
-              {earlierDone.length > 0 && filter === 'all' && (
-                <button onClick={() => setShowEarlier((x) => !x)} style={{ background: 'none', border: 'none', padding: 0, color: '#8a8178', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' }}>
-                  {showEarlier ? 'Hide' : 'Show'} finished sessions ({earlierDone.length})
-                </button>
-              )}
-              {aiCost && (
-                <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--stone)' }}
-                  title={(aiCost.month_by_kind_gbp || []).map((k: any) => `${k.kind}: £${k.gbp.toFixed(2)}`).join('\n')}>
-                  AI £{(aiCost.today_gbp || 0).toFixed(2)} today · £{(aiCost.month_gbp || 0).toFixed(2)} this month
-                </span>
-              )}
-            </div>
+            ))}
+            {sessionTimes.length > 1 && (
+              <select
+                value={selectedSessionIdx === null ? '' : String(selectedSessionIdx)}
+                onChange={(e) => setSelectedSessionIdx(e.target.value === '' ? null : Number(e.target.value))}
+                style={{ flexShrink: 0, padding: '0.3rem 0.5rem', borderRadius: 6, border: '1px solid #d8cbbc', background: 'white', fontSize: 'var(--text-xs)', color: '#333' }}
+              >
+                <option value="">All sessions ({sessionTimes.length})</option>
+                {sessionTimes.map((t, i) => (
+                  <option key={t} value={i}>{new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</option>
+                ))}
+              </select>
+            )}
+            {earlierDone.length > 0 && filter === 'all' && (
+              <button onClick={() => setShowEarlier((x) => !x)} style={{ flexShrink: 0, background: 'none', border: 'none', padding: '0 0.2rem', color: '#8a8178', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {showEarlier ? 'Hide' : 'Show'} finished ({earlierDone.length})
+              </button>
+            )}
+            <span style={{ flex: 1, minWidth: '0.5rem' }} />
+            <button
+              onClick={handlePrintSelected}
+              disabled={selected.size === 0}
+              aria-label="Print the selected cards"
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.6rem', backgroundColor: selected.size === 0 ? '#f0f0f0' : 'var(--clay)', color: selected.size === 0 ? '#999' : 'white', border: 'none', borderRadius: 6, cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: 'var(--text-xs)', fontWeight: 700 }}
+            >
+              <Printer size={13} />{selected.size > 0 ? ` ${selected.size}` : ''}
+            </button>
+            <button onClick={selectAll} style={{ flexShrink: 0, padding: '0.35rem 0.6rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 'var(--text-xs)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              {selected.size === visibleBookings.length ? 'None' : 'All'}
+            </button>
+            <button
+              onClick={toggleList}
+              aria-label={listView ? 'Show as cards' : 'Show as a list'}
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.6rem', borderRadius: 6, border: '1px solid #d8cbbc', background: 'white', color: '#6b625a', fontSize: 'var(--text-xs)', fontWeight: 700 }}
+            >
+              {listView ? <LayoutGrid size={13} /> : <ListIcon size={13} />}
+            </button>
+            <button
+              onClick={handleManualSync}
+              disabled={syncing}
+              aria-label="Check for new bookings"
+              title={lastSyncTime ? `Last checked ${lastSyncTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}` : 'Check for new bookings'}
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0.35rem 0.5rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: 6, cursor: syncing ? 'wait' : 'pointer', opacity: syncing ? 0.6 : 1 }}
+            >
+              <RefreshCw size={13} className={syncing ? 'animate-spin' : undefined} />
+            </button>
           </div>
         )}
 
@@ -1073,7 +1090,7 @@ export default function DailyCardsPage() {
 
         {/* [9 Oct] News in one box, a line each: studio alerts, new
             bookings, new iPad photos. */}
-        {(alerts.length > 0 || newSinceLoad.length > 0 || photoNews.length > 0) && (() => {
+        {(alerts.length > 0 || newSinceLoad.length > 0 || photoNews.length > 0 || (yesterday && !ydayDone)) && (() => {
           const matched = photoNews.filter((p) => p.state === 'matched');
           const reading = photoNews.filter((p) => p.state === 'reading');
           const look = photoNews.filter((p) => p.state === 'needs a look');
@@ -1087,6 +1104,16 @@ export default function DailyCardsPage() {
             <div style={{ border: '1px solid #ece5db', borderRadius: 8, background: 'white', marginBottom: '1rem', overflow: 'hidden' }}>
               <div style={{ marginTop: -1 }}>
                 {alerts.map((a) => row(`a${a.id}`, '#b03a2e', <strong>{a.message}</strong>, 'Dismiss', () => dismissAlert(a.id)))}
+                {/* [11 Oct] The morning check, one line in with the rest
+                    rather than a banner of its own above everything. */}
+                {yesterday && !ydayDone && row('yday', yesterday.missing.length ? '#b03a2e' : '#2f5d3a',
+                  <>
+                    <strong>{yesterday.label}:</strong> {yesterday.got} of {yesterday.of} photographed
+                    {yesterday.missing.length > 0 && <>. No photo: {yesterday.missing.map((x) => x.customer_name).join(', ')}</>}
+                    {yesterday.noShow > 0 && <> · {yesterday.noShow} did not come</>}
+                  </>,
+                  yesterday.missing.length ? 'Open' : 'Got it',
+                  () => (yesterday.missing.length ? setCardDate(yesterday.day) : setYdayDone(true)))}
                 {newSinceLoad.length > 0 && row('new', '#8a5a00',
                   <><strong>{newSinceLoad.length} new booking{newSinceLoad.length === 1 ? '' : 's'}:</strong> {newSinceLoad.map((b) => b.customer_name).join(', ')}. Marked below, print those too.</>,
                   'Got it', acceptNew)}
@@ -1106,32 +1133,6 @@ export default function DailyCardsPage() {
           />
         )}
 
-        {bookings.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={handlePrintSelected}
-              disabled={selected.size === 0}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.8rem', backgroundColor: selected.size === 0 ? '#ddd' : 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}
-            >
-              <Printer size={14} /> Print{selected.size > 0 ? ` (${selected.size})` : ''}
-            </button>
-            <button
-              onClick={selectAll}
-              style={{ padding: '0.45rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
-            >
-              {selected.size === visibleBookings.length ? 'Deselect all' : 'Select all'}
-            </button>
-            <button
-              onClick={handleManualSync}
-              disabled={syncing}
-              aria-label="Check for new bookings"
-              title={lastSyncTime ? `Last checked ${lastSyncTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}` : 'Check for new bookings'}
-              style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', padding: '0.45rem 0.6rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', opacity: syncing ? 0.6 : 1 }}
-            >
-              <RefreshCw size={15} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
-            </button>
-          </div>
-        )}
       </div>
 
 
