@@ -1186,7 +1186,11 @@ export default function DailyCardsPage() {
                     {thumbs.length > 0 && (
                       <div style={{ display: 'flex', gap: '0.45rem', overflowX: 'auto', margin: '0.65rem 0 0.2rem', paddingBottom: 2 }}>
                         {thumbs.map((t, k) => (
-                          <span key={k} style={{ flex: '0 0 auto', width: 64, textAlign: 'center' }}>
+                          <span key={k} role="button" aria-label={`Look at ${t.name}`}
+                            // [11 Oct] A piece opens full screen, zoomable; the
+                            // rest of the card still opens the booking.
+                            onClick={(e) => { e.stopPropagation(); setViewer({ title: b.customer_name, start: k, pieces: thumbs.map((x) => ({ photo: x.url, box: x.box, piece_type: x.name })) }); }}
+                            style={{ flex: '0 0 auto', width: 64, textAlign: 'center', cursor: 'zoom-in' }}>
                             <PieceThumb url={t.url} box={t.box} size={60} />
                             <span style={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.2, color: '#6b625a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
                           </span>

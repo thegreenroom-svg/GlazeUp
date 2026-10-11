@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { PhotoWithBoxes, PieceBox, pieceColour } from '@/components/PieceBoxes';
 
 // [6 Oct] Daisy: the cards are the interface -- tap a picture and it should
@@ -52,6 +52,34 @@ function CloseUp({ url, box }: { url: string; box: PieceBox | null }) {
   );
 }
 
+/**
+ * [11 Oct] Daisy: "can we still zoom into those photos?" Past the close-up,
+ * the whole table photo is shown at a bigger scale in a box you can drag
+ * around, opened centred on the piece, so a painted detail or a rim can be
+ * looked at properly.
+ */
+function Zoomed({ url, box, zoom }: { url: string; box: PieceBox | null; zoom: number }) {
+  const sc = useRef<HTMLDivElement>(null);
+  const img = useRef<HTMLImageElement>(null);
+  const pad = 4;
+  const bw = box ? Math.min(100, box.right_pct + pad) - Math.max(0, box.left_pct - pad) : 100;
+  const widthPct = (100 / Math.max(bw, 5)) * 100 * zoom;
+  const centre = () => {
+    const s = sc.current, im = img.current;
+    if (!s || !im || !box) return;
+    const cx = ((box.left_pct + box.right_pct) / 200) * im.clientWidth;
+    const cy = ((box.top_pct + box.bottom_pct) / 200) * im.clientHeight;
+    s.scrollLeft = cx - s.clientWidth / 2;
+    s.scrollTop = cy - s.clientHeight / 2;
+  };
+  useEffect(() => { centre(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [zoom, url]);
+  return (
+    <div ref={sc} style={{ height: '60vh', width: '100%', overflow: 'auto', borderRadius: 8, background: '#111', WebkitOverflowScrolling: 'touch' }}>
+      <img ref={img} src={url} alt="" onLoad={centre} style={{ width: `${widthPct}%`, maxWidth: 'none', display: 'block' }} />
+    </div>
+  );
+}
+
 export function PieceViewer({
   pieces,
   start = 0,
@@ -64,6 +92,8 @@ export function PieceViewer({
   onClose: () => void;
 }) {
   const [i, setI] = useState(Math.min(Math.max(start, 0), Math.max(pieces.length - 1, 0)));
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => { setZoom(1); }, [i]);
   const touchX = useRef<number | null>(null);
   const n = pieces.length;
   const go = (d: number) => setI((x) => (x + d + n) % n);
@@ -95,7 +125,7 @@ export function PieceViewer({
       onClick={(e) => e.stopPropagation()}
       onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
       onTouchEnd={(e) => {
-        if (touchX.current == null || n < 2) return;
+        if (touchX.current == null || n < 2 || zoom > 1) return;
         const dx = e.changedTouches[0].clientX - touchX.current;
         touchX.current = null;
         if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
@@ -118,9 +148,9 @@ export function PieceViewer({
 
       <div style={{ position: 'relative' }}>
         {p.photo
-          ? <CloseUp url={p.photo} box={p.box} />
+          ? (zoom > 1 ? <Zoomed url={p.photo} box={p.box} zoom={zoom} /> : <CloseUp url={p.photo} box={p.box} />)
           : <div style={{ padding: '4rem 1rem', opacity: 0.6 }}>No photo of this piece</div>}
-        {n > 1 && (
+        {n > 1 && zoom === 1 && (
           <>
             <button onClick={() => go(-1)} aria-label="Previous" style={navBtn('left')}><ChevronLeft size={24} /></button>
             <button onClick={() => go(1)} aria-label="Next" style={navBtn('right')}><ChevronRight size={24} /></button>
@@ -128,6 +158,13 @@ export function PieceViewer({
         )}
       </div>
 
+      {p.photo && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.6rem', marginTop: '0.7rem' }}>
+          <button aria-label="Zoom out" disabled={zoom === 1} onClick={() => setZoom((z) => Math.max(1, z / 1.6))} style={{ ...zoomBtn, opacity: zoom === 1 ? 0.35 : 1 }}><Minus size={18} /></button>
+          <span style={{ fontSize: 'var(--text-xs)', opacity: 0.7, minWidth: 64 }}>{zoom === 1 ? 'Close-up' : `${Math.round(zoom * 10) / 10}x`}</span>
+          <button aria-label="Zoom in" disabled={zoom >= 6} onClick={() => setZoom((z) => Math.min(6, z * 1.6))} style={{ ...zoomBtn, opacity: zoom >= 6 ? 0.35 : 1 }}><Plus size={18} /></button>
+        </div>
+      )}
       <p style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginTop: '0.9rem', textTransform: 'capitalize' }}>
         <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 999, background: pieceColour(i), marginRight: 8, verticalAlign: 'middle' }} />
         {p.piece_type || 'Piece'}
@@ -149,6 +186,11 @@ export function PieceViewer({
     </div>
   );
 }
+
+const zoomBtn: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.14)', border: 'none', borderRadius: 999, width: 44, height: 44,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer',
+};
 
 function navBtn(side: 'left' | 'right'): React.CSSProperties {
   return {
