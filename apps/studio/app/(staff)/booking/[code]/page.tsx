@@ -13,7 +13,7 @@ import { PageShell } from '@/components/PageShell';
 import { PhotoWithBoxes, PieceThumb, pieceColour, PieceBox } from '@/components/PieceBoxes';
 import { PieceViewer } from '@/components/PieceViewer';
 import { DateSlider, dayName } from '@/components/DateSlider';
-import { Calendar, Flame, Mail, Package, Phone, Printer, Receipt, Truck } from 'lucide-react';
+import { Calendar, Camera, Flame, Mail, Package, Phone, Printer, Receipt, Truck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -127,8 +127,15 @@ export default function BookingPage() {
         {b.notes && <p style={{ margin: '0.6rem 0 0', fontSize: 'var(--text-sm)', color: '#555' }}>{b.notes}</p>}
         {b.collection_notes && <p style={{ margin: '0.4rem 0 0', fontSize: 'var(--text-sm)', color: '#C0392B', fontWeight: 600 }}>{b.collection_notes}</p>}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.8rem' }}>
+          {/* [11 Oct] What the daily card offered, now that a photographed
+              booking opens here instead of its card. */}
+          {!b.collected_at && <button style={btn} onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}`)}><Camera size={15} /> {data.photos.length ? 'Table photo & returns' : 'Photograph the table'}</button>}
           <button style={btn} onClick={() => router.push(`/packing?code=${encodeURIComponent(b.booking_code)}`)}><Package size={15} /> Pack</button>
-          {day && <button style={btn} onClick={() => router.push(`/daily-cards?date=${day}&code=${encodeURIComponent(b.booking_code)}&open=1`)}><Printer size={15} /> Card</button>}
+          {(() => {
+            const due = !b.collected_at && b.days_to_collect != null && b.days_to_collect <= 0;
+            return <button style={due ? { ...btn, background: 'var(--clay)', color: 'white', border: 'none' } : btn} onClick={() => router.push(`/collection?code=${encodeURIComponent(b.booking_code)}`)}><Printer size={15} /> {due ? 'Hand over' : 'Collection card'}</button>;
+          })()}
+          {day && <button style={btn} onClick={() => router.push(`/daily-cards?date=${day}&code=${encodeURIComponent(b.booking_code)}&open=1`)}><Printer size={15} /> Day card</button>}
         </div>
       </div>
 

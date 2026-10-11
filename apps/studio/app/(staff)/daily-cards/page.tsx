@@ -236,6 +236,14 @@ export default function DailyCardsPage() {
   // not the top of the day or the menu. Remembered for this tab only, and
   // only for a couple of hours so tomorrow does not reopen today's card.
   const OPEN_KEY = 'glazeup_open_card';
+  // [11 Oct] Daisy: a card is for while the session is on. Once its photos
+  // have come through (or it is collected) the card's job is done, so a tap
+  // opens the booking page, with everything that has happened since.
+  const isDone = (b: { photo_count?: number; collected_at?: string | null }) => (b.photo_count || 0) > 0 || !!b.collected_at;
+  const tapCard = (b: { booking_code: string; photo_count?: number; collected_at?: string | null }) => {
+    if (isDone(b)) router.push(`/booking/${encodeURIComponent(b.booking_code)}`);
+    else openCard(b.booking_code);
+  };
   const openCard = async (code: string) => {
     if (openCode === code) {
       setOpenCode(null);
@@ -1096,7 +1104,7 @@ export default function DailyCardsPage() {
               <div
                 className="no-print"
                 id={`row-${b.booking_code}`}
-                onClick={() => openCard(b.booking_code)}
+                onClick={() => tapCard(b)}
                 style={{ display: 'flex', alignItems: 'stretch', background: 'white', border: isNew ? '2px solid #e0a020' : '1px solid #e5ddd2', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}
               >
                 <div style={{ width: 6, flexShrink: 0, background: st0.colour }} />
@@ -1488,10 +1496,10 @@ export default function DailyCardsPage() {
                   );
                 })()}
                 <button
-                  onClick={() => openCard(b.booking_code)}
+                  onClick={() => (openCode === b.booking_code ? openCard(b.booking_code) : tapCard(b))}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', padding: '0.4rem 0.9rem', borderRadius: 999, border: '1px solid var(--clay)', background: openCode === b.booking_code ? 'var(--clay)' : 'transparent', color: openCode === b.booking_code ? 'white' : 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)' }}
                 >
-                  {openCode === b.booking_code ? <>Close <ChevronUp size={15} /></> : <>Open <ChevronDown size={15} /></>}
+                  {openCode === b.booking_code ? <>Close <ChevronUp size={15} /></> : isDone(b) ? <>Open booking</> : <>Open <ChevronDown size={15} /></>}
                 </button>
                 <button
                   onClick={() => printOne(b.booking_code)}
@@ -1500,12 +1508,12 @@ export default function DailyCardsPage() {
                 >
                   <Printer size={14} /> Print
                 </button>
-                <a
+                {!isDone(b) && <a
                   href={`/booking/${encodeURIComponent(b.booking_code)}`}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.6rem', marginLeft: '0.4rem', padding: '0.4rem 0.9rem', borderRadius: 999, border: '1px solid var(--clay)', background: 'transparent', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', textDecoration: 'none' }}
                 >
                   Booking
-                </a>
+                </a>}
 
                 {openCode === b.booking_code && (() => {
                   const tp = tablePieces[b.booking_code];
