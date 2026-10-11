@@ -195,7 +195,7 @@ app.get('/api/demo/bookings', async (req, res) => {
     // most are in the past -- Daisy asked to see everything.)
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at, till_pottery, wheel')
+      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at, collected_at, till_pottery, wheel, live_ticket_name')
       .eq('studio_id', DEMO_STUDIO_ID)
       // Cancelled in Square: not a card. (No-shows stay, so the day reads true.)
       .or('status.is.null,status.neq.cancelled')
@@ -241,18 +241,20 @@ app.get('/api/demo/bookings', async (req, res) => {
     if (codes.length) {
       const { data: pieceRows } = await supabase
         .from('pottery_pieces')
-        .select('booking_id, reference_photo_url, square_item_id, shape_confirmed')
+        .select('booking_id, reference_photo_url, photo_box, piece_type, square_item_id, shape_confirmed, created_at')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', codes)
-        .neq('archived', true);
+        .neq('archived', true)
+        .order('created_at', { ascending: true });
       // [9 Oct] The card's status line says what the pottery comes to, so
       // the price is visible without opening every card.
       const sids = [...new Set((pieceRows || []).map((p) => p.square_item_id).filter(Boolean))];
       const priceOf = {};
+      const nameOf = {};
       for (let i = 0; i < sids.length; i += 200) {
-        const { data: cat } = await supabase.from('piece_catalogue').select('square_item_id, price_cents, price_min_cents')
+        const { data: cat } = await supabase.from('piece_catalogue').select('square_item_id, name, price_cents, price_min_cents')
           .eq('studio_id', DEMO_STUDIO_ID).in('square_item_id', sids.slice(i, i + 200));
-        (cat || []).forEach((c) => { priceOf[c.square_item_id] = c.price_min_cents || c.price_cents || 0; });
+        (cat || []).forEach((c) => { priceOf[c.square_item_id] = c.price_min_cents || c.price_cents || 0; nameOf[c.square_item_id] = c.name; });
       }
       // What the till charged, where a piece's shape is on its booking's
       // bill (each line used once); the catalogue price otherwise.
@@ -268,10 +270,15 @@ app.get('/api/demo/bookings', async (req, res) => {
         bills[b.booking_code] = m;
       });
       (pieceRows || []).forEach((p) => {
-        if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0, cents: 0, to_check: 0, guesses: 0 };
+        if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0, cents: 0, to_check: 0, guesses: 0, thumbs: [] };
         const pc = pieceCounts[p.booking_id];
         pc.pieces++;
         if (p.reference_photo_url) pc.with_photo++;
+        // [11 Oct] Daisy: once the photo is in, the card can show what was
+        // painted instead of the printed-card layout. Up to 8 small crops.
+        if (p.reference_photo_url && pc.thumbs.length < 8) {
+          pc.thumbs.push({ url: p.reference_photo_url, box: p.photo_box || null, name: (p.square_item_id && nameOf[p.square_item_id]) || p.piece_type || 'Piece' });
+        }
         const charged = p.square_item_id && bills[p.booking_id]?.get(p.square_item_id)?.shift();
         // A recognised shape nobody (person or till) has settled yet.
         if (p.square_item_id && !p.shape_confirmed && !charged) pc.guesses++;
@@ -324,6 +331,21 @@ app.get('/api/demo/bookings', async (req, res) => {
       } catch (e) { logger.warn('[returning] lookup failed', e.message); }
     }
 
+    // [11 Oct] Where each collection date's kiln shelf is, for the card.
+    const kilnStage = {};
+    {
+      const dates = [...new Set(Object.values(collectionDates).map((d) => String(d).slice(0, 10)))];
+      if (dates.length) {
+        const { data: shelves } = await supabase.from('collection_batches')
+          .select('collection_date, shelved_at, dipped_at, into_kiln_at, out_of_kiln_at')
+          .eq('studio_id', DEMO_STUDIO_ID).in('collection_date', dates);
+        (shelves || []).forEach((x) => {
+          kilnStage[String(x.collection_date).slice(0, 10)] = x.out_of_kiln_at ? 'Out of the kiln' : x.into_kiln_at ? 'In the kiln'
+            : x.dipped_at ? 'Dipped' : x.shelved_at ? 'On the kiln shelf' : null;
+        });
+      }
+    }
+
     const merged = data.map(({ till_pottery, ...b }) => ({
       ...b,
       collection_date: collectionDates[b.booking_code] || null,
@@ -345,6 +367,8 @@ app.get('/api/demo/bookings', async (req, res) => {
       piece_count: pieceCounts[b.booking_code]?.pieces || 0,
       photo_count: pieceCounts[b.booking_code]?.with_photo || 0,
       pottery_cents: pieceCounts[b.booking_code]?.cents || 0,
+      thumbs: pieceCounts[b.booking_code]?.thumbs || [],
+      kiln_stage: kilnStage[String(collectionDates[b.booking_code] || '').slice(0, 10)] || null,
       to_check: pieceCounts[b.booking_code]?.to_check || 0,
       guesses: pieceCounts[b.booking_code]?.guesses || 0,
       // [9 Oct] Wheel hire and throwing sessions: no painted table, so no

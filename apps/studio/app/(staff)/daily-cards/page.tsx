@@ -109,6 +109,10 @@ interface Booking {
   photo_count?: number;
   party_of?: string | null;
   pottery_cents?: number;
+  thumbs?: { url: string; box: any; name: string }[];
+  kiln_stage?: string | null;
+  live_ticket_name?: string | null;
+  fulfilment_method?: string | null;
   to_check?: number;
   guesses?: number;
   is_wheel?: boolean;
@@ -1114,6 +1118,13 @@ export default function DailyCardsPage() {
           // its full card. The full card is still rendered (hidden on
           // screen) so printing works the same either way.
           const compact = listView && view === 'painting' && openCode !== b.booking_code;
+          // [11 Oct] Daisy: "when the photo is taken or comes through, a lot
+          // of information can go off the card ... we don't want anyone
+          // pressing anything they don't need to." A photographed card
+          // shows what was painted and where it is now, with nothing to
+          // press but the card itself (it opens the booking). The printed
+          // layout is still there for printing, just hidden on screen.
+          const done = !compact && view === 'painting' && openCode !== b.booking_code && isDone(b);
           const st0 = cardStatus(b, collectDate);
           const photos0 = b.photo_count || 0;
           return (
@@ -1142,9 +1153,64 @@ export default function DailyCardsPage() {
                 </div>
               </div>
             )}
+            {done && (() => {
+              const st = cardStatus(b, collectDate);
+              const thumbs = b.thumbs || [];
+              const due = b.collection_date ? new Date(`${String(b.collection_date).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : null;
+              const room = b.is_wheel ? 'Wheel' : roomOf(b.space_name);
+              const back = (b.returns_waiting || []).filter((r) => !r.own).length;
+              return (
+                <div
+                  className="no-print"
+                  id={`card-${b.booking_code}`}
+                  role="button"
+                  onClick={() => tapCard(b)}
+                  style={{ display: 'block', background: 'white', border: isNew ? '2px solid #e0a020' : '1px solid #ddd', borderRadius: 2, cursor: 'pointer', textAlign: 'left', overflow: 'hidden', scrollMarginTop: 90 }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.8rem', background: st.colour, color: 'white' }}>
+                    <span style={{ fontWeight: 800, fontSize: 'var(--text-sm)', letterSpacing: '.03em', textTransform: 'uppercase' }}>
+                      {st.label}
+                      <span style={{ fontWeight: 600, textTransform: 'none', letterSpacing: 0, opacity: .92 }}>
+                        {[b.photo_count ? ` · ${b.photo_count} piece${b.photo_count === 1 ? '' : 's'}` : '', b.pottery_cents ? ` · ${money(b.pottery_cents)}` : ''].join('')}
+                      </span>
+                    </span>
+                    {room && <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: 999, background: 'rgba(255,255,255,.22)', flexShrink: 0 }}>{room}</span>}
+                  </div>
+                  <div style={{ padding: '0.8rem 0.9rem 0.9rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+                      <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '1.35rem', color: 'var(--charcoal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.customer_name}</span>
+                      <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: '#8a8178' }}>
+                        {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}{b.table_number ? ` · table ${b.table_number}` : ''}
+                      </span>
+                    </div>
+                    {thumbs.length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.45rem', overflowX: 'auto', margin: '0.65rem 0 0.2rem', paddingBottom: 2 }}>
+                        {thumbs.map((t, k) => (
+                          <span key={k} style={{ flex: '0 0 auto', width: 64, textAlign: 'center' }}>
+                            <PieceThumb url={t.url} box={t.box} size={60} />
+                            <span style={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.2, color: '#6b625a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.55rem' }}>
+                      {due && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#f6ece1', color: 'var(--clay)' }}>{b.collected_at ? 'Collected' : `Collect ${due}`}</span>}
+                      {b.kiln_stage && !b.collected_at && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fbe9e1', color: '#B8562E' }}>{b.kiln_stage}</span>}
+                      {b.live_ticket_name && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#eef3ee', color: '#3d7a4a' }}>Till: {b.live_ticket_name}</span>}
+                      {b.fulfilment_method === 'postal' && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A6761D' }}>Posting</span>}
+                      {back > 0 && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A8651A' }}>{back} on the returns shelf</span>}
+                      {(b.photo_count || 0) > 0 && !b.is_wheel && (b.party_size || 0) > (b.photo_count || 0) && (
+                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fff4d6', color: '#8a5a00' }}>{b.photo_count} for {b.party_size} seats</span>
+                      )}
+                    </div>
+                    {st.hint && st.label === 'Same party' && <p style={{ margin: '0.5rem 0 0', fontSize: 'var(--text-xs)', color: '#6b625a' }}>{st.hint}</p>}
+                  </div>
+                </div>
+              );
+            })()}
             <div
-              id={`card-${b.booking_code}`}
-              className={`print-card${compact ? ' list-hidden' : ''}`}
+              id={done ? undefined : `card-${b.booking_code}`}
+              className={`print-card${compact || done ? ' list-hidden' : ''}`}
               data-selected={(printOnly ? printOnly === b.booking_code : isSelected) ? "true" : "false"}
               style={{
                 padding: '0', 
