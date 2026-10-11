@@ -13,6 +13,7 @@ import { PageShell } from '@/components/PageShell';
 import { PhotoWithBoxes, PieceThumb, pieceColour, PieceBox } from '@/components/PieceBoxes';
 import { PieceViewer } from '@/components/PieceViewer';
 import { DateSlider, dayName } from '@/components/DateSlider';
+import { SHOW_PRICES, TRIAL_RUN } from '@/lib/trial';
 import { Calendar, Camera, ChevronLeft, Flame, Mail, Package, Phone, Printer, Receipt, Truck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -136,7 +137,7 @@ export default function BookingPage() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.8rem' }}>
           {/* [11 Oct] What the daily card offered, now that a photographed
               booking opens here instead of its card. */}
-          {!b.collected_at && <button style={btn} onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}`)}><Camera size={15} /> {data.photos.length ? 'Table photo & returns' : 'Photograph the table'}</button>}
+          {!b.collected_at && !(TRIAL_RUN && !data.photos.length) && <button style={btn} onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}`)}><Camera size={15} /> {data.photos.length ? 'Table photo & returns' : 'Photograph the table'}</button>}
           <button style={btn} onClick={() => router.push(`/packing?code=${encodeURIComponent(b.booking_code)}`)}><Package size={15} /> Pack</button>
           {(() => {
             const due = !b.collected_at && b.days_to_collect != null && b.days_to_collect <= 0;
@@ -177,7 +178,7 @@ export default function BookingPage() {
 
       {/* Pieces */}
       <div style={card}>
-        <h2 style={h2}>{data.pieces.length} piece{data.pieces.length === 1 ? '' : 's'}{data.total_cents ? ` · ${money(data.total_cents)}` : ''}</h2>
+        <h2 style={h2}>{data.pieces.length} piece{data.pieces.length === 1 ? '' : 's'}{SHOW_PRICES && data.total_cents ? ` · ${money(data.total_cents)}` : ''}</h2>
         {data.pieces.length === 0 && <p style={{ margin: 0, color: '#777', fontSize: 'var(--text-sm)' }}>No pieces photographed yet.</p>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.6rem' }}>
           {data.pieces.map((p, i) => (
@@ -187,8 +188,9 @@ export default function BookingPage() {
                 <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>{i + 1}. {p.shape || p.piece_type || 'Piece'}</span>
                 {p.description && p.description !== p.shape && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#555' }}>{p.description}</span>}
                 <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>
-                  {p.price_cents ? money(p.price_cents) : ''}{p.shape && !p.shape_sure ? `${p.price_cents ? ' · ' : ''}guess` : ''}
-                  {p.parts > 1 ? ` · ${p.parts} parts` : ''}{p.box_number ? ` · box ${p.box_number}` : ''}
+                  {SHOW_PRICES
+                    ? <>{p.price_cents ? money(p.price_cents) : ''}{p.shape && !p.shape_sure ? `${p.price_cents ? ' · ' : ''}guess` : ''}{p.parts > 1 ? ` · ${p.parts} parts` : ''}{p.box_number ? ` · box ${p.box_number}` : ''}</>
+                    : [p.parts > 1 ? `${p.parts} parts` : '', p.box_number ? `box ${p.box_number}` : ''].filter(Boolean).join(' · ')}
                 </span>
                 <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, color: stageColour(p.stage) }}>{p.stage}</span>
               </span>
@@ -211,8 +213,8 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* Till */}
-      <div style={card}>
+      {/* Till -- hidden during the trial run (see lib/trial.ts). */}
+      {SHOW_PRICES && <div style={card}>
         <h2 style={h2}><Receipt size={14} /> Till</h2>
         {data.tickets.length === 0
           ? <p style={{ margin: 0, color: '#777', fontSize: 'var(--text-sm)' }}>No till ticket linked yet.</p>
@@ -223,7 +225,7 @@ export default function BookingPage() {
             </div>
           ))}
         {(b.paid_piece_count || b.payment) && <p style={{ margin: '0.4rem 0 0', fontSize: 'var(--text-xs)', color: '#777' }}>{[b.paid_piece_count ? `${b.paid_piece_count} pieces paid` : null, b.payment].filter(Boolean).join(' · ')}</p>}
-      </div>
+      </div>}
 
       {/* Timeline */}
       {data.timeline.length > 0 && (
