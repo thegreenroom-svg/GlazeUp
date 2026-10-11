@@ -1,6 +1,6 @@
 'use client';
 import QRCode from 'qrcode';
-import { PieceThumb, PhotoWithBoxes } from '@/components/PieceBoxes';
+import { PieceThumb, PhotoWithBoxes, PIECE_COLOURS } from '@/components/PieceBoxes';
 import { PieceViewer, ViewerPiece } from '@/components/PieceViewer';
 
 export const dynamic = 'force-dynamic';
@@ -1183,20 +1183,35 @@ export default function DailyCardsPage() {
                         {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}{b.table_number ? ` · table ${b.table_number}` : ''}
                       </span>
                     </div>
-                    {thumbs.length > 0 && (
-                      <div style={{ display: 'flex', gap: '0.45rem', overflowX: 'auto', margin: '0.65rem 0 0.2rem', paddingBottom: 2 }}>
-                        {thumbs.map((t, k) => (
-                          <span key={k} role="button" aria-label={`Look at ${t.name}`}
-                            // [11 Oct] A piece opens full screen, zoomable; the
-                            // rest of the card still opens the booking.
-                            onClick={(e) => { e.stopPropagation(); setViewer({ title: b.customer_name, start: k, pieces: thumbs.map((x) => ({ photo: x.url, box: x.box, piece_type: x.name })) }); }}
-                            style={{ flex: '0 0 auto', width: 64, textAlign: 'center', cursor: 'zoom-in' }}>
-                            <PieceThumb url={t.url} box={t.box} size={60} />
-                            <span style={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.2, color: '#6b625a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    {thumbs.length > 0 && (() => {
+                      // [11 Oct] Daisy: keep the whole table photo with the
+                      // numbered pieces, and 1, 2, 3 below to tap. It jogs
+                      // everyone's memory. Tapping either opens the piece.
+                      const vp = thumbs.map((x, k) => ({ photo: x.url, box: x.box, piece_type: `${k + 1}. ${x.name}` }));
+                      const open = (k: number) => setViewer({ title: b.customer_name, start: k, pieces: vp });
+                      const firstUrl = thumbs[0].url;
+                      return (
+                        <>
+                          <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '0.65rem', borderRadius: 6, overflow: 'hidden', maxWidth: 640, marginInline: 'auto' }}>
+                            <PhotoWithBoxes
+                              src={firstUrl}
+                              pieces={thumbs.map((x, k) => ({ index: k + 1, piece_type: x.name, box: x.url === firstUrl ? x.box : null }))}
+                              onPick={open}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', margin: '0.6rem 0 0.2rem' }}>
+                            {thumbs.map((t, k) => (
+                              <span key={k} role="button" aria-label={`Look at ${t.name}`}
+                                onClick={(e) => { e.stopPropagation(); open(k); }}
+                                style={{ width: 72, textAlign: 'center', cursor: 'zoom-in' }}>
+                                <PieceThumb url={t.url} box={t.box} size={64} ring={PIECE_COLOURS[k % PIECE_COLOURS.length]} />
+                                <span style={{ display: 'block', fontSize: '0.68rem', lineHeight: 1.2, color: 'var(--charcoal)', fontWeight: 600, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k + 1}. {t.name}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.55rem' }}>
                       {due && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#f6ece1', color: 'var(--clay)' }}>{b.collected_at ? 'Collected' : `Collect ${due}`}</span>}
                       {b.kiln_stage && !b.collected_at && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fbe9e1', color: '#B8562E' }}>{b.kiln_stage}</span>}
