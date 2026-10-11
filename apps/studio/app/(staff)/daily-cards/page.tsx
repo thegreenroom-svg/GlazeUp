@@ -30,7 +30,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 
 // [6 Oct] Every card says where the booking is and the one thing to do
 // next, so nobody needs to know the app's layout -- just the button.
-type NextStep = 'arrived' | 'photo' | 'handover' | null;
+type NextStep = 'photo' | 'handover' | null;
 // A card with no button always says what happens next instead, so nobody
 // is left looking at a card wondering where to go.
 // fallbackDate is the date the card itself prints as "Ready", used when
@@ -47,7 +47,7 @@ function cardStatus(
   // table photo to wait for.
   if (b.is_wheel && !photos && !b.finished_at) {
     if (b.arrived_at) return { label: 'On the wheel', colour: '#6a5a8a', next: null, hint: 'Wheel session. No table photo needed.' };
-    return { label: 'Wheel booked', colour: '#8a8178', next: 'arrived' };
+    return { label: 'Wheel booked', colour: '#8a8178', next: null };
   }
   if (b.finished_at || photos > 0) {
     // Every piece is coming back to finish: nothing to fire, nothing to hand over.
@@ -70,7 +70,9 @@ function cardStatus(
     return { label: 'No photo yet', colour: '#b03a2e', next: 'photo', hint: b.arrived_at ? undefined : 'Session over. If they came, photograph the table; the iPad photos may still be on the way.' };
   }
   if (b.arrived_at) return { label: 'Painting', colour: 'var(--clay)', next: 'photo' };
-  return { label: 'Booked', colour: '#8a8178', next: 'arrived' };
+  // [11 Oct] Daisy: no "They're here" button. A booked card goes straight
+  // to photographing the table.
+  return { label: 'Booked', colour: '#8a8178', next: 'photo' };
 }
 
 // [9 Oct] Which room, in a word, from the Square service name.
@@ -708,22 +710,6 @@ export default function DailyCardsPage() {
       });
       if (!r.ok) throw new Error();
     } catch { set(!wheel); }
-  };
-
-  const markArrived = async (b: Booking, arrived: boolean) => {
-    const before = b.arrived_at ?? null;
-    const set = (v: string | null) => setBookings((bs) => bs.map((x) => (x.booking_code === b.booking_code ? { ...x, arrived_at: v } : x)));
-    set(arrived ? new Date().toISOString() : null);
-    try {
-      const r = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(b.booking_code)}/arrived`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arrived }),
-      });
-      if (!r.ok) throw new Error();
-      if (arrived) showToast(`${b.customer_name} arrived`, () => markArrived({ ...b, arrived_at: new Date().toISOString() }, false));
-    } catch {
-      set(before);
-      showToast("That didn't save. Try again.");
-    }
   };
 
   // [6 Oct] Daisy: persistent undo where needed. The toast's Undo only
@@ -1483,22 +1469,17 @@ export default function DailyCardsPage() {
                           {b.is_wheel ? 'Not on the wheel? Undo' : 'On the wheel instead? No photo needed'}
                         </button>
                       )}
-                      {st.label === 'Painting' && (
-                        <button onClick={() => markArrived(b, false)} style={undoLink}>Not here yet? Undo arrival</button>
-                      )}
                       {st.label === 'Collected' && (
                         <button onClick={() => markCollected(b, false)} style={undoLink}>Undo collected</button>
                       )}
                       {st.next && (
                         <button
                           onClick={() => {
-                            if (st.next === 'arrived') markArrived(b, true);
                             if (st.next === 'photo') openSheet(b, '/floor');
                             if (st.next === 'handover') openSheet(b, '/collection');
                           }}
                           style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.6rem', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-md)' }}
                         >
-                          {st.next === 'arrived' && <>They&apos;re here</>}
                           {st.next === 'photo' && <><Camera size={18} /> Photograph the table</>}
                           {st.next === 'handover' && <>Hand over</>}
                         </button>
