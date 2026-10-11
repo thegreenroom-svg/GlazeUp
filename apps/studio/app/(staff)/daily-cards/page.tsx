@@ -36,7 +36,7 @@ type NextStep = 'photo' | 'handover' | null;
 // fallbackDate is the date the card itself prints as "Ready", used when
 // the booking has none of its own saved.
 function cardStatus(
-  b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[]; is_wheel?: boolean; session_start?: string; session_end?: string | null; status?: string | null; party_of?: string | null },
+  b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[]; is_wheel?: boolean; session_start?: string; session_end?: string | null; status?: string | null; party_of?: string | null; live_ticket_name?: string | null },
   fallbackDate?: string | null
 ): { label: string; colour: string; next: NextStep; hint?: string } {
   const today = new Date().toLocaleDateString('en-CA');
@@ -69,6 +69,13 @@ function cardStatus(
   // [9 Oct] The session is over and there is still no photo: the one
   // status that needs chasing, so it is red.
   const end = b.session_end ? new Date(b.session_end).getTime() : b.session_start ? new Date(b.session_start).getTime() + 2 * 3600000 : 0;
+  // [11 Oct] An earlier day with no photo and nothing on the till: almost
+  // always they did not come. Grey, not red, so the red ones on a past day
+  // are the ones genuinely worth chasing (paid, or marked as here).
+  const sessionDay = b.session_start ? new Date(b.session_start).toLocaleDateString('en-CA') : '';
+  if (end && sessionDay && sessionDay < today && !b.live_ticket_name && !b.arrived_at) {
+    return { label: 'No show?', colour: '#a39a90', next: null, hint: 'No photo and nothing on the till, so probably did not come. If they did, the iPad photo may still be on its way.' };
+  }
   if (end && end < Date.now()) {
     return { label: 'No photo yet', colour: '#b03a2e', next: 'photo', hint: b.arrived_at ? undefined : 'Session over. If they came, photograph the table; the iPad photos may still be on the way.' };
   }
@@ -950,6 +957,39 @@ export default function DailyCardsPage() {
           ))}
         </div>
 
+        {/* [11 Oct] THE MORNING CHECK. On today's page, the last open day at a
+            glance: how many tables, how many photographed, and by name the
+            ones that came (paid or marked here) but have no photo. */}
+        {view === 'painting' && isToday && (() => {
+          const todayStr = new Date().toLocaleDateString('en-CA');
+          const dayOf = (x: Booking) => new Date(x.session_start).toLocaleDateString('en-CA');
+          const prevDay = allBookings.map(dayOf).filter((d) => d < todayStr).sort().pop();
+          if (!prevDay) return null;
+          const prev = allBookings.filter((x) => dayOf(x) === prevDay && !/cancel/i.test(x.status || ''));
+          if (!prev.length) return null;
+          const painting = prev.filter((x) => !x.is_wheel && x.status !== 'no_show');
+          const photographed = painting.filter((x) => (x.photo_count || 0) > 0).length;
+          const missing = painting.filter((x) => !(x.photo_count || 0) && (x.live_ticket_name || x.arrived_at));
+          const noShow = painting.filter((x) => !(x.photo_count || 0) && !x.live_ticket_name && !x.arrived_at).length;
+          const label = new Date(`${prevDay}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+          const ok = missing.length === 0;
+          return (
+            <div style={{ marginBottom: '0.9rem', background: ok ? '#eef6ef' : '#fdf1ec', border: `1px solid ${ok ? '#cfe5d3' : '#f0cfc4'}`, borderRadius: 'var(--radius-md)', padding: '0.65rem 0.8rem', fontSize: 'var(--text-sm)' }}>
+              <div style={{ fontWeight: 800, color: ok ? '#2E7D32' : '#b03a2e' }}>
+                {label}: {photographed} of {painting.length - noShow} tables photographed
+              </div>
+              <div style={{ color: '#6b625a', marginTop: '0.15rem' }}>
+                {ok ? 'Every table that came has its photo.' : 'Came but no photo: '}
+                {missing.map((x, k) => (
+                  <span key={x.booking_code}>{k ? ', ' : ''}<a href={`/booking/${encodeURIComponent(x.booking_code)}`} style={{ color: '#b03a2e', fontWeight: 700 }}>{x.customer_name}</a></span>
+                ))}
+                {noShow > 0 && <span>{ok ? ' ' : '. '}{noShow} probably did not come.</span>}
+              </div>
+              <button onClick={() => setCardDate(prevDay)} style={{ marginTop: '0.35rem', border: 'none', background: 'none', padding: 0, color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-xs)', cursor: 'pointer' }}>See {label.split(' ')[0]}'s cards ›</button>
+            </div>
+          );
+        })()}
+
         {/* [9 Oct] One bar: the day at a glance, tap to filter. Replaces the
             stacked session buttons and the finished-sessions toggle. */}
         {view === 'painting' && bookings.length > 0 && (
@@ -1221,6 +1261,7 @@ export default function DailyCardsPage() {
                           {b.kiln_stage || 'Kiln shelf'} ›
                         </span>
                       )}
+                      {(b.visit_number || 1) > 1 && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#efeaf6', color: '#6a5a8a' }}>Visit {b.visit_number}</span>}
                       {b.live_ticket_name && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#eef3ee', color: '#3d7a4a' }}>Till: {b.live_ticket_name}</span>}
                       {b.fulfilment_method === 'postal' && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A6761D' }}>Posting</span>}
                       {back > 0 && <span role="link" onClick={(e) => { e.stopPropagation(); router.push('/returns'); }} style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A8651A', cursor: 'pointer' }}>{back} on the returns shelf ›</span>}

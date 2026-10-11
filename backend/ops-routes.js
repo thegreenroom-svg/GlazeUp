@@ -597,6 +597,44 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
     } catch (err) { logger.error('[kiln-shelf-date] failed', err.message); res.status(500).json({ error: err.message }); }
   });
 
+  // ---- THIS WEEK: SHAPES AND AI COST -----------------------------------
+  // [11 Oct] Daisy: check the cheaper matching is holding up. For each of
+  // the last 7 days: what the AI cost, how many pieces came in and got a
+  // shape, and -- where the till later settled a piece -- how often the
+  // photo's shape matched what was charged. Plus how shapes were settled.
+  app.get('/api/spec/shapes/weekly', async (req, res) => {
+    try {
+      const since = new Date(Date.now() - 7 * 86400000).toISOString();
+      const [ai, ps, oc] = await Promise.all([
+        supabase.from('ai_usage').select('cost_usd, created_at').eq('studio_id', STUDIO_ID).gte('created_at', since).limit(20000),
+        supabase.from('pottery_pieces').select('created_at, square_item_id, shape_confidence, shape_confirmed').eq('studio_id', STUDIO_ID)
+          .not('archived', 'is', true).not('reference_photo_url', 'is', null).gte('created_at', since).limit(5000),
+        supabase.from('shape_outcomes').select('created_at, correct').eq('studio_id', STUDIO_ID).gte('created_at', since).limit(5000),
+      ]);
+      const days = new Map();
+      const day = (iso) => londonDay(new Date(iso));
+      for (let i = 6; i >= 0; i--) days.set(londonDay(new Date(Date.now() - i * 86400000)), { day: null, ai_gbp: 0, pieces: 0, shaped: 0, checked: 0, right: 0 });
+      for (const [k, v] of days) v.day = k;
+      (ai.data || []).forEach((r) => { const d = days.get(day(r.created_at)); if (d) d.ai_gbp += Number(r.cost_usd || 0) * GBP_PER_USD; });
+      const how = {};
+      (ps.data || []).forEach((p) => {
+        const d = days.get(day(p.created_at)); if (!d) return;
+        d.pieces++;
+        if (p.square_item_id) d.shaped++;
+        const k = p.shape_confirmed && !p.square_item_id ? 'handmade'
+          : /^till$/.test(p.shape_confidence || '') ? 'till (confirmed)'
+          : p.shape_confidence === 'till-kind' ? 'till, paired for free'
+          : /^till-/.test(p.shape_confidence || '') ? 'till, by photo'
+          : p.square_item_id ? 'photo only' : 'no shape yet';
+        how[k] = (how[k] || 0) + 1;
+      });
+      (oc.data || []).forEach((o) => { const d = days.get(day(o.created_at)); if (d) { d.checked++; if (o.correct) d.right++; } });
+      const list = [...days.values()].map((d) => ({ ...d, ai_gbp: Math.round(d.ai_gbp * 100) / 100 }));
+      const tot = list.reduce((a, d) => ({ ai_gbp: a.ai_gbp + d.ai_gbp, pieces: a.pieces + d.pieces, checked: a.checked + d.checked, right: a.right + d.right }), { ai_gbp: 0, pieces: 0, checked: 0, right: 0 });
+      res.json({ days: list, totals: { ...tot, ai_gbp: Math.round(tot.ai_gbp * 100) / 100 }, settled_by: how });
+    } catch (err) { logger.error('[shapes-weekly] failed', err.message); res.status(500).json({ error: err.message }); }
+  });
+
   // ---- COLLECT, ON ONE SCREEN ------------------------------------------
   // [11 Oct] Daisy: merge Packing, Collection, Overdue and the returns
   // shelf into one Collect screen. Every booking still holding pottery,

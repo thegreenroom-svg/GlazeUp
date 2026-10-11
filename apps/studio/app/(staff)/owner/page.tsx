@@ -351,6 +351,56 @@ export default function OwnerPage() {
         </p>
       </Card>
 
+      <ShapesWeek />
+
     </PageShell>
+  );
+}
+
+// [11 Oct] Daisy: is the cheaper shape matching holding up? The last seven
+// days: AI cost, pieces in, and -- where the till settled a piece -- how
+// often the photo's shape matched what was charged.
+type Week = {
+  days: { day: string; ai_gbp: number; pieces: number; shaped: number; checked: number; right: number }[];
+  totals: { ai_gbp: number; pieces: number; checked: number; right: number };
+  settled_by: Record<string, number>;
+};
+function ShapesWeek() {
+  const [w, setW] = useState<Week | null>(null);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shapes/weekly`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).then((d) => d && setW(d)).catch(() => {});
+  }, []);
+  if (!w) return null;
+  const maxGbp = Math.max(0.01, ...w.days.map((d) => d.ai_gbp));
+  const pct = w.totals.checked ? Math.round((w.totals.right / w.totals.checked) * 100) : null;
+  return (
+    <Card>
+      <p style={{ color: B.text, fontWeight: 700, marginBottom: '0.2rem' }}>Shapes and AI, last 7 days</p>
+      <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginBottom: '0.7rem' }}>
+        AI £{w.totals.ai_gbp.toFixed(2)} · {w.totals.pieces} pieces in
+        {pct !== null ? ` · photo matched the till ${pct}% of the time (${w.totals.right} of ${w.totals.checked})` : ''}
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, alignItems: 'end', height: 90 }}>
+        {w.days.map((d) => (
+          <div key={d.day} title={`${d.day}: £${d.ai_gbp.toFixed(2)}, ${d.pieces} pieces`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+            <span style={{ fontSize: 10, color: B.stone, marginBottom: 2 }}>{d.ai_gbp ? `${Math.round(d.ai_gbp * 100)}p` : ''}</span>
+            <div style={{ width: '70%', height: `${Math.max(2, (d.ai_gbp / maxGbp) * 60)}px`, background: B.clay, borderRadius: 3 }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginTop: 4 }}>
+        {w.days.map((d) => (
+          <span key={d.day} style={{ fontSize: 10, color: B.stone, textAlign: 'center' }}>
+            {new Date(`${d.day}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })}
+          </span>
+        ))}
+      </div>
+      {Object.keys(w.settled_by).length > 0 && (
+        <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.7rem', lineHeight: 1.6 }}>
+          How shapes were settled: {Object.entries(w.settled_by).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · ')}
+        </p>
+      )}
+    </Card>
   );
 }
