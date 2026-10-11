@@ -1,6 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import { ChevronLeft } from 'lucide-react';
 
 // ============================================================================
 // SHARED PAGE SHELL -- one real structure every page uses.
@@ -25,32 +27,58 @@ export function PageShell({
   subtitle,
   children,
   maxWidth = 700,
+  back,
+  right,
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   maxWidth?: number;
+  /**
+   * [11 Oct] Where Back goes. Every screen except the daily cards is
+   * somewhere you arrived from somewhere, and the hamburger is a poor way
+   * back: it makes you choose again instead of undoing one step. `true`
+   * uses the browser's own history.
+   */
+  back?: string | true | (() => void);
+  /** One control that belongs beside the title rather than below it. */
+  right?: React.ReactNode;
 }) {
+  const router = useRouter();
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      style={{ padding: '1.5rem 1.25rem', maxWidth, margin: '0 auto' }}
+      style={{ padding: '1.1rem 1.25rem', maxWidth, margin: '0 auto' }}
     >
-      <h1
-        style={{
-          fontSize: 'var(--text-xl)',
-          fontWeight: 800,
-          letterSpacing: '-0.02em',
-          color: 'var(--charcoal)',
-          marginBottom: subtitle ? '0.3rem' : '1.25rem',
-        }}
-      >
-        {title}
-      </h1>
+      {back && (
+        <button
+          className="no-print"
+          onClick={() => (back === true ? router.back() : typeof back === 'function' ? back() : router.push(back))}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', minHeight: 36, marginBottom: '0.3rem', marginLeft: '-0.3rem', padding: '0 0.3rem', border: 'none', background: 'none', color: '#8a8178', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
+        >
+          <ChevronLeft size={16} /> Back
+        </button>
+      )}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
+        <h1
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 'var(--text-xl)',
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            color: 'var(--charcoal)',
+            marginBottom: subtitle ? '0.2rem' : '0.8rem',
+          }}
+        >
+          {title}
+        </h1>
+        {right && <span className="no-print" style={{ flexShrink: 0 }}>{right}</span>}
+      </div>
       {subtitle && (
-        <p style={{ color: 'var(--charcoal)', opacity: 0.6, fontSize: 'var(--text-base)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
+        <p style={{ color: 'var(--charcoal)', opacity: 0.6, fontSize: 'var(--text-base)', lineHeight: 1.45, marginBottom: '0.9rem' }}>
           {subtitle}
         </p>
       )}

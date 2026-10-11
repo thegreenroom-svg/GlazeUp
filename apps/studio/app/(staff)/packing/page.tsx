@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { Row, RowAction, Chip } from '@/components/Row';
+import { Count, Tool, ToolFile, Toolbar } from '@/components/Toolbar';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Package, PackageCheck, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2, Printer } from 'lucide-react';
+import { Package, PackageCheck, Check, Search, Camera, Loader, RefreshCw, Trash2, Printer, Layers } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
@@ -313,26 +314,83 @@ export default function PackingPage() {
     const { piece: p, index: i } = openPiece;
     const colour = PIECE_COLOURS[i % 6];
     return (
-      <PageShell title="Packing" subtitle={openBooking.customer_name}>
-        <button onClick={() => setOpenPiece(null)} style={backBtn}>
-          <ChevronLeft size={16} /> Back to the pieces
-        </button>
-        <div style={{ marginTop: '0.75rem' }}>
-          <p style={{ fontSize: 'var(--text-lg)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <span style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: colour, color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
-            {p.piece_type || 'Piece'}
+      <PageShell
+        title={p.piece_type || 'Piece'}
+        subtitle={p.description && !editingDescription ? p.description : undefined}
+        back={() => setOpenPiece(null)}
+      >
+        {/* [11 Oct] The photograph is why anyone opens this screen -- it is
+            what you hold up against the shelf -- so it is the first thing
+            now. Two correction buttons used to sit above it, which put the
+            picture below the fold on a phone; they are on one line
+            underneath, where a correction belongs: after looking. */}
+        <div>
+          <p style={{ fontSize: 'var(--text-sm)', color: '#8a8178', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.6rem' }}>
+            <span style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: colour, color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+            {openBooking.customer_name}
+            {p.assigned_to && <span style={{ color: 'var(--clay)' }}>· for {p.assigned_to}</span>}
           </p>
-          {p.description && !editingDescription && <p style={{ fontSize: 'var(--text-base)', color: '#666', marginTop: '0.35rem' }}>{p.description}</p>}
-          {p.assigned_to && <p style={{ fontSize: 'var(--text-base)', marginTop: '0.35rem' }}>For <strong>{p.assigned_to}</strong></p>}
 
-          {/* A wrong description caught directly: item 1 called "a sheep
-              figurine" when it's genuinely two different jugs. Three ways
-              to fix it -- ask the AI again from its own crop, type the
-              real description by hand, or (below) remove it entirely if
-              it was never a real piece at all. */}
-          {!editingDescription && (
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-              <button
+          {/* Big cropped view first: this is what you hold up against the
+              shelf. The full table photo sits underneath for context, with
+              this piece ringed, because sometimes the only way to identify
+              a plate is seeing what it was sitting next to. */}
+          {/* [6 Sep] Daisy: the shelf crop "should be with booking now...
+              eventually it would follow into packing and handover."
+              So it prefers the piece as last seen ON THE SHELF -- fired,
+              glazed, in the state the person packing it is holding --
+              over the table photo, which shows it chalky and unfired.
+              The table shot is still the fallback for anything a sweep
+              has not found yet. */}
+          {(shelfCrop(p) || (p.reference_photo_url && p.photo_box)) && (
+            <div style={{ marginTop: '0.75rem', width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `3px solid ${colour}`, ...(shelfCrop(p) || cropStyle(p.reference_photo_url as string, p.photo_box as PieceBox)) }} />
+          )}
+          {p.reference_photo_url && (
+            <div style={{ position: 'relative', marginTop: '0.75rem' }}>
+              {/* Same accountability line as the booking view -- this is
+                  the other place a bad photo actually gets noticed. */}
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: 0 }}>On the table</p>
+                {p.photo_taken_by && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: 0 }}>
+                    Photographed by <strong style={{ color: 'var(--charcoal)' }}>{p.photo_taken_by}</strong>
+                  </p>
+                )}
+              </div>
+              <img src={p.reference_photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block' }} />
+              {p.photo_box && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${p.photo_box.left_pct}%`,
+                  top: `calc(${p.photo_box.top_pct}% + 1.15rem)`,
+                  width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
+                  height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
+                  border: `3px solid ${colour}`,
+                  borderRadius: 'var(--radius-sm)',
+                  boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                  pointerEvents: 'none',
+                }} />
+              )}
+            </div>
+          )}
+          {!p.reference_photo_url && (
+            <p style={{ marginTop: '0.75rem', fontSize: 'var(--text-sm)', color: '#888' }}>No photo on this piece — identify it from the description.</p>
+          )}
+          <button
+            onClick={() => markCollected(p)}
+            disabled={saving === p.id || p.status === 'collected'}
+            style={{ ...primaryBtn, marginTop: '1rem', opacity: p.status === 'collected' ? 0.5 : 1 }}
+          >
+            {p.status === 'collected' ? '✓ Packed' : saving === p.id ? 'Saving...' : 'Mark this one packed'}
+          </button>
+
+          {/* The three ways a description gets corrected, and the two ways
+              a piece leaves the list -- one line, after the photograph.
+              A wrong description caught directly: item 1 called "a sheep
+              figurine" when it is genuinely two different jugs. */}
+          <Toolbar style={{ marginTop: '0.9rem' }}>
+            {!editingDescription && (
+              <Tool
                 onClick={async () => {
                   setRedescribing(true); setSuggestion(null);
                   try {
@@ -343,19 +401,73 @@ export default function PackingPage() {
                   finally { setRedescribing(false); }
                 }}
                 disabled={redescribing}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.65rem 0.85rem', minHeight: 44, borderRadius: 'var(--radius-sm)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-xs)', cursor: 'pointer' }}
+                tone="clay"
+                icon={redescribing ? <Loader size={13} className="animate-spin" /> : <RefreshCw size={13} />}
               >
-                {redescribing ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                {redescribing ? 'Asking again…' : 'Try again'}
-              </button>
-              <button
-                onClick={() => { setDescriptionDraft(p.description || ''); setEditingDescription(true); }}
-                style={{ padding: '0.65rem 0.85rem', minHeight: 44, borderRadius: 'var(--radius-sm)', border: '1px solid #ccc', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: 'var(--text-xs)', cursor: 'pointer' }}
-              >
+                {redescribing ? 'Asking again…' : 'Ask the AI again'}
+              </Tool>
+            )}
+            {!editingDescription && (
+              <Tool onClick={() => { setDescriptionDraft(p.description || ''); setEditingDescription(true); }}>
                 Type it myself
-              </button>
-            </div>
-          )}
+              </Tool>
+            )}
+            {!editingNotes && (
+              <Tool onClick={() => { setNotesDraft(p.notes || ''); setEditingNotes(true); }} active={!!p.notes} tone="warn">
+                {p.notes ? `Note: ${p.notes}` : 'Add a note'}
+              </Tool>
+            )}
+            {p.status !== 'collected' && !breakResult && (
+              <Tool
+                onClick={async () => {
+                  setBreaking(true);
+                  try {
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/breakage`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({}),
+                    });
+                    const d = await res.json();
+                    if (res.ok) setBreakResult(d);
+                  } finally { setBreaking(false); }
+                }}
+                disabled={breaking}
+                tone="late"
+              >
+                {breaking ? 'Marking…' : 'It broke in the kiln'}
+              </Tool>
+            )}
+            {/* For when the AI mistook something that was never a piece at
+                all -- a shopping bag, a matchbox -- for one. Archived, not
+                deleted, so nothing genuinely disappears. */}
+            <Tool
+              onClick={() => {
+                setPendingConfirm({
+                  title: 'Remove this piece?',
+                  body: 'It will no longer count toward what needs packing. Nothing is deleted — it can be brought back.',
+                  confirmLabel: 'Remove',
+                  destructive: true,
+                  run: async () => {
+                    setRemoving(true);
+                    try {
+                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/archive`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ archived: true }),
+                      });
+                      if (res.ok) {
+                        setPieces((prev) => prev.filter((x) => x.id !== p.id));
+                        setOpenPiece(null);
+                      }
+                    } finally { setRemoving(false); }
+                  },
+                });
+              }}
+              disabled={removing}
+              icon={<Trash2 size={13} />}
+            >
+              {removing ? 'Removing…' : 'Not a real piece'}
+            </Tool>
+          </Toolbar>
 
           {/* The AI's second attempt -- shown, never saved automatically.
               Accepting it reuses the exact same manual-edit route as
@@ -429,15 +541,8 @@ export default function PackingPage() {
 
           {/* Free-text notes, separate from the description -- "chipped on
               the base", the kind of thing a packer needs to know that
-              isn't a visual description of the piece itself. */}
-          {!editingNotes && (
-            <button
-              onClick={() => { setNotesDraft(p.notes || ''); setEditingNotes(true); }}
-              style={{ display: 'block', marginTop: '0.5rem', padding: 0, border: 'none', background: 'none', color: p.notes ? 'var(--charcoal)' : '#999', fontSize: 'var(--text-sm)', textAlign: 'left', cursor: 'pointer' }}
-            >
-              {p.notes ? `Note: ${p.notes}` : '+ Add a note'}
-            </button>
-          )}
+              isn't a visual description of the piece itself. Opened from
+              the control line above. */}
           {editingNotes && (
             <div style={{ marginTop: '0.5rem' }}>
               <input
@@ -473,84 +578,7 @@ export default function PackingPage() {
             </div>
           )}
 
-          {/* Big cropped view first: this is what you hold up against the
-              shelf. The full table photo sits underneath for context, with
-              this piece ringed, because sometimes the only way to identify
-              a plate is seeing what it was sitting next to. */}
-          {/* [6 Sep] Daisy: the shelf crop "should be with booking now...
-              eventually it would follow into packing and handover."
-              So it prefers the piece as last seen ON THE SHELF -- fired,
-              glazed, in the state the person packing it is holding --
-              over the table photo, which shows it chalky and unfired.
-              The table shot is still the fallback for anything a sweep
-              has not found yet. */}
-          {(shelfCrop(p) || (p.reference_photo_url && p.photo_box)) && (
-            <div style={{ marginTop: '0.75rem', width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `3px solid ${colour}`, ...(shelfCrop(p) || cropStyle(p.reference_photo_url as string, p.photo_box as PieceBox)) }} />
-          )}
-          {p.reference_photo_url && (
-            <div style={{ position: 'relative', marginTop: '0.75rem' }}>
-              {/* Same accountability line as the booking view -- this is
-                  the other place a bad photo actually gets noticed. */}
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: 0 }}>On the table</p>
-                {p.photo_taken_by && (
-                  <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: 0 }}>
-                    Photographed by <strong style={{ color: 'var(--charcoal)' }}>{p.photo_taken_by}</strong>
-                  </p>
-                )}
-              </div>
-              <img src={p.reference_photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block' }} />
-              {p.photo_box && (
-                <div style={{
-                  position: 'absolute',
-                  left: `${p.photo_box.left_pct}%`,
-                  top: `calc(${p.photo_box.top_pct}% + 1.15rem)`,
-                  width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
-                  height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
-                  border: `3px solid ${colour}`,
-                  borderRadius: 'var(--radius-sm)',
-                  boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
-                  pointerEvents: 'none',
-                }} />
-              )}
-            </div>
-          )}
-          {!p.reference_photo_url && (
-            <p style={{ marginTop: '0.75rem', fontSize: 'var(--text-sm)', color: '#888' }}>No photo on this piece — identify it from the description.</p>
-          )}
 
-          <button
-            onClick={() => markCollected(p)}
-            disabled={saving === p.id || p.status === 'collected'}
-            style={{ ...primaryBtn, marginTop: '1rem', opacity: p.status === 'collected' ? 0.5 : 1 }}
-          >
-            {p.status === 'collected' ? '✓ Packed' : saving === p.id ? 'Saving...' : 'Mark this one packed'}
-          </button>
-
-          {/* The bad moment, handled while the piece is in hand. Marks it,
-              and drafts the message so the customer conversation starts
-              from a written offer rather than an apology improvised at the
-              till. */}
-          {p.status !== 'collected' && !breakResult && (
-            <button
-              onClick={async () => {
-                setBreaking(true);
-                try {
-                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/breakage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}),
-                  });
-                  const d = await res.json();
-                  if (res.ok) setBreakResult(d);
-                } finally { setBreaking(false); }
-              }}
-              disabled={breaking}
-              style={{ width: '100%', marginTop: '0.5rem', padding: '0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid #E5B8B8', background: '#FBF3F3', color: '#A33', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
-            >
-              {breaking ? 'Marking...' : 'It broke in the kiln'}
-            </button>
-          )}
 
           {breakResult && (
             <div style={{ marginTop: '0.7rem', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid #E5B8B8', background: '#FBF3F3' }}>
@@ -576,39 +604,6 @@ export default function PackingPage() {
             </div>
           )}
 
-          {/* For when the AI mistook something that was never a piece at
-              all -- a shopping bag, a matchbox -- for one. Archived, not
-              deleted, so nothing genuinely disappears; it just leaves the
-              booking's active list. Confirmed first, since it removes the
-              row from view immediately. */}
-          <button
-            onClick={async () => {
-              setPendingConfirm({
-                title: 'Remove this piece?',
-                body: 'It will no longer count toward what needs packing. Nothing is deleted — it can be brought back.',
-                confirmLabel: 'Remove',
-                destructive: true,
-                run: async () => {
-                  setRemoving(true);
-                  try {
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/archive`, {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ archived: true }),
-                    });
-                    if (res.ok) {
-                      setPieces((prev) => prev.filter((x) => x.id !== p.id));
-                      setOpenPiece(null);
-                    }
-                  } finally { setRemoving(false); }
-                },
-              });
-            }}
-            disabled={removing}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', width: '100%', marginTop: '0.5rem', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'transparent', color: '#999', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-          >
-            <Trash2 size={13} />
-            {removing ? 'Removing…' : 'This isn\'t a real piece — remove it'}
-          </button>
         </div>
         <ConfirmDialog
           open={!!pendingConfirm}
@@ -630,44 +625,89 @@ export default function PackingPage() {
     // separately, which is exactly how a numbering drift gets introduced
     // later -- piece 2 in the list quietly becoming piece 3 on the photo.
     const packablePieces = pieces.filter((p) => p.fulfilment !== 'return_visit');
+    const outstanding = packablePieces.filter((p) => p.status !== 'collected').length;
+    const allSelected = selected.size > 0 && selected.size === outstanding;
+    // What used to be a paragraph of its own under the Back button: where
+    // this booking is going, and anything held back from the parcel.
+    const where = [
+      openBooking.posting > 0
+        ? `${openBooking.posting} to post${openBooking.postal_postcode ? ` · ${openBooking.postal_postcode}` : ''}`
+        : 'Collecting from the studio',
+      openBooking.on_hold > 0 ? `${openBooking.on_hold} on hold, not in this parcel` : null,
+    ].filter(Boolean).join(' · ');
     return (
-      <PageShell title="Packing" subtitle={openBooking.customer_name}>
-        <button onClick={() => { setOpenBooking(null); loadQueue(); }} style={backBtn}>
-          <ChevronLeft size={16} /> Back to the queue
-        </button>
-
-        <p style={{ fontSize: 'var(--text-sm)', color: '#666', margin: '0.6rem 0 0.75rem' }}>
-          {openBooking.posting > 0
-            ? `${openBooking.posting} to post${openBooking.postal_postcode ? ` · ${openBooking.postal_postcode}` : ''}`
-            : 'Collecting from the studio'}
-          {openBooking.on_hold > 0 && ` · ${openBooking.on_hold} on hold, not in this parcel`}
-        </p>
-
+      <PageShell title={openBooking.customer_name} subtitle={where} back={() => { setOpenBooking(null); loadQueue(); }}>
         {piecesLoading && <p style={{ fontSize: 'var(--text-base)', color: '#888' }}>Loading the pieces...</p>}
 
-        {/* Select individual pieces, or all at once, and pack them
+        {/* [11 Oct] Everything that used to be a band of its own is on this
+            one line: the count, select all, where they were last seen, the
+            shelf camera and the label printer. Before this there were three
+            separate blocks of buttons between the piece list and the table
+            photo, two of them headed "Where are these pieces?" -- and the
+            photo you actually hold up against the shelf was below the lot.
+
+            Select individual pieces, or all at once, and pack them
             together -- opening each one just to tick it off was real
-            friction for something this routine. A piece already packed
-            is left off the count (nothing to select) but still shown,
-            same as everywhere else on this screen. */}
-        {packablePieces.length > 0 && (() => {
-          const outstanding = packablePieces.filter((p) => p.status !== 'collected').length;
-          return outstanding > 0 && (
-            <p style={{ fontSize: 'var(--text-sm)', color: '#A6761D', fontWeight: 600, marginBottom: '0.3rem' }}>
-              {outstanding} still to pack
-            </p>
-          );
-        })()}
-        {packablePieces.length > 0 && (
-          <button
-            onClick={() => {
-              const stillToPack = packablePieces.filter((p) => p.status !== 'collected').map((p) => p.id);
-              setSelected((prev) => (prev.size === stillToPack.length ? new Set() : new Set(stillToPack)));
-            }}
-            style={{ padding: 0, marginBottom: '0.4rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-          >
-            {selected.size === packablePieces.filter((p) => p.status !== 'collected').length && selected.size > 0 ? 'Deselect all' : 'Select all'}
-          </button>
+            friction for something this routine. */}
+        <Toolbar>
+          {outstanding > 0 && <Count>{outstanding} still to pack</Count>}
+          {packablePieces.length > 0 && (
+            <Tool
+              tone="dark"
+              active={allSelected}
+              onClick={() => {
+                const stillToPack = packablePieces.filter((p) => p.status !== 'collected').map((p) => p.id);
+                setSelected((prev) => (prev.size === stillToPack.length ? new Set() : new Set(stillToPack)));
+              }}
+            >
+              {allSelected ? 'Deselect all' : 'Select all'}
+            </Tool>
+          )}
+          {/* Deliberately LAST SEEN with a timestamp, never "is on". Pieces
+              move between shelves, and a confidently wrong shelf wastes
+              more time than no answer at all. */}
+          {!piecesLoading && lastSeen && pieces.length > 0 && (
+            <Tool onClick={() => setShowLastSeen((v) => !v)} active={showLastSeen} tone="warn" icon={<Layers size={15} />}>
+              Last seen {new Date(lastSeen.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </Tool>
+          )}
+          {/* Daisy chose the hybrid: know roughly where to walk without
+              photographing, then confirm with a photo only if it isn't
+              obvious. The free answer sits to the left of this. */}
+          {!piecesLoading && pieces.length > 0 && (
+            <ToolFile
+              icon={<Search size={15} />}
+              onFile={(f) => { const code = openBooking.booking_code; setOpenBooking(null); runSweep(f, code); }}
+            >
+              {lastSeen ? 'Not there? Photograph the shelf' : 'Photograph the shelf to find them'}
+            </ToolFile>
+          )}
+          {/* Daisy: "print a label at that point of packing... for
+              collection with a very big name and collection date with
+              pieces itemized, or postage with the full postage address." */}
+          <Tool onClick={() => router.push(`/print-label?code=${encodeURIComponent(openBooking.booking_code)}`)} icon={<Printer size={15} />}>
+            Print label
+          </Tool>
+        </Toolbar>
+
+        {/* Same numbers and same colours as the table photo below,
+            deliberately: piece 2 on the table is piece 2 on the shelf. */}
+        {showLastSeen && lastSeen && (
+          <div style={{ marginBottom: '0.8rem', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+            <PhotoWithBoxes
+              src={lastSeen.photo_url}
+              pieces={packablePieces.map((pc) => ({
+                piece_type: pc.piece_type,
+                description: pc.description,
+                box: pc.last_seen_box,
+              }))}
+            />
+            {!packablePieces.some((pc) => pc.last_seen_box) && (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning)', margin: '0.35rem 0 0' }}>
+                This photo was taken before positions were recorded, so nothing is boxed on it.
+              </p>
+            )}
+          </div>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -747,10 +787,11 @@ export default function PackingPage() {
         )}
 
         {/* The other half of packing. The list tells you WHAT is in the
-            parcel; this finds it on a shelf of two hundred fired pieces
-            that all look alike. It was reachable only from the landing
-            tiles, which meant leaving the booking and re-picking it from a
-            list of sixty names -- so it carries the booking with it. */}
+            parcel; the shelf camera on the control line above finds it on a
+            shelf of two hundred fired pieces that all look alike. It was
+            reachable only from the landing tiles, which meant leaving the
+            booking and re-picking it from a list of sixty names -- so it
+            carries the booking with it. */}
         {/* Was a link to a page called Find on Table that no longer
             exists -- removed hours ago in the same evening's stripping-
             down, leaving this button pointing nowhere. Daisy: "the 404
@@ -762,98 +803,6 @@ export default function PackingPage() {
             so the result shows where every other sweep result already
             shows, at the top of Packing, rather than needing a second
             copy of that whole display built just for this one button. */}
-        {/* Daisy chose the hybrid: know roughly where to walk without
-            photographing, then confirm with a photo only if it isn't
-            obvious. This is the first half -- it appears directly above
-            "Find these on the shelf", so the cheap answer is read
-            before the expensive one is offered.
-
-            Deliberately says LAST SEEN with a timestamp, never "is on".
-            Pieces move between shelves, and a confidently wrong shelf
-            would waste more time than no answer at all. */}
-        {!piecesLoading && lastSeen && pieces.length > 0 && (
-          <div style={{ marginTop: '0.85rem', border: '1px solid #e6ded3', borderRadius: 'var(--radius-md)', padding: '0.7rem', background: '#FBF7F1' }}>
-            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', marginTop: 0, marginBottom: '0.5rem' }}>
-              Where are these pieces?
-            </p>
-            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>
-              Last seen on a shelf {new Date(lastSeen.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-            </p>
-            <button
-              onClick={() => setShowLastSeen((v) => !v)}
-              style={{ marginTop: '0.35rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-            >
-              {showLastSeen ? 'Hide that shelf photo' : 'Show me that shelf'}
-            </button>
-            {/* Same numbers and same colours as the table photo above,
-                deliberately: piece 2 on the table is piece 2 on the
-                shelf. A shelf photo with no boxes is barely better than
-                walking over and looking. Drawn by the shared component
-                now, so that promise holds by construction rather than by
-                me keeping four copies in step. */}
-            {showLastSeen && (
-              <div style={{ marginTop: '0.5rem', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                <PhotoWithBoxes
-                  src={lastSeen.photo_url}
-                  pieces={packablePieces.map((pc) => ({
-                    piece_type: pc.piece_type,
-                    description: pc.description,
-                    box: pc.last_seen_box,
-                  }))}
-                />
-              </div>
-            )}
-            {showLastSeen && !packablePieces.some((pc) => pc.last_seen_box) && (
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning)', marginTop: '0.35rem' }}>
-                This photo was taken before positions were recorded, so nothing is boxed on it.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* ONE section for the backward question, not two scattered
-            controls. Daisy: "it's like part of the app, and there's lots
-            of buttons... it needs to split into the workflow better."
-            She was right -- "last seen" and "find these on the shelf"
-            were separate things in separate places, but they answer the
-            same question: WHERE ARE THESE PIECES. Now one block, headed
-            by that question, with the free answer above and the camera
-            below it as the follow-up rather than a rival. */}
-        {!piecesLoading && pieces.length > 0 && (
-          <div style={{ marginTop: '0.85rem' }}>
-            {!lastSeen && (
-              <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', marginBottom: '0.5rem' }}>
-                Where are these pieces?
-              </p>
-            )}
-            <label
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', padding: '0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
-            >
-              <Search size={15} /> {lastSeen ? 'Not there? Photograph the shelf' : 'Photograph the shelf to find them'}
-              <input
-                type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  const code = openBooking.booking_code;
-                  setOpenBooking(null);
-                  runSweep(f, code);
-                  e.target.value = '';
-                }}
-              />
-            </label>
-          </div>
-        )}
-
-        {/* Daisy: "print a label at that point of packing... for
-            collection with a very big name and collection date with
-            pieces itemized, or postage with the full postage address." */}
-        <button
-          onClick={() => router.push(`/print-label?code=${encodeURIComponent(openBooking.booking_code)}`)}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.5rem', padding: '0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid #ccc', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
-        >
-          <Printer size={15} /> Print label
-        </button>
 
         {!piecesLoading && photo && (
           <div style={{ marginTop: '1rem' }}>
@@ -958,16 +907,21 @@ export default function PackingPage() {
   // ---------- LEVEL 1: the queue ----------
   return (
     <PageShell title="Packing" subtitle="Pottery due out">
-      {/* Top of the queue, because after a kiln comes out this is the first
-          thing you do -- before you know which booking you're looking at. */}
-      <div style={{ border: '1px solid #eee', borderRadius: 'var(--radius-md)', padding: '0.75rem', marginBottom: '0.9rem' }}>
-        <p style={{ fontSize: 'var(--text-base)', fontWeight: 700 }}>Just unloaded the kiln?</p>
-        <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.15rem 0 0.55rem' }}>
-          Photograph the shelf and it&apos;ll tell you whose pottery is on it.
-        </p>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-md)', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-          {sweeping ? <Loader size={15} className="animate-spin" /> : <Camera size={15} />}
-          {sweeping ? 'Reading the shelf...' : 'Photograph the shelf'}
+      {/* [11 Oct] This was a bordered box with a heading, two sentences of
+          explanation, a camera button, a second full-width primary button
+          and a link -- six bands before the queue, which is the thing the
+          page is actually for. The camera stays prominent, because after a
+          firing it is the first thing anyone does; everything else is one
+          line of chips. The explanation went: "Photograph the shelf" says
+          it, and whoever is holding the camera already knows why.
+
+          Daisy, twice: "Can't see previous photos" -- they live on their
+          own page (Next packing) because opening one inline closed the
+          last, and comparing two shelves meant remembering the first. */}
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', minHeight: 56, padding: '0.95rem', borderRadius: 'var(--radius-md)', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-lg)', cursor: sweeping ? 'default' : 'pointer', opacity: sweeping ? 0.7 : 1 }}>
+          {sweeping ? <Loader size={18} className="animate-spin" /> : <Camera size={18} />}
+          {sweeping ? 'Reading the shelf…' : 'Photograph the shelf'}
           <input
             type="file"
             accept="image/*"
@@ -978,35 +932,20 @@ export default function PackingPage() {
           />
         </label>
 
+        <Toolbar style={{ marginTop: '0.6rem' }}>
+          <Tool onClick={() => router.push('/next-packing')} icon={<PackageCheck size={15} />}>Next packing</Tool>
+          <Tool onClick={() => router.push('/shelves')} icon={<Layers size={15} />}>Shelves</Tool>
+          <Tool onClick={() => router.push('/out-of-kiln')}>Out of the kiln</Tool>
+          {foundSoFar.length > 0 && (
+            <Tool onClick={() => { setFoundSoFar([]); setSweep(null); setSweepPhoto((old) => { if (old) URL.revokeObjectURL(old); return null; }); }}>
+              Start a new search
+            </Tool>
+          )}
+        </Toolbar>
+
         {sweepError && (
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--danger)', marginTop: '0.5rem' }}>{sweepError}</p>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--danger)', marginBottom: '0.5rem' }}>{sweepError}</p>
         )}
-
-        {/* Daisy, having asked for these twice: "Can't see previous
-            photos". They were only rendered after a sweep FAILED --
-            which meant looking at your own photos required something to
-            break first. That was my design being too clever: I built
-            them as a fallback, but she asked for them as a feature. The
-            photos are hers, they are always relevant, so they are always
-            here -- below the camera button, quiet, and permanent. */}
-        {/* Daisy: "if I want to check other photos and see other
-            shelves, I lose this one." Opening a shelf photo inline
-            closed the last one, so comparing shelves meant remembering
-            what you had just seen. Its own page holds them all in one
-            continuous scroll instead. */}
-        <button
-          onClick={() => router.push('/next-packing')}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.8rem', padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', minHeight: 48 }}
-        >
-          <PackageCheck size={16} /> Find the next packing
-        </button>
-
-        <button
-          onClick={() => router.push('/shelves')}
-          style={{ padding: '0.4rem 0', marginTop: '0.6rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
-        >
-          Wall of shelves — every box photographed
-        </button>
 
 
         {sweep && sweep.bookings.length === 0 && sweepPhoto && (
@@ -1152,14 +1091,6 @@ export default function PackingPage() {
             )}
           </div>
         )}
-        {foundSoFar.length > 0 && (
-          <button
-            onClick={() => { setFoundSoFar([]); setSweep(null); setSweepPhoto((old) => { if (old) URL.revokeObjectURL(old); return null; }); }}
-            style={{ width: '100%', padding: '0.4rem', marginTop: '0.6rem', border: 'none', background: 'transparent', color: '#999', fontSize: 'var(--text-xs)', textDecoration: 'underline', cursor: 'pointer' }}
-          >
-            Start a new search
-          </button>
-        )}
       </div>
 
       {loading && <p style={{ fontSize: 'var(--text-base)', color: '#888' }}>Loading...</p>}
@@ -1209,12 +1140,6 @@ export default function PackingPage() {
     </PageShell>
   );
 }
-
-const backBtn: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: '0.25rem',
-  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-  color: 'var(--clay)', fontSize: 'var(--text-base)', fontWeight: 600,
-};
 
 const primaryBtn: React.CSSProperties = {
   width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: 'none',
