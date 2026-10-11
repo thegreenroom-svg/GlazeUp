@@ -581,6 +581,20 @@ export default function registerSpecRoutes2(app, supabase, STUDIO_ID, logger, JU
 // currently shares the same one, so this identifies a shift, not a person.
 // Verification happens server-side so the hash never reaches the browser.
 // ============================================================================
+// [11 Oct] A SIGNED SHIFT TOKEN. The PIN gate only ever hid screens: anyone
+// with a URL could open any page. On a good PIN the server now also hands
+// back a token signed with PIN_SECRET; the app keeps it in a cookie and the
+// app's own middleware checks the signature before serving a staff page.
+// No PIN_SECRET on the server: no token, and nothing changes.
+export function shiftToken(crypto, staffId, role, hours = 14) {
+  const secret = process.env.PIN_SECRET;
+  if (!secret) return null;
+  const exp = Date.now() + hours * 3600000;
+  const body = Buffer.from(JSON.stringify({ id: staffId || '', role: role || '', exp })).toString('base64url');
+  const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
 export function registerPinRoutes(app, supabase, STUDIO_ID, logger, crypto) {
   app.post('/api/spec/pin/verify', async (req, res) => {
     try {
@@ -613,6 +627,7 @@ export function registerPinRoutes(app, supabase, STUDIO_ID, logger, crypto) {
         staff: staff ? { ...staff, id: match.staff_member_id } : null,
         shared: sharedBy > 1,
         shared_by: sharedBy,
+        token: shiftToken(crypto, match.staff_member_id, staff?.role),
       });
     } catch (err) {
       logger.error(err);

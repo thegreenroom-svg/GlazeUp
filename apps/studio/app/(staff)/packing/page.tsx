@@ -1,9 +1,11 @@
 'use client';
+import { postOrQueue } from '@/lib/outbox';
 
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { Row, RowAction, Chip } from '@/components/Row';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Package, PackageCheck, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2, Printer } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
@@ -298,14 +300,10 @@ export default function PackingPage() {
   const markCollected = async (p: Piece) => {
     setSaving(p.id);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/packed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packed: true }),
-      });
-      // Only tick the row if it genuinely saved. Showing a tick for a
-      // failed write is worse than showing nothing -- a packer would trust
-      // it and the piece would sit on the shelf marked as gone.
+      // [11 Oct] Through the outbox: with no wifi the tick is kept here and
+      // sent when the connection is back. A reply from the server that is
+      // not OK still leaves the row unticked, as before.
+      const res = await postOrQueue(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/packed`, { packed: true }, `Packed: ${p.piece_type || 'piece'}`);
       if (res.ok) setPieces((prev) => prev.map((x) => (x.id === p.id ? { ...x, status: 'collected' } : x)));
     } catch { /* left as-is; the row simply doesn't tick */ } finally { setSaving(null); }
   };
@@ -1175,55 +1173,38 @@ export default function PackingPage() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {queue.map((q) => (
-          <button
-            key={q.booking_code}
-            onClick={() => openIt(q)}
-            style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left',
-              padding: '0.7rem 0.8rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-              border: `1px solid ${q.done ? '#CDE3CD' : '#eee'}`,
-              backgroundColor: q.done ? '#F4F8F4' : 'white',
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 'var(--text-md)', fontWeight: 700 }}>{q.customer_name}</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: '#777' }}>
-                {q.posting > 0 ? `${q.posting} to post` : 'Collecting'}
-                {q.on_hold > 0 ? ` · ${q.on_hold} on hold` : ''}
-                {q.shelf_label ? ` · ${q.shelf_label}` : ''}
-              </p>
-              {/* Daisy: "and these need dates." Three batches wait at
-                  once now, so which pile a booking is in, and whether
-                  it is already late, matters more than anything else
-                  on this row. Overdue is coloured, not just stated. */}
-              {q.collection_date && (() => {
-                const today = new Date().toISOString().slice(0, 10);
-                const late = q.collection_date < today;
-                return (
-                  <p style={{ fontSize: 'var(--text-xs)', fontWeight: late ? 700 : 600, color: late ? '#C0392B' : 'var(--clay)' }}>
-                    {late ? 'Was due ' : 'Collect '}
-                    {new Date(q.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                  </p>
-                );
-              })()}
-              {/* Said up front so nobody walks to the shelf expecting a
-                  photo that was never taken. */}
-              {!q.has_photo && <p style={{ fontSize: 'var(--text-xs)', color: '#A6761D' }}>No photo — identify by description</p>}
-            </div>
-            <div style={{ flexShrink: 0, marginLeft: '0.5rem', textAlign: 'right' }}>
-              <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, color: q.out_of_kiln ? '#2E7D32' : 'var(--clay)' }}>
-                {q.piece_count} piece{q.piece_count === 1 ? '' : 's'}
-              </span>
-              {/* Out of the kiln and on a shelf, or still waiting to be
-                  fired -- which is what a packer needs to know before
-                  walking anywhere. No dates involved. */}
-              <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600, color: q.out_of_kiln ? '#2E7D32' : '#A6761D' }}>
-                {q.out_of_kiln ? (q.shelf_label || 'Out of the kiln') : `${q.ready}/${q.piece_count} fired`}
-              </span>
-            </div>
-          </button>
-        ))}
+        {queue.map((q) => {
+          // [11 Oct] The same row shape as Collect and the booking page.
+          const today = new Date().toISOString().slice(0, 10);
+          const late = !!q.collection_date && q.collection_date < today;
+          const due = q.collection_date
+            ? new Date(q.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+            : null;
+          return (
+            <Row
+              key={q.booking_code}
+              title={q.customer_name}
+              tone={q.done ? 'done' : late ? 'late' : 'plain'}
+              detail={[
+                `${q.piece_count} piece${q.piece_count === 1 ? '' : 's'}`,
+                q.posting > 0 ? `${q.posting} to post` : null,
+                q.on_hold > 0 ? `${q.on_hold} on hold` : null,
+                q.shelf_label || null,
+              ].filter(Boolean).join(' · ')}
+              chips={(
+                <>
+                  {due && <Chip tone={late ? 'late' : 'clay'}>{late ? `Was due ${due}` : `Collect ${due}`}</Chip>}
+                  <Chip tone={q.out_of_kiln ? 'good' : 'kiln'}>
+                    {q.out_of_kiln ? (q.shelf_label ? `Shelf ${q.shelf_label}` : 'Out of the kiln') : `${q.ready}/${q.piece_count} fired`}
+                  </Chip>
+                  {!q.has_photo && <Chip tone="warn">No photo</Chip>}
+                </>
+              )}
+              onClick={() => openIt(q)}
+              action={<RowAction onClick={() => openIt(q)}>Pack</RowAction>}
+            />
+          );
+        })}
       </div>
     </PageShell>
   );

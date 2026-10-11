@@ -1,4 +1,5 @@
 'use client';
+import { postOrQueue } from '@/lib/outbox';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { PageShell } from '@/components/PageShell';
+import { Row, RowAction } from '@/components/Row';
 import { QrScanner } from '@/components/QrScanner';
 import { Camera, Printer, Check, Loader, Undo2, PackageCheck } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
@@ -99,13 +101,10 @@ export default function CollectionPage() {
   const collect = async (code: string, uncollect = false) => {
     setBusy(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/collect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_code: code, uncollect }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Could not update');
+      const r = await postOrQueue(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/collect`, { booking_code: code, uncollect }, `${uncollect ? 'Un-collect' : 'Hand over'} ${code}`);
+      if (r.queued) { setMessage('No wifi: saved here, will send when it is back.'); return; }
+      const data = await r.res!.json();
+      if (!r.ok) throw new Error(data?.error || 'Could not update');
       setMessage(uncollect ? 'Put back as not collected.' : `Handed over — ${data.pieces_updated} piece(s) marked collected.`);
       await loadDue();
       if (card?.booking_code === code) setCard(null);
@@ -224,14 +223,15 @@ export default function CollectionPage() {
                 <span style={{ color: '#777', fontWeight: 500 }}> · {d.total_pieces} piece{d.total_pieces === 1 ? '' : 's'}</span>
               </p>
               {d.bookings.map((b) => (
-                <button
+                // [11 Oct] The same row as Collect and Packing: the name opens
+                // the card to check it, and handing over is one tap on the row.
+                <Row
                   key={b.booking_code}
+                  title={b.customer_name}
+                  detail={`${b.piece_count} piece${b.piece_count === 1 ? '' : 's'}`}
                   onClick={() => loadCard(b.booking_code)}
-                  style={{ width: '100%', textAlign: 'left', border: '1px solid #eee', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.85rem', marginBottom: '0.4rem', background: 'white', cursor: 'pointer' }}
-                >
-                  <span style={{ fontWeight: 700, fontSize: 'var(--text-md)' }}>{b.customer_name}</span>
-                  <span style={{ float: 'right', fontSize: 'var(--text-sm)', color: '#8C6A4A', fontWeight: 700 }}>{b.piece_count} piece{b.piece_count === 1 ? '' : 's'}</span>
-                </button>
+                  action={<RowAction tone="good" onClick={() => collect(b.booking_code)}>Hand over</RowAction>}
+                />
               ))}
             </div>
           ))}

@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { PieceThumb, PIECE_COLOURS } from '@/components/PieceBoxes';
 import { DateSlider, OPEN_DAYS, isoOf, plusDays, dayName, fireBy } from '@/components/DateSlider';
+import { postOrQueue } from '@/lib/outbox';
 import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Loader, Maximize2, Minus, Plus, Printer, X, ZoomIn } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -124,12 +125,15 @@ export default function KilnPage() {
   const step = async (date: string, stage: Step, undo = false) => {
     setBusy(date); setErr(null);
     try {
-      const r = await fetch(`${API}/api/spec/batch/${date}/move`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stage, undo, by: who() }),
-      });
+      // [11 Oct] Goes through the outbox: with no wifi it is kept and sent
+      // when the connection is back, and the shelf shows the new stage now.
+      const r = await postOrQueue(`${API}/api/spec/batch/${date}/move`, { stage, undo, by: who() }, `Kiln: ${dayName(date)} ${undo ? 'undo' : stage}`);
       if (!r.ok) throw new Error();
-      await load();
+      if (r.queued) {
+        const col = STEPS.find((x) => x.key === stage)?.col;
+        setShelves((ss) => (ss || []).map((s) => (s.date === date && col ? { ...s, stage: { ...(s.stage || {}), [col]: undo ? undefined : new Date().toISOString() } as Shelf['stage'] } : s)));
+        setErr('No wifi: saved here, will send when it is back.');
+      } else await load();
     } catch { setErr('Could not save that. Try again.'); } finally { setBusy(null); }
   };
 
@@ -137,12 +141,10 @@ export default function KilnPage() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(moveTo)) return;
     setBusy(code); setErr(null);
     try {
-      const r = await fetch(`${API}/api/spec/bookings/${encodeURIComponent(code)}/collection-date`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection_date: moveTo }),
-      });
+      const r = await postOrQueue(`${API}/api/spec/bookings/${encodeURIComponent(code)}/collection-date`, { collection_date: moveTo }, `Move booking to ${dayName(moveTo)}`);
       if (!r.ok) throw new Error();
       setMoving(null); setMoveTo('');
-      await load();
+      if (r.queued) setErr('No wifi: saved here, will send when it is back.'); else await load();
     } catch { setErr('Could not change that date. Try again.'); } finally { setBusy(null); }
   };
 
@@ -150,18 +152,17 @@ export default function KilnPage() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return;
     setBusy('new'); setErr(null);
     try {
-      const r = await fetch(`${API}/api/spec/kiln/shelf-dates`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: newDate }),
-      });
+      const r = await postOrQueue(`${API}/api/spec/kiln/shelf-dates`, { date: newDate }, `New shelf ${dayName(newDate)}`);
       if (!r.ok) throw new Error();
       setNewDate('');
-      await load();
+      if (r.queued) setErr('No wifi: saved here, will send when it is back.'); else await load();
     } catch { setErr('Could not add that shelf. Try again.'); } finally { setBusy(null); }
   };
 
-  const post = async (path: string, body: unknown) => {
-    const r = await fetch(`${API}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const post = async (path: string, body: unknown, label = 'Kiln') => {
+    const r = await postOrQueue(`${API}${path}`, body, label);
     if (!r.ok) throw new Error();
+    if (r.queued) setErr('No wifi: saved here, will send when it is back.');
   };
 
   // Everything went in, or the picked pieces stay behind and the rest go in.

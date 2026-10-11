@@ -1,12 +1,24 @@
 'use client';
 import SaveWatch from '@/components/SaveWatch';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Delete } from 'lucide-react';
 
 const SESSION_KEY = 'glazeup_shift';
+// [11 Oct] The signed shift token from the server, kept in a cookie so the
+// app's middleware can check it before serving a staff page. Not httpOnly
+// (the app sets it from here), but it is signed, so it cannot be forged.
+const TOKEN_COOKIE = 'glazeup_token';
+const setTokenCookie = (token: string | null | undefined, maxAgeSec: number) => {
+  try {
+    if (!token) return;
+    const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}`;
+  } catch { /* cookies blocked: the client gate still applies */ }
+};
+const clearTokenCookie = () => { try { document.cookie = `${TOKEN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`; } catch { /* ignore */ } };
 // localStorage, not sessionStorage -- deliberately, from the app review.
 // The 14-hour shift expiry below existed all along but sessionStorage
 // dies whenever Safari kills the tab, so in practice the PIN re-asked
@@ -207,9 +219,16 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     finally { setTeamLoading(false); }
   };
 
+  const lastToken = useRef<string | null>(null);
   const finishLogin = (s: Shift) => {
     try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch { /* private mode */ }
+    setTokenCookie(lastToken.current, Math.floor(SHIFT_MS / 1000));
     setShift(s);
+    // Sent here by the lock from a deeper page? Carry on to it.
+    try {
+      const next = new URLSearchParams(window.location.search).get('next');
+      if (next && next.startsWith('/') && !next.startsWith('//')) { window.location.replace(next); return; }
+    } catch { /* ignore */ }
     setMode('enter');
     setPin('');
     setSharedPinUsed('');
@@ -237,6 +256,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
         return;
       }
       const data = await res.json();
+      lastToken.current = data.token || null;
       if (data.shared) {
         // Shared PIN -- offer to personalise instead of logging straight
         // in as nobody-in-particular. Skipping still works exactly as
@@ -334,6 +354,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = () => {
+    clearTokenCookie();
     try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
     setShift(null);
     setPin('');
