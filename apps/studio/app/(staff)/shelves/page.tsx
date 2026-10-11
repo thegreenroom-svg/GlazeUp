@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { EmptyState } from '@/components/EmptyState';
+import { Count, Tool, Toolbar } from '@/components/Toolbar';
 import { Loader, Layers } from 'lucide-react';
 
 // Daisy: "check all the photographs of all the shelves that are on file
@@ -103,8 +104,47 @@ export default function ShelvesPage() {
       .catch(() => setSweeps([]));
   }, []);
 
+  // [11 Oct] ONE TILE PER BOX, NOT PER PHOTO -- worked out here rather than
+  // inside the grid, so the control line above can say how many shelves are
+  // on the wall without counting them a second time. The grouping rules
+  // themselves are unchanged; the comment that explained them has moved up
+  // with the code.
+  //
+  // The first version of this wall showed every sweep, so twelve tiles of
+  // the same two shelving units looked like twelve shelves -- every re-check
+  // and every test shot added another. A sweep log is not a wall.
+  //
+  // A box is identified by the number written on it, so tiles are grouped by
+  // box_number and each shows its most recent photo. Photos with no box
+  // number cannot be told apart from each other at all, so they collapse to
+  // the latest few with the rest behind a toggle: showing all of them
+  // implies a distinctness that is not there.
+  const visibleSweeps = (sweeps || []).filter((sw) => showBlanks || (sw.matched_details || []).some((m) => m.box));
+  const blanks = (sweeps || []).filter((sw) => !(sw.matched_details || []).some((m) => m.box)).length;
+  const unnumbered = visibleSweeps.filter((sw) => !(sw.box_number || '').trim()).length;
+  const kept: Sweep[] = (() => {
+    const seenBox = new Set<string>();
+    const out: Sweep[] = [];
+    let seen = 0;
+    for (const sw of visibleSweeps) {
+      const box = (sw.box_number || '').trim();
+      if (box) {
+        if (seenBox.has(box)) continue;   // older photo of a box already shown
+        seenBox.add(box);
+        out.push(sw);
+      } else {
+        seen += 1;
+        if (showAllUnnumbered || seen <= 6) out.push(sw);
+      }
+    }
+    return out;
+  })();
+
   return (
-    <PageShell title="Shelves" subtitle="Every shelf photographed, most recent first">
+    // [11 Oct] Reached from Collect, from Packing and from Out of the kiln,
+    // and it had no way back at all except the hamburger. Collect is its
+    // home -- the menu files it under there too.
+    <PageShell title="Shelves" subtitle="Every shelf photographed, most recent first" back="/collect">
       {sweeps === null && (
         <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-base)', color: 'var(--muted)' }}>
           <Loader size={16} className="animate-spin" /> Loading…
@@ -119,52 +159,29 @@ export default function ShelvesPage() {
         />
       )}
 
-      {(() => {
-        const blanks = (sweeps || []).filter((sw) => !(sw.matched_details || []).some((m) => m.box)).length;
-        if (!blanks) return null;
-        return (
-          <button
-            onClick={() => setShowBlanks((v) => !v)}
-            style={{ padding: '0.4rem 0', marginBottom: '0.9rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
-          >
-            {showBlanks
-              ? 'Hide the ones that found nothing'
-              : `${blanks} photo${blanks === 1 ? '' : 's'} found nothing — show ${blanks === 1 ? 'it' : 'them'}`}
-          </button>
-        );
-      })()}
+      {/* [11 Oct] Both "show the hidden ones" toggles were full width lines
+          of their own -- one above the wall, pushing it down, and one below
+          it where it was easy to miss entirely. They are chips on one
+          control line now, with the shelf count at the start of it, and the
+          wall starts straight after. Filled in means showing. */}
+      {!!sweeps?.length && (
+        <Toolbar>
+          <Count>{kept.length} {kept.length === 1 ? 'shelf' : 'shelves'}</Count>
+          {blanks > 0 && (
+            <Tool onClick={() => setShowBlanks((v) => !v)} active={showBlanks} tone="clay">
+              {blanks} found nothing
+            </Tool>
+          )}
+          {unnumbered > 6 && (
+            <Tool onClick={() => setShowAllUnnumbered((v) => !v)} active={showAllUnnumbered} tone="clay">
+              {showAllUnnumbered ? 'Fewer with no box number' : `${unnumbered - 6} more with no box number`}
+            </Tool>
+          )}
+        </Toolbar>
+      )}
 
-      {/* [6 Sep] ONE TILE PER BOX, NOT PER PHOTO.
-          The first version of this wall showed every sweep, so twelve
-          tiles of the same two shelving units looked like twelve
-          shelves -- every re-check and every test shot added another.
-          A sweep log is not a wall.
-
-          A box is identified by the number written on it, so tiles are
-          grouped by box_number and each shows its most recent photo.
-          Photos with no box number cannot be told apart from each other
-          at all, so they collapse to the latest few with the rest
-          behind a toggle: showing all of them implies a distinctness
-          that is not there. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', marginBottom: '1rem' }}>
-        {(() => {
-          const visible = (sweeps || []).filter((sw) => showBlanks || (sw.matched_details || []).some((m) => m.box));
-          const seenBox = new Set<string>();
-          const kept: Sweep[] = [];
-          let unnumbered = 0;
-          for (const sw of visible) {
-            const box = (sw.box_number || '').trim();
-            if (box) {
-              if (seenBox.has(box)) continue;   // older photo of a box already shown
-              seenBox.add(box);
-              kept.push(sw);
-            } else {
-              unnumbered += 1;
-              if (showAllUnnumbered || unnumbered <= 6) kept.push(sw);
-            }
-          }
-          return kept;
-        })().map((sw) => {
+        {kept.map((sw) => {
           const n = (sw.matched_details || []).filter((d) => d.box).length;
           const isOpen = openSweep === sw.id;
           return (
@@ -186,21 +203,6 @@ export default function ShelvesPage() {
           );
         })}
       </div>
-
-      {(() => {
-        const unnumbered = (sweeps || []).filter((sw) => !(sw.box_number || '').trim() && (showBlanks || (sw.matched_details || []).some((m) => m.box))).length;
-        if (unnumbered <= 6) return null;
-        return (
-          <button
-            onClick={() => setShowAllUnnumbered((v) => !v)}
-            style={{ padding: '0.4rem 0', marginBottom: '0.9rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
-          >
-            {showAllUnnumbered
-              ? 'Show fewer'
-              : `${unnumbered - 6} more photos with no box number — show them`}
-          </button>
-        );
-      })()}
 
       {/* [6 Sep] Daisy: "also wouldn't expand."
           It did -- but it rendered BELOW the grid, so with a dozen

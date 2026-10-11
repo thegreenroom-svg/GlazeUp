@@ -16,6 +16,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
+import { Row, Chip } from '@/components/Row';
+import { Count, Tool, Toolbar } from '@/components/Toolbar';
 import { Search, Camera } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -92,13 +94,13 @@ const field = {
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={field} aria-label="Up to date" />
           </div>
         ) : (
-          <button
-            onClick={() => setRange(true)}
-            style={{ alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0,
-                     color: 'var(--clay)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' }}
-          >
-            Search a range instead
-          </button>
+          // [11 Oct] This was a bare text link with no padding, so the
+          // tappable area was about twelve pixels high. It is a chip now,
+          // which gets it to a thumb-sized target without taking any more
+          // room than the line of text did.
+          <Toolbar style={{ marginBottom: 0 }}>
+            <Tool onClick={() => setRange(true)} tone="clay">Search a range instead</Tool>
+          </Toolbar>
         )}
         <button
           onClick={run}
@@ -116,40 +118,49 @@ const field = {
         <p style={{ fontSize: 'var(--text-sm)', color: '#777' }}>Nothing matched that.</p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {(results || []).map((b) => (
-          <button
-            key={b.booking_code}
-            // [9 Oct] Straight to the card: pieces, photos, prices, where it all is, and Hand over.
-            onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
-            style={{ textAlign: 'left', background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.8rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 'var(--text-md)', fontWeight: 700, margin: 0 }}>{b.customer_name}</p>
-              <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.15rem 0 0' }}>
-                {new Date(b.session_start).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                {' · '}
-                {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                {b.table_number ? ` · Table ${b.table_number}` : ''}
-              </p>
+      {/* [11 Oct] How many matched, said once and quietly, where a count
+          belongs. */}
+      {!!results?.length && (
+        <Toolbar>
+          <Count>{results.length} {results.length === 1 ? 'booking' : 'bookings'}</Count>
+        </Toolbar>
+      )}
+
+      {/* [11 Oct] Each result was a hand-rolled card with the name and dates
+          down the left and the piece and photo counts floated right. It is
+          the shared row now, the same shape as a result on Collect or the
+          returns shelf, with the counts as small chips. The tap still goes
+          to the same place. */}
+      {(results || []).map((b) => (
+        <Row
+          key={b.booking_code}
+          title={b.customer_name}
+          detail={
+            <>
+              {new Date(b.session_start).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+              {' · '}
+              {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              {b.table_number ? ` · Table ${b.table_number}` : ''}
+            </>
+          }
+          chips={
+            <>
+              <Chip>{b.pieces} piece{b.pieces === 1 ? '' : 's'}</Chip>
               {b.collection_date && (
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--clay)', fontWeight: 600, margin: '0.15rem 0 0' }}>
+                <Chip tone="clay">
                   Collect {new Date(b.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                </p>
+                </Chip>
               )}
-            </div>
-            <div style={{ flexShrink: 0, textAlign: 'right' }}>
-              <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)' }}>
-                {b.pieces} piece{b.pieces === 1 ? '' : 's'}
-              </span>
               {/* The question behind most searches. Said plainly either way. */}
-              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: b.with_photo ? '#2E7D32' : '#A6761D', display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
-                <Camera size={11} /> {b.with_photo ? `${b.with_photo} with photo` : 'no photo'}
-              </span>
-            </div>
-          </button>
-        ))}
-      </div>
+              <Chip tone={b.with_photo ? 'good' : 'post'}>
+                <Camera size={11} style={{ verticalAlign: '-1px' }} /> {b.with_photo ? `${b.with_photo} with photo` : 'no photo'}
+              </Chip>
+            </>
+          }
+          // [9 Oct] Straight to the card: pieces, photos, prices, where it all is, and Hand over.
+          onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
+        />
+      ))}
     </PageShell>
   );
 }

@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { PieceThumb, PIECE_COLOURS } from '@/components/PieceBoxes';
 import { DateSlider, OPEN_DAYS, isoOf, plusDays, dayName, fireBy } from '@/components/DateSlider';
+import { Collapse, Count, Tool, Toolbar } from '@/components/Toolbar';
 import { postOrQueue } from '@/lib/outbox';
 import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Loader, Maximize2, Minus, Plus, Printer, X, ZoomIn } from 'lucide-react';
 
@@ -222,19 +223,24 @@ export default function KilnPage() {
   ));
 
   return (
-    <PageShell title="Kiln" subtitle="One shelf for each collection date">
-      {/* [11 Oct] The kiln's other screens live here now, off the menu. */}
-      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+    <PageShell title="Kiln" subtitle="One shelf for each collection date" back={true}>
+      {/* [11 Oct] The kiln's other screens live here now, off the menu --
+          on one line that scrolls sideways rather than wrapping onto two,
+          and with the shelf count in front of them so the page says how
+          much there is before you start scrolling through it. */}
+      <Toolbar>
+        <Count>{shelves.length} shelf{shelves.length === 1 ? '' : 'ves'}</Count>
         {([['Kiln plan', '/kiln-plan'], ['Shelf labels', '/shelf-stickers'], ['Out of the kiln', '/out-of-kiln']] as const).map(([label, href]) => (
-          <button key={href} onClick={() => router.push(href)}
-            style={{ minHeight: 38, padding: '0 0.8rem', borderRadius: 999, border: '1px solid #e6ddd2', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-            {label}
-          </button>
+          <Tool key={href} onClick={() => router.push(href)}>{label}</Tool>
         ))}
-      </div>
-      <p style={{ color: '#6b625a', fontSize: 'var(--text-sm)', lineHeight: 1.5, marginBottom: '0.8rem' }}>
-        Chalk the date on the shelf, or print its label. Put that date&apos;s pieces on it, then dip and fire the shelf due first.
-      </p>
+      </Toolbar>
+      {/* The standing instruction, folded. It is worth having on the wall
+          for a new starter and is noise on the fiftieth firing. */}
+      <Collapse summary="How a shelf works">
+        <p style={{ color: '#6b625a', fontSize: 'var(--text-sm)', lineHeight: 1.5, margin: 0 }}>
+          Chalk the date on the shelf, or print its label. Put that date&apos;s pieces on it, then dip and fire the shelf due first.
+        </p>
+      </Collapse>
       {err && <p style={{ color: '#b03a2e', fontSize: 'var(--text-sm)', marginBottom: '0.6rem' }}>{err}</p>}
       <KilnCalendar shelves={shelves} onPick={(date) => {
         setOpen(date);

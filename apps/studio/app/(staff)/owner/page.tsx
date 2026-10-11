@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { Collapse } from '@/components/Toolbar';
 import { Loader, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 
 // Daisy: "something to look at every day."
@@ -131,10 +132,12 @@ function Card({ children }: { children: React.ReactNode }) {
   );
 }
 
+// [11 Oct] Back goes to the menu, which is the only way in here (Office).
+const BACK = '/menu';
+
 export default function OwnerPage() {
   const [d, setD] = useState<Dash | null>(null);
   const [err, setErr] = useState(false);
-  const [showTodo, setShowTodo] = useState(false);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/owner/dashboard`, { cache: 'no-store' })
@@ -144,13 +147,13 @@ export default function OwnerPage() {
   }, []);
 
   if (err) return (
-    <PageShell title="The numbers" subtitle="Takings, records and where it comes from">
+    <PageShell title="The numbers" subtitle="Takings, records and where it comes from" back={BACK}>
       <p style={{ color: B.stone }}>Could not load the figures just now.</p>
     </PageShell>
   );
 
   if (!d) return (
-    <PageShell title="The numbers" subtitle="Takings, records and where it comes from">
+    <PageShell title="The numbers" subtitle="Takings, records and where it comes from" back={BACK}>
       <p style={{ color: B.stone, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
         <Loader size={15} className="animate-spin" /> Adding it up
       </p>
@@ -160,7 +163,7 @@ export default function OwnerPage() {
   const catMax = d.categories[0]?.cents || 1;
 
   return (
-    <PageShell title="The numbers" subtitle="Takings, records and where it comes from">
+    <PageShell title="The numbers" subtitle="Takings, records and where it comes from" back={BACK}>
 
       <Card>
         <p style={{ color: B.stone, fontSize: 'var(--text-xs)', fontWeight: 600 }}>
@@ -213,9 +216,12 @@ export default function OwnerPage() {
             <span style={{ color: 'var(--clay)', fontWeight: 800 }}>{money(r.v)}</span>
           </div>
         ))}
+        {/* [11 Oct] "An average day takes £X" came out of this line: the
+            same figure is already printed under the bar at the top of the
+            page, where it is the marker on it. The trading-day count is
+            only said here, so it stays. */}
         <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.5rem' }}>
           Across {d.trading_days.toLocaleString('en-GB')} trading days.
-          An average day takes {money(d.avg_day_cents)}.
         </p>
       </Card>
 
@@ -246,78 +252,55 @@ export default function OwnerPage() {
         ))}
       </Card>
 
+      {/* [11 Oct] These two were full cards, each with a paragraph of
+          explanation and a hand-rolled "Show me what they are" toggle under
+          it. Same disclosure, same text, now the shared Collapse: the
+          heading is the tappable line and the explanation opens with the
+          list. The explanation is read once; the figures above are the
+          thing you come back for. */}
       {(d.other_items?.length ?? 0) > 0 && (
-        <Card>
-          <p style={{ color: B.text, fontWeight: 700 }}>What is in Other</p>
-          <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.25rem', lineHeight: 1.5 }}>
-            {money(d.other_total_cents)} across {d.other_items_count} things that had no
-            category in Square when they were sold, mostly items since deleted. Old
-            sessions and parties are already moved to their own lines by name.
+        <Collapse summary={`What is in Other · ${money(d.other_total_cents)} across ${d.other_items_count} things`}>
+          <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginBottom: '0.5rem', lineHeight: 1.5 }}>
+            All of it had no category in Square when it was sold, mostly items since
+            deleted. Old sessions and parties are already moved to their own lines by name.
           </p>
-          <button
-            onClick={() => setShowTodo((v) => !v)}
-            style={{
-              marginTop: '0.5rem', background: 'none', border: 'none', padding: 0,
-              color: 'var(--clay)', fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer',
-            }}
-          >
-            {showTodo ? 'Hide the list' : 'Show me what they are'}
-          </button>
-          {showTodo && (
-            <div style={{ marginTop: '0.7rem', borderTop: `1px solid ${B.sand}`, paddingTop: '0.5rem' }}>
-              {d.other_items!.map((it, i) => (
-                <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', gap: '0.5rem',
-                  fontSize: 'var(--text-xs)', padding: '0.22rem 0', color: B.text,
-                }}>
-                  <span>{it.name} <span style={{ color: B.stone }}>×{it.count}</span></span>
-                  <span style={{ color: B.stone, flexShrink: 0 }}>{money(it.cents)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+          <div style={{ borderTop: `1px solid ${B.sand}`, paddingTop: '0.5rem' }}>
+            {d.other_items!.map((it, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between', gap: '0.5rem',
+                fontSize: 'var(--text-xs)', padding: '0.22rem 0', color: B.text,
+              }}>
+                <span>{it.name} <span style={{ color: B.stone }}>×{it.count}</span></span>
+                <span style={{ color: B.stone, flexShrink: 0 }}>{money(it.cents)}</span>
+              </div>
+            ))}
+          </div>
+        </Collapse>
       )}
 
       {!(d.other_items?.length) && d.uncategorised_count > 0 && (
-        <Card>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-            <AlertCircle size={17} color="#a8651a" style={{ flexShrink: 0, marginTop: 2 }} />
-            <div style={{ flex: 1 }}>
-              <p style={{ color: B.text, fontWeight: 700 }}>
-                {d.uncategorised_count} items have no category in Square
-              </p>
-              <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.25rem', lineHeight: 1.5 }}>
-                They are why {money(d.other_total_cents)} has been sitting under
-                &quot;Other&quot; with nothing to say what it was. Nearly all of it is
-                pottery — teapots, lanterns, the big serving bowls. Give them a
-                category in Square and this page corrects itself.
-              </p>
-              <button
-                onClick={() => setShowTodo((v) => !v)}
-                style={{
-                  marginTop: '0.5rem', background: 'none', border: 'none', padding: 0,
-                  color: 'var(--clay)', fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                {showTodo ? 'Hide the list' : 'Show me which ones'}
-              </button>
-            </div>
+        <Collapse
+          summary={`${d.uncategorised_count} items have no category in Square`}
+          icon={<AlertCircle size={17} color="#a8651a" style={{ flexShrink: 0 }} />}
+        >
+          <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginBottom: '0.5rem', lineHeight: 1.5 }}>
+            They are why {money(d.other_total_cents)} has been sitting under
+            &quot;Other&quot; with nothing to say what it was. Nearly all of it is
+            pottery — teapots, lanterns, the big serving bowls. Give them a
+            category in Square and this page corrects itself.
+          </p>
+          <div style={{ borderTop: `1px solid ${B.sand}`, paddingTop: '0.5rem' }}>
+            {d.uncategorised.map((it, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between', gap: '0.5rem',
+                fontSize: 'var(--text-xs)', padding: '0.22rem 0', color: B.text,
+              }}>
+                <span>{it.name}</span>
+                <span style={{ color: B.stone, flexShrink: 0 }}>{money(it.price_cents)}</span>
+              </div>
+            ))}
           </div>
-          {showTodo && (
-            <div style={{ marginTop: '0.7rem', borderTop: `1px solid ${B.sand}`, paddingTop: '0.5rem' }}>
-              {d.uncategorised.map((it, i) => (
-                <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', gap: '0.5rem',
-                  fontSize: 'var(--text-xs)', padding: '0.22rem 0', color: B.text,
-                }}>
-                  <span>{it.name}</span>
-                  <span style={{ color: B.stone, flexShrink: 0 }}>{money(it.price_cents)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+        </Collapse>
       )}
 
       <Card>

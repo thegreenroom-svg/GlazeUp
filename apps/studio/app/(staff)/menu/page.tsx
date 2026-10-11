@@ -5,7 +5,9 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch, Calculator, HelpCircle, AlertTriangle, Activity, CheckCircle2, Flame, Clock } from 'lucide-react';
+// [11 Oct] Eleven icons left over from the twenty-three tiles this page
+// used to have were still being imported. Only the nine still drawn.
+import { Printer, Package, Search, TrendingUp, Tags, ScanSearch, AlertTriangle, Activity, Flame } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { Count, Tool, Toolbar } from '@/components/Toolbar';
 import { Loader, Search, X, AlertCircle, ImageOff } from 'lucide-react';
 
 // Daisy: "a really useful page for stock and finding etc with prices."
@@ -68,16 +69,8 @@ function StockBadge({ s, big = false }: { s: Shape; big?: boolean }) {
   );
 }
 
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: '0.4rem 0.8rem', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap',
-      border: `1px solid ${on ? 'var(--charcoal)' : 'var(--stone)'}`,
-      backgroundColor: on ? 'var(--charcoal)' : '#fff', color: on ? '#fff' : 'var(--charcoal)',
-      fontSize: 'var(--text-sm)', cursor: 'pointer', flexShrink: 0,
-    }}>{children}</button>
-  );
-}
+// [11 Oct] The local filter chip has gone in favour of the shared Tool, so
+// a chip on this page is the same object as a chip on Collect or Packing.
 
 function Photo({ url, alt, height, whole = false }: { url: string | null; alt: string; height: number; whole?: boolean }) {
   const [failed, setFailed] = useState(false);
@@ -183,8 +176,28 @@ export default function StockPage() {
   const clearAll = () => { setQ(''); setCat(null); setBand(null); setStock('all'); setNoPhoto(false); searchRef.current?.focus(); };
   const filtered = q || cat || band || stock !== 'all' || noPhoto;
 
+  // [11 Oct] Sort had the right hand half of a line of its own, under three
+  // separate rows of filters. It is one control, so it goes beside the title
+  // where PageShell keeps those, and that whole line disappears.
+  const sortPicker = (
+    <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort" style={{
+      width: 'auto', minHeight: 36, padding: '0.35rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--stone)',
+      backgroundColor: '#fff', color: 'var(--charcoal)', fontSize: 'var(--text-sm)',
+    }}>
+      <option value="name">A to Z</option>
+      <option value="price-up">Cheapest first</option>
+      <option value="price-down">Dearest first</option>
+      <option value="stock">Lowest stock first</option>
+    </select>
+  );
+
   return (
-    <PageShell title="Stock" subtitle="Every shape, its price, and how many are in" maxWidth={1100}>
+    <PageShell
+      title="Stock"
+      subtitle="Every shape, its price, and how many are in"
+      maxWidth={1100}
+      right={items.length ? sortPicker : undefined}
+    >
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)', padding: '2rem 0' }}>
           <Loader size={18} className="animate-spin" /> Loading the shelves
@@ -220,46 +233,43 @@ export default function StockPage() {
             )}
           </div>
 
-          {/* Stock + price filters */}
-          <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-            <Chip on={stock === 'all'} onClick={() => setStock('all')}>All {totals.all}</Chip>
-            <Chip on={stock === 'in'} onClick={() => setStock('in')}>In stock</Chip>
-            <Chip on={stock === 'low'} onClick={() => setStock('low')}>Running low {totals.low}</Chip>
-            <Chip on={stock === 'out'} onClick={() => setStock('out')}>Out {totals.out}</Chip>
-            {totals.noPhoto > 0 && <Chip on={noPhoto} onClick={() => setNoPhoto(!noPhoto)}>No photo {totals.noPhoto}</Chip>}
-            <span style={{ width: 1, backgroundColor: 'var(--stone)', margin: '0 0.25rem', flexShrink: 0 }} />
+          {/* [11 Oct] Four bands sat between the search box and the first
+              shape: stock filters, price bands, categories, then a line
+              carrying the count on the left and sort on the right. Stock,
+              photo and price are one control line now, led by the count and
+              with Clear on it instead of buried in a sentence. Sort has
+              moved up beside the title. Nothing has been dropped. */}
+          <Toolbar>
+            {/* The whole catalogue total used to be said twice, once on the
+                count line and again on the All chip. It is said once here,
+                and only grows into "40 of 450" when something is filtered
+                out. */}
+            <Count>
+              {filtered ? `${shown.length} of ${totals.all} shapes` : `${totals.all} ${totals.all === 1 ? 'shape' : 'shapes'}`}
+            </Count>
+            {filtered && <Tool onClick={clearAll} tone="clay">Clear</Tool>}
+            <Tool active={stock === 'all'} onClick={() => setStock('all')} tone="dark">All</Tool>
+            <Tool active={stock === 'in'} onClick={() => setStock('in')} tone="dark">In stock</Tool>
+            <Tool active={stock === 'low'} onClick={() => setStock('low')} tone="dark">Running low {totals.low}</Tool>
+            <Tool active={stock === 'out'} onClick={() => setStock('out')} tone="dark">Out {totals.out}</Tool>
+            {totals.noPhoto > 0 && <Tool active={noPhoto} onClick={() => setNoPhoto(!noPhoto)} tone="dark">No photo {totals.noPhoto}</Tool>}
+            <span style={{ width: 1, alignSelf: 'stretch', backgroundColor: 'var(--stone)', margin: '0 0.25rem', flexShrink: 0 }} />
             {BANDS.map((b) => (
-              <Chip key={b.key} on={band === b.key} onClick={() => setBand(band === b.key ? null : b.key)}>{b.label}</Chip>
+              <Tool key={b.key} active={band === b.key} onClick={() => setBand(band === b.key ? null : b.key)} tone="dark">{b.label}</Tool>
             ))}
-          </div>
+          </Toolbar>
 
-          {/* Categories */}
-          <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
-            <Chip on={!cat} onClick={() => setCat(null)}>Everything</Chip>
+          {/* Categories keep a line of their own: they answer a different
+              question from the rest ("what kind of thing" rather than "how
+              much, how many"), and there are a dozen of them, so folding
+              them in would mean scrolling past every price band to reach
+              the mugs. */}
+          <Toolbar>
+            <Tool active={!cat} onClick={() => setCat(null)} tone="dark">Everything</Tool>
             {catCounts.map(([c, n]) => (
-              <Chip key={c} on={cat === c} onClick={() => setCat(cat === c ? null : c)}>{catLabel(c)} {n}</Chip>
+              <Tool key={c} active={cat === c} onClick={() => setCat(cat === c ? null : c)} tone="dark">{catLabel(c)} {n}</Tool>
             ))}
-          </div>
-
-          {/* Count + sort */}
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem',
-            marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: 'var(--muted)', flexWrap: 'wrap',
-          }}>
-            <span>
-              {shown.length} {shown.length === 1 ? 'shape' : 'shapes'}
-              {filtered && <> · <button onClick={clearAll} style={{ border: 'none', background: 'none', color: 'var(--clay)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>clear</button></>}
-            </span>
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} style={{
-              width: 'auto', padding: '0.35rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--stone)',
-              backgroundColor: '#fff', color: 'var(--charcoal)', fontSize: 'var(--text-sm)',
-            }}>
-              <option value="name">A to Z</option>
-              <option value="price-up">Cheapest first</option>
-              <option value="price-down">Dearest first</option>
-              <option value="stock">Lowest stock first</option>
-            </select>
-          </div>
+          </Toolbar>
 
           {/* Grid */}
           {shown.length ? (

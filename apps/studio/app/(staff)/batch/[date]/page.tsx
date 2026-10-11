@@ -20,7 +20,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { PieceThumb, PIECE_COLOURS } from '@/components/PieceBoxes';
-import { AlertTriangle, Check, Package } from 'lucide-react';
+import { Row, Chip } from '@/components/Row';
+import { Collapse, Tally, Tool, Toolbar } from '@/components/Toolbar';
+import { Check } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,35 +112,29 @@ export default function BatchPage() {
   const ready = batch.bookings.filter((b) => b.ready);
 
   return (
-    <PageShell title={`Collecting ${pretty}`} subtitle={`${t.bookings} bookings · ${t.pieces} pieces`}>
+    // [11 Oct] Arrived at by scanning a shelf sticker, and out of the kiln
+    // it is collection's page, so Back goes to Collect rather than leaving
+    // the hamburger as the only way off it.
+    <PageShell title={`Collecting ${pretty}`} subtitle={`${t.bookings} bookings · ${t.pieces} pieces`} back="/collect">
       {/* The headline is the exception count, not the total. A batch
           with nothing missing should say so in one line and stop. */}
-      <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
-        {t.missing === 0 && t.part_missing === 0 ? (
-          <p style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 700, color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Check size={18} /> Everything for this date is accounted for
-          </p>
-        ) : (
-          <>
-            {t.part_missing > 0 && (
-              <p style={{ margin: '0 0 0.3rem', fontSize: 'var(--text-base)', fontWeight: 700, color: '#C0392B', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-                <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: 2 }} />
-                {t.part_missing} piece{t.part_missing === 1 ? ' is' : 's are'} missing a part
-              </p>
-            )}
-            {t.missing > 0 && (
-              <p style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 700, color: '#A6761D' }}>
-                {t.missing} piece{t.missing === 1 ? ' has' : 's have'} not been found on any shelf
-              </p>
-            )}
-          </>
-        )}
-        {t.packed > 0 && (
-          <p style={{ margin: '0.4rem 0 0', fontSize: 'var(--text-sm)', color: '#777', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Package size={14} /> {t.packed} already packed
-          </p>
-        )}
-      </div>
+      {/* [11 Oct] It was a white panel holding up to three bold lines with
+          their own icons, and then the stage panel under it, so the first
+          booking with something wrong with it started two panels down. The
+          counts are one line of words now and the clear case is one line of
+          green. Nothing is said twice. */}
+      {t.missing === 0 && t.part_missing === 0 && (
+        <p style={{ margin: '0 0 0.6rem', fontSize: 'var(--text-base)', fontWeight: 700, color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <Check size={18} /> Everything for this date is accounted for
+        </p>
+      )}
+      <Tally
+        items={[
+          { label: 'missing a part', n: t.part_missing, tone: 'late' },
+          { label: 'not found on any shelf', n: t.missing, tone: 'warn' },
+          { label: 'already packed', n: t.packed, tone: 'quiet' },
+        ]}
+      />
 
       {/* Where this batch is in the week. Only the next step is
           offered as an action -- an unfired batch cannot come out of a
@@ -154,55 +150,68 @@ export default function BatchPage() {
           { key: 'out', done: st?.out_of_kiln_at ?? null, label: 'Out of the kiln', doneLabel: 'Out of the kiln' },
         ];
         const next = steps.find((x) => !x.done);
+        const done = steps.filter((x) => x.done);
         return (
-          <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
-            {steps.filter((x) => x.done).map((x) => (
-              <p key={x.key} style={{ margin: '0 0 0.3rem', fontSize: 'var(--text-sm)', color: '#2E7D32', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Check size={15} /> {x.doneLabel}
-                  <span style={{ fontWeight: 400, color: '#777' }}>
-                    {new Date(x.done as string).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                  </span>
-                </span>
-                <button onClick={() => move(x.key, true)} disabled={moving}
-                  style={{ border: 'none', background: 'none', color: '#A6761D', fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer', padding: '0.2rem 0.3rem' }}>
-                  undo
-                </button>
-              </p>
-            ))}
+          <>
+            {/* [11 Oct] You only reach this page once the shelf is out of
+                the kiln, so these lines are always a finished history by
+                the time anyone reads them -- three green ticks and three
+                dates above the thing you actually scanned the sticker to
+                find out. Folded, with every undo still a tap away. */}
+            {done.length > 0 && (
+              <Collapse summary="Shelf, kiln and out of the kiln" icon={<Check size={15} color="#2E7D32" />}>
+                {done.map((x) => (
+                  <p key={x.key} style={{ margin: '0 0 0.3rem', fontSize: 'var(--text-sm)', color: '#2E7D32', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Check size={15} /> {x.doneLabel}
+                      <span style={{ fontWeight: 400, color: '#777' }}>
+                        {new Date(x.done as string).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </span>
+                    <button onClick={() => move(x.key, true)} disabled={moving}
+                      style={{ border: 'none', background: 'none', color: '#A6761D', fontSize: 'var(--text-sm)', fontWeight: 700, cursor: 'pointer', minHeight: 36, padding: '0 0.4rem' }}>
+                      undo
+                    </button>
+                  </p>
+                ))}
+              </Collapse>
+            )}
+            {/* The next step stays out in the open: it is the one thing
+                here that is an action rather than a record. */}
             {next && (
               <button
                 onClick={() => move(next.key)}
                 disabled={moving}
-                style={{ width: '100%', minHeight: 52, marginTop: steps.some((x) => x.done) ? '0.4rem' : 0, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
+                style={{ width: '100%', minHeight: 52, marginBottom: '1rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
               >
                 {moving ? 'Saving…' : next.label}
               </button>
             )}
-          </div>
+          </>
         );
       })()}
 
+      {/* [11 Oct] Each booking with a problem was a hand-rolled card whose
+          name was its own small button. It is the shared row now, so the
+          whole row is the target rather than the line of text, and the
+          pieces sit inside it as they did. The collection note keeps its
+          red because it is the one thing on here written by a person. */}
       {problems.map((b) => (
-        <div key={b.booking_code} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem', marginBottom: '0.6rem' }}>
-          <button
-            onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
-            style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--charcoal)' }}
-          >
-            {b.customer_name}
-          </button>
-          {b.collection_notes && (
-            <p style={{ fontSize: 'var(--text-xs)', color: '#C0392B', fontWeight: 600, margin: '0.2rem 0 0' }}>{b.collection_notes}</p>
-          )}
+        <Row
+          key={b.booking_code}
+          title={b.customer_name}
+          detail={b.collection_notes ? <span style={{ color: '#C0392B', fontWeight: 600 }}>{b.collection_notes}</span> : undefined}
+          onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
+        >
           {b.pieces.map((p, i) => (
-            <div key={p.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', marginTop: '0.45rem' }}>
+            <span key={p.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', marginTop: '0.45rem' }}>
               <PieceThumb url={p.reference_photo_url} box={p.photo_box} size={40} ring={PIECE_COLOURS[i % 6]} />
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--charcoal)', margin: 0 }}>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--charcoal)' }}>
                   {p.description || p.piece_type}
-                </p>
-                <p style={{
-                  fontSize: 'var(--text-xs)', fontWeight: 700, margin: '0.1rem 0 0',
+                </span>
+                <span style={{
+                  display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, marginTop: '0.1rem',
                   color: p.state === 'part missing' ? '#C0392B' : p.state === 'not found yet' ? '#A6761D' : p.packed ? '#2E7D32' : '#777',
                 }}>
                   {/* The specific failure Daisy described: the base goes
@@ -213,31 +222,32 @@ export default function BatchPage() {
                     : p.state}
                   {p.box ? ` · box ${p.box}` : ''}
                   {p.damaged ? ' · damaged' : ''}
-                </p>
-              </div>
-            </div>
+                </span>
+              </span>
+            </span>
           ))}
-        </div>
+        </Row>
       ))}
 
+      {/* [11 Oct] The "show the complete ones" toggle was a full width
+          button. It is a chip, filled in while they are showing, and the
+          complete bookings are shared rows tinted green. */}
       {ready.length > 0 && (
-        <button
-          onClick={() => setShowReady((v) => !v)}
-          style={{ width: '100%', minHeight: 44, marginTop: '0.4rem', borderRadius: 'var(--radius-md)', border: '1px solid #ece5db', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-        >
-          {showReady ? 'Hide' : `${ready.length} booking${ready.length === 1 ? '' : 's'} complete — show`}
-        </button>
+        <Toolbar style={{ marginTop: '0.6rem' }}>
+          <Tool active={showReady} onClick={() => setShowReady((v) => !v)} tone="dark">
+            {ready.length} booking{ready.length === 1 ? '' : 's'} complete
+          </Tool>
+        </Toolbar>
       )}
 
       {showReady && ready.map((b) => (
-        <button
+        <Row
           key={b.booking_code}
+          tone="done"
+          title={b.customer_name}
+          chips={<Chip tone="good">{b.pieces.length} ready</Chip>}
           onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
-          style={{ display: 'flex', justifyContent: 'space-between', width: '100%', textAlign: 'left', background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-sm)', padding: '0.55rem 0.7rem', marginTop: '0.4rem', cursor: 'pointer' }}
-        >
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{b.customer_name}</span>
-          <span style={{ fontSize: 'var(--text-xs)', color: '#2E7D32', fontWeight: 700 }}>{b.pieces.length} ready</span>
-        </button>
+        />
       ))}
     </PageShell>
   );

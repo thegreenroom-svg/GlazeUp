@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { Row as ListRow, Chip } from '@/components/Row';
+import { Collapse, Count, Tool, Toolbar } from '@/components/Toolbar';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { Camera, Loader, X, Search, Plus, Copy, Check, AlertCircle, Trash2, Coffee } from 'lucide-react';
 
@@ -226,16 +228,21 @@ export default function TableTotalPage() {
   const shapeResults = !catalogue || !words.length ? [] : catalogue.filter((s) => words.every((w) => `${s.name} ${s.category || ''}`.toLowerCase().includes(w))).slice(0, 24);
   const extraResults = !extrasList ? [] : (words.length ? extrasList.filter((x) => words.every((w) => `${x.name} ${x.category}`.toLowerCase().includes(w))) : extrasList).slice(0, 60);
 
+  // [11 Oct] `pill` has gone with the hand-rolled piece rows; the shared
+  // Chip does those three states. `row` is still the frame the "finding the
+  // pieces" line sits in.
   const row: React.CSSProperties = { display: 'flex', gap: '0.6rem', alignItems: 'center', padding: '0.55rem', border: '1px solid var(--sand)', borderRadius: 'var(--radius-md)', backgroundColor: '#fff' };
-  const pill = (bg: string, fg: string): React.CSSProperties => ({ padding: '0.15rem 0.5rem', borderRadius: 999, backgroundColor: bg, color: fg, fontSize: 'var(--text-xs)', fontWeight: 600, whiteSpace: 'nowrap' });
 
   return (
-    <PageShell title="Table total" subtitle="Photograph the table, see what everyone owes" maxWidth={760}>
+    // [11 Oct] Reached from the menu, under Today, so Back goes there.
+    <PageShell title="Table total" subtitle="Photograph the table, see what everyone owes" maxWidth={760} back="/menu">
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => takePhoto(e.target.files?.[0])} />
 
-      {/* Booking + people */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <select value={booking?.booking_code || ''} onChange={(e) => chooseBooking(e.target.value)} style={{ width: 'auto', flex: '1 1 220px', padding: '0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--stone)', backgroundColor: '#fff', fontSize: 'var(--text-sm)' }}>
+      {/* [11 Oct] Booking and people were a wrapping row of their own; now
+          they are the one control line, which scrolls sideways rather than
+          folding onto a second row on the iPad. */}
+      <Toolbar>
+        <select value={booking?.booking_code || ''} onChange={(e) => chooseBooking(e.target.value)} style={{ flexShrink: 0, minWidth: 220, minHeight: 36, padding: '0 0.55rem', borderRadius: 999, border: '1px solid var(--stone)', backgroundColor: '#fff', fontSize: 'var(--text-sm)' }}>
           <option value="">No booking (walk-in)</option>
           {bookings.map((b) => (
             <option key={b.booking_code} value={b.booking_code}>
@@ -243,8 +250,8 @@ export default function TableTotalPage() {
             </option>
           ))}
         </select>
-        <button onClick={() => setPeople((p) => [...p, `Person ${p.length + 1}`])} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.5rem 0.8rem', borderRadius: 999, border: '1px solid var(--stone)', background: '#fff', cursor: 'pointer', fontSize: 'var(--text-sm)' }}><Plus size={14} /> Person</button>
-      </div>
+        <Tool onClick={() => setPeople((p) => [...p, `Person ${p.length + 1}`])} icon={<Plus size={14} />}>Person</Tool>
+      </Toolbar>
 
       {stage === 'start' && (
         <button onClick={() => fileRef.current?.click()} style={{ width: '100%', padding: '2rem 1rem', borderRadius: 'var(--radius-lg)', border: '2px dashed var(--clay)', background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--charcoal)' }}>
@@ -262,55 +269,71 @@ export default function TableTotalPage() {
 
       {stage === 'ready' && (
         <>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.6rem' }}>
+          {/* [11 Oct] This was the photo, two sentences of how-to and the
+              Retake button across one band, with the how-to taking the
+              width. The count and the buttons are the control line; the
+              how-to folds, because it is the same two sentences every
+              table. "Bring back N removed" has come up here from under the
+              list, so every control on this step is on one line. */}
+          <Toolbar>
             {photoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--radius-md)' }} />
+              <img src={photoUrl} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
             )}
-            <div style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>
-              {live.length} piece{live.length === 1 ? '' : 's'} found{stillPricing ? ', pricing...' : ''}.
-              {people.length > 1 ? ' Tap the coloured dot to change whose it is.' : ''} Tap a piece to correct it.
-            </div>
-            <button onClick={() => fileRef.current?.click()} style={{ padding: '0.45rem 0.8rem', borderRadius: 999, border: '1px solid var(--stone)', background: '#fff', cursor: 'pointer', fontSize: 'var(--text-sm)', display: 'inline-flex', gap: 4, alignItems: 'center' }}><Camera size={14} /> Retake</button>
-          </div>
+            <Count>{live.length} piece{live.length === 1 ? '' : 's'} found{stillPricing ? ', pricing…' : ''}</Count>
+            <Tool onClick={() => fileRef.current?.click()} icon={<Camera size={14} />}>Retake</Tool>
+            {pieces.some((p) => p.removed) && (
+              <Tool onClick={() => setPieces((ps) => ps.map((p) => ({ ...p, removed: false })))}>
+                Bring back {pieces.filter((p) => p.removed).length} removed
+              </Tool>
+            )}
+          </Toolbar>
+          <Collapse summary="Correcting a piece, or splitting the bill">
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+              Tap a piece to change what it is, pick its size, give it its own price, or
+              take it off the table. Add a person on the line above, then tap the coloured
+              dot on a piece to say whose it is.
+            </p>
+          </Collapse>
 
+          {/* [11 Oct] Each piece was a hand-rolled card with its own border,
+              its own thumbnail size and its own three pills. It is the
+              shared row now, so a piece here reads the same as a piece on
+              packing or collect. The crop, the price and the coloured
+              person dot all stay exactly where they were, and tapping
+              anywhere on the row opens the same editor the middle of it
+              used to. The dot is 36px rather than 34, for wet hands. */}
           <div style={{ display: 'grid', gap: '0.45rem' }}>
             {live.map((p) => {
               const sure = p.confidence === 'high' || p.confidence === 'chosen';
               return (
-                <div key={p.id} style={row}>
-                  {p.crop
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={p.crop} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
-                    : <div style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: 'var(--sand)', flexShrink: 0 }} />}
-                  <button onClick={() => openEditor(p)} style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
-                    <div style={{ fontWeight: 600, color: 'var(--charcoal)', fontSize: 'var(--text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.custom ? `${p.piece_type} (own price)` : p.shape ? p.shape.name : p.piece_type}
-                    </div>
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</div>
-                    <div style={{ marginTop: 3 }}>
-                      {p.pricing ? <span style={pill('var(--ivory)', 'var(--muted)')}>Pricing...</span>
-                        : p.price_cents == null ? <span style={pill('#FBEDEC', 'var(--danger)')}>{p.shape ? 'Pick the size' : 'Tap to choose'}</span>
-                          : !sure && !p.custom ? <span style={pill('var(--warning-bg)', 'var(--warning)')}>Check this one</span> : null}
-                    </div>
-                  </button>
-                  <div style={{ fontWeight: 700, color: 'var(--clay)', fontSize: 'var(--text-md)', minWidth: 58, textAlign: 'right' }}>
-                    {p.price_cents != null ? money(p.price_cents) : ''}
-                  </div>
-                  {people.length > 1 && (
-                    <button onClick={() => cyclePerson(p)} title={people[p.person]} style={{ width: 34, height: 34, borderRadius: 999, border: 'none', cursor: 'pointer', backgroundColor: PERSON_TINTS[p.person % PERSON_TINTS.length], color: '#fff', fontWeight: 700, fontSize: 'var(--text-xs)', flexShrink: 0 }}>
-                      {(people[p.person] || '?').slice(0, 2)}
-                    </button>
-                  )}
-                </div>
+                <ListRow
+                  key={p.id}
+                  photo={p.crop}
+                  title={p.custom ? `${p.piece_type} (own price)` : p.shape ? p.shape.name : p.piece_type}
+                  detail={p.description}
+                  onClick={() => openEditor(p)}
+                  chips={
+                    p.pricing ? <Chip>Pricing…</Chip>
+                      : p.price_cents == null ? <Chip tone="late">{p.shape ? 'Pick the size' : 'Tap to choose'}</Chip>
+                        : !sure && !p.custom ? <Chip tone="warn">Check this one</Chip> : null
+                  }
+                  action={
+                    <>
+                      <span style={{ fontWeight: 700, color: 'var(--clay)', fontSize: 'var(--text-md)', minWidth: 58, textAlign: 'right' }}>
+                        {p.price_cents != null ? money(p.price_cents) : ''}
+                      </span>
+                      {people.length > 1 && (
+                        <button onClick={() => cyclePerson(p)} title={people[p.person]} style={{ width: 36, height: 36, borderRadius: 999, border: 'none', cursor: 'pointer', backgroundColor: PERSON_TINTS[p.person % PERSON_TINTS.length], color: '#fff', fontWeight: 700, fontSize: 'var(--text-xs)', flexShrink: 0 }}>
+                          {(people[p.person] || '?').slice(0, 2)}
+                        </button>
+                      )}
+                    </>
+                  }
+                />
               );
             })}
           </div>
-          {pieces.some((p) => p.removed) && (
-            <button onClick={() => setPieces((ps) => ps.map((p) => ({ ...p, removed: false })))} style={{ marginTop: 6, border: 'none', background: 'none', color: 'var(--clay)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
-              Bring back {pieces.filter((p) => p.removed).length} removed
-            </button>
-          )}
         </>
       )}
 

@@ -78,9 +78,12 @@ export default function QuickCheckPage() {
     finally { setBusy(false); }
   };
 
+  // [11 Oct] Reached from Needs a look and from nowhere else, and it had no
+  // way back until you had settled every piece. Same Back on all three
+  // states so it does not appear and disappear under your thumb.
   if (!list) {
     return (
-      <PageShell title="Quick check" subtitle="Settle the guessed shapes, one tap each">
+      <PageShell title="Quick check" subtitle="Settle the guessed shapes, one tap each" back="/needs-a-look">
         <p style={{ color: 'var(--stone)', display: 'flex', gap: '0.4rem', alignItems: 'center' }}><Loader size={15} className="animate-spin" /> Loading</p>
       </PageShell>
     );
@@ -89,7 +92,7 @@ export default function QuickCheckPage() {
   const p = list[i];
   if (!p) {
     return (
-      <PageShell title="Quick check" subtitle="Settle the guessed shapes, one tap each">
+      <PageShell title="Quick check" subtitle="Settle the guessed shapes, one tap each" back="/needs-a-look">
         <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '1.2rem', textAlign: 'center' }}>
           <Check size={28} color="#3D7A4A" />
           <p style={{ fontWeight: 700, marginTop: '0.4rem', color: 'var(--charcoal)' }}>
@@ -105,7 +108,7 @@ export default function QuickCheckPage() {
 
   const opts = p.options.filter((o) => !p.guess || o.square_item_id !== p.guess.square_item_id);
   return (
-    <PageShell title="Quick check" subtitle={`${i + 1} of ${list.length}${done ? ` · ${done} confirmed` : ''}`}>
+    <PageShell title="Quick check" subtitle={`${i + 1} of ${list.length}${done ? ` · ${done} confirmed` : ''}`} back="/needs-a-look">
       <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

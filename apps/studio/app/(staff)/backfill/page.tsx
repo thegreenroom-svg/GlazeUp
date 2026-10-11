@@ -26,6 +26,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { EmptyState } from '@/components/EmptyState';
+import { Collapse, Count, Tool, Toolbar } from '@/components/Toolbar';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { Camera, Loader, Check, AlertCircle } from 'lucide-react';
 import { PhotoWithBoxes, PieceList, pieceColour, type PieceBox } from '@/components/PieceBoxes';
@@ -235,60 +237,72 @@ export default function BackfillPage() {
   const field = { width: '100%', minHeight: 44, padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-sm)', background: 'white', color: 'var(--charcoal)' } as const;
 
   return (
-    <PageShell title="Backfill from photos" subtitle="Tables photographed outside the app">
-      <DailyIpadPhotos />
+    // [11 Oct] No tile or link points here any more -- Daisy: "take out the
+    // backfill for now" -- so there is no one page to send Back to. The
+    // browser's own history is the honest answer.
+    <PageShell title="Backfill from photos" subtitle="Tables photographed outside the app" back={true}>
+      <input ref={picker} type="file" accept="image/*" multiple onChange={(e) => pick(e.target.files)} style={{ display: 'none' }} />
+
+      {/* [11 Oct] Four bands used to sit above the first thumbnail: the
+          whole iPad panel with its stats and its seven-step Shortcuts
+          guide, the backlog card, and two full-width buttons. The photos
+          are what you came for, so the buttons are one scrolling line, the
+          backlog detail folds behind its own heading, and the iPad panel
+          has moved to the bottom of the page -- it is set up once and then
+          runs itself every evening. */}
+      <Toolbar>
+        {prog && (prog.total > 0 || prog.on_disk > 0) && <Count>{prog.done} of {prog.total} done</Count>}
+        <Tool onClick={() => picker.current?.click()} tone="clay" icon={<Camera size={15} />}>Choose photos</Tool>
+        {shots.some((s) => s.status === 'waiting' || s.status === 'failed') && (
+          <Tool onClick={readAll} disabled={busy} tone="clay">
+            {busy ? 'Reading…' : `Identify ${shots.filter((s) => s.status === 'waiting' || s.status === 'failed').length}`}
+          </Tool>
+        )}
+        {/* [6 Sep] Daisy: "still no photos."
+            Because this button only appeared when something was
+            PENDING, and the eleven photos whose booking I picked by
+            hand sit in 'assigned' -- a status I added and then never
+            counted here. Pending hit zero, the button vanished, and
+            the assigned ones had no way to be run at all. They had
+            been stuck since the moment they were assigned. */}
+        {prog && prog.pending + (prog.assigned || 0) > 0 && (
+          <Tool onClick={runBatch} disabled={running} tone="dark">
+            {running
+              ? `Working… ${prog.pending + (prog.assigned || 0)} left`
+              : prog.pending === 0
+                // Worth saying plainly: finishing a hand-picked
+                // booking costs nothing, because its read is already
+                // stored on the row.
+                ? `Finish ${prog.assigned} hand-picked booking${prog.assigned === 1 ? '' : 's'} — no AI calls`
+                : `Run the AI over ${prog.pending} photo${prog.pending === 1 ? '' : 's'}${prog.assigned ? ` and finish ${prog.assigned} picked by hand` : ''}`}
+          </Tool>
+        )}
+      </Toolbar>
+
       {prog && (prog.total > 0 || prog.on_disk > 0) && (
-        <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
-          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>The 27 Aug – 5 Sep backlog</p>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: '0 0 0.6rem' }}>
-            {prog.done} of {prog.total} done · {prog.pieces} piece{prog.pieces === 1 ? '' : 's'} with photos
+        <Collapse summary="The 27 Aug – 5 Sep backlog">
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: 0 }}>
+            {prog.pieces} piece{prog.pieces === 1 ? '' : 's'} with photos
             {prog.assigned ? ` · ${prog.assigned} waiting to finish` : ''}
             {prog.duplicate ? ` · ${prog.duplicate} second shots skipped` : ''}
             {prog.unmatched ? ` · ${prog.unmatched} need a look` : ''}
             {prog.failed ? ` · ${prog.failed} failed` : ''}
           </p>
           {prog.pending === 0 && prog.done > 0 && (
-            <p style={{ fontSize: 'var(--text-sm)', color: '#2E7D32', fontWeight: 700, margin: 0 }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: '#2E7D32', fontWeight: 700, margin: '0.4rem 0 0' }}>
               All done — nothing left to run.
             </p>
           )}
-          {/* [6 Sep] Daisy: "still no photos."
-              Because this button only appeared when something was
-              PENDING, and the eleven photos whose booking I picked by
-              hand sit in 'assigned' -- a status I added and then never
-              counted here. Pending hit zero, the button vanished, and
-              the assigned ones had no way to be run at all. They had
-              been stuck since the moment they were assigned. */}
-          {prog.pending + (prog.assigned || 0) > 0 && (
-            <button onClick={runBatch} disabled={running}
-              style={{ width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: running ? 0.6 : 1 }}>
-              {running
-                ? `Working… ${prog.pending + (prog.assigned || 0)} left`
-                : prog.pending === 0
-                  // Worth saying plainly: finishing a hand-picked
-                  // booking costs nothing, because its read is already
-                  // stored on the row.
-                  ? `Finish ${prog.assigned} hand-picked booking${prog.assigned === 1 ? '' : 's'} — no AI calls`
-                  : `Run the AI over ${prog.pending} photo${prog.pending === 1 ? '' : 's'}${prog.assigned ? ` and finish ${prog.assigned} picked by hand` : ''}`}
-            </button>
-          )}
-        </div>
+        </Collapse>
       )}
 
-      <input ref={picker} type="file" accept="image/*" multiple onChange={(e) => pick(e.target.files)} style={{ display: 'none' }} />
-
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <button onClick={() => picker.current?.click()}
-          style={{ flex: '1 1 auto', minHeight: 48, padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-          <Camera size={18} /> Choose photos
-        </button>
-        {shots.some((s) => s.status === 'waiting' || s.status === 'failed') && (
-          <button onClick={readAll} disabled={busy}
-            style={{ flex: '1 1 auto', minHeight: 48, padding: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>
-            {busy ? 'Reading…' : `Identify ${shots.filter((s) => s.status === 'waiting' || s.status === 'failed').length}`}
-          </button>
-        )}
-      </div>
+      {shots.length === 0 && (
+        <EmptyState
+          icon={<Camera size={22} />}
+          title="No photos picked yet"
+          hint="Choose photos from the camera roll and each one is read for chalk boards, then matched to its booking."
+        />
+      )}
 
       {/* Thumbnails rather than full-bleed photos, each badged with what
           is in it, so the ones needing a decision can be found without
@@ -381,6 +395,16 @@ export default function BackfillPage() {
           </div>
         );
       })()}
+
+      {/* [11 Oct] Moved down here from the very top. It is how the iPad is
+          set up to send its photos by itself every evening, plus the week's
+          counts -- set up once, then the one thing on this page nobody has
+          to touch, so it no longer sits in front of the photos. It carries
+          its own heading and its own fold, and nothing inside it has
+          changed. */}
+      <div style={{ marginTop: '1.5rem' }}>
+        <DailyIpadPhotos />
+      </div>
     </PageShell>
   );
 }

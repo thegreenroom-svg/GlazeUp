@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { Chip } from '@/components/Row';
+import { Count, Tool, Toolbar } from '@/components/Toolbar';
 import { Loader, Check, X, Search, RefreshCw, AlertCircle, ImageOff } from 'lucide-react';
 
 // Which shape is each painted piece?
@@ -44,25 +46,18 @@ function Thumb({ src, size = 120 }: { src?: string | null; size?: number }) {
   return <img src={src} alt="" loading="lazy" onError={() => setBad(true)} style={{ width: size, height: size, objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--ivory)', flexShrink: 0 }} />;
 }
 
+// [11 Oct] The verdict was a hand-rolled pill with its own six colour
+// pairs. Same six verdicts, same wording, now the shared Chip, so "Needs a
+// look" is the same red here as it is on the booking page and on collect.
 function Verdict({ p }: { p: Piece }) {
   const v = p.shape_confirmed
-    ? (p.square_item_id ? { t: 'Confirmed', bg: 'var(--success-bg)', fg: 'var(--success)' } : { t: 'Not one of ours', bg: 'var(--ivory)', fg: 'var(--muted)' })
-    : !p.shape_checked_at ? { t: 'Not checked yet', bg: 'var(--ivory)', fg: 'var(--muted)' }
+    ? (p.square_item_id ? { t: 'Confirmed', tone: 'good' as const } : { t: 'Not one of ours', tone: 'quiet' as const })
+    : !p.shape_checked_at ? { t: 'Not checked yet', tone: 'quiet' as const }
       : p.square_item_id ? (p.shape_confidence === 'high'
-        ? { t: 'Sure', bg: 'var(--success-bg)', fg: 'var(--success)' }
-        : { t: 'Fairly sure', bg: 'var(--warning-bg)', fg: 'var(--warning)' })
-        : { t: 'Needs a look', bg: '#FBEDEC', fg: 'var(--danger)' };
-  return <span style={{ padding: '0.15rem 0.55rem', borderRadius: 999, backgroundColor: v.bg, color: v.fg, fontSize: 'var(--text-xs)', fontWeight: 600, whiteSpace: 'nowrap' }}>{v.t}</span>;
-}
-
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: '0.4rem 0.8rem', borderRadius: 999, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer',
-      border: `1px solid ${on ? 'var(--charcoal)' : 'var(--stone)'}`,
-      backgroundColor: on ? 'var(--charcoal)' : '#fff', color: on ? '#fff' : 'var(--charcoal)', fontSize: 'var(--text-sm)',
-    }}>{children}</button>
-  );
+        ? { t: 'Sure', tone: 'good' as const }
+        : { t: 'Fairly sure', tone: 'warn' as const })
+        : { t: 'Needs a look', tone: 'late' as const };
+  return <Chip tone={v.tone}>{v.t}</Chip>;
 }
 
 export default function RecognitionPage() {
@@ -129,40 +124,37 @@ export default function RecognitionPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [catalogue, q]);
 
-  const pct = stats && stats.total ? Math.round((stats.matched / stats.total) * 100) : 0;
-
   return (
-    <PageShell title="Shape recognition" subtitle="Which shape each painted piece is, checked against the stocktake photos" maxWidth={900}>
-      {stats && (
-        <div style={{ backgroundColor: '#fff', border: '1px solid var(--sand)', borderRadius: 'var(--radius-lg)', padding: '0.9rem 1rem', marginBottom: '0.9rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <div>
-              <span style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--charcoal)' }}>{stats.matched}</span>
-              <span style={{ color: 'var(--muted)', fontSize: 'var(--text-sm)' }}> of {stats.total} pieces have a shape</span>
-            </div>
-            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>{stats.confirmed} confirmed by staff · {stats.unchecked} not checked yet</span>
-          </div>
-          <div style={{ height: 8, borderRadius: 999, backgroundColor: 'var(--sand)', marginTop: '0.6rem', overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', backgroundColor: 'var(--clay)' }} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-            <button onClick={runNow} disabled={running} style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem', borderRadius: 999,
-              border: 'none', backgroundColor: 'var(--clay)', color: '#fff', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', opacity: running ? 0.6 : 1,
-            }}>
-              <RefreshCw size={14} className={running ? 'animate-spin' : ''} /> {running ? 'Checking...' : 'Check new pieces now'}
-            </button>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>{runMsg || 'Runs on its own every five minutes too.'}</span>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.75rem' }}>
-        <Chip on={filter === 'all'} onClick={() => setFilter('all')}>Latest</Chip>
-        <Chip on={filter === 'unsure'} onClick={() => setFilter('unsure')}>Needs a look</Chip>
-        <Chip on={filter === 'matched'} onClick={() => setFilter('matched')}>Recognised</Chip>
-        <Chip on={filter === 'unchecked'} onClick={() => setFilter('unchecked')}>Not checked yet</Chip>
-      </div>
+    // [11 Oct] Reached from the menu's Office list, so Back undoes that one
+    // step instead of sending you home to the cards.
+    <PageShell title="Shape recognition" subtitle="Which shape each painted piece is, checked against the stocktake photos" maxWidth={900} back="/menu">
+      {/* [11 Oct] Three bands above the first piece: a card with the big
+          "N of M pieces have a shape", a progress bar saying that same
+          fraction again, the Check button and its note, then a separate row
+          of four filter chips. All one line now. The two counts that had
+          their own sentence are where they belong -- the total in the lead
+          count, "not checked yet" on the filter that shows them -- and the
+          bar has gone, because it drew the fraction printed beside it. */}
+      <Toolbar>
+        {stats && <Count>{stats.matched} of {stats.total} have a shape · {stats.confirmed} confirmed</Count>}
+        <Tool onClick={() => setFilter('all')} active={filter === 'all'} tone="dark">Latest</Tool>
+        <Tool onClick={() => setFilter('unsure')} active={filter === 'unsure'} tone="dark">Needs a look</Tool>
+        <Tool onClick={() => setFilter('matched')} active={filter === 'matched'} tone="dark">Recognised</Tool>
+        <Tool onClick={() => setFilter('unchecked')} active={filter === 'unchecked'} tone="dark">
+          Not checked yet{stats?.unchecked ? ` ${stats.unchecked}` : ''}
+        </Tool>
+        <Tool
+          onClick={runNow}
+          disabled={running}
+          tone="clay"
+          icon={<RefreshCw size={14} className={running ? 'animate-spin' : ''} />}
+        >
+          {running ? 'Checking…' : 'Check new pieces now'}
+        </Tool>
+      </Toolbar>
+      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', margin: '-0.4rem 0 0.8rem' }}>
+        {runMsg || 'Runs on its own every five minutes too.'}
+      </p>
 
       {loading ? (
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', color: 'var(--muted)', padding: '1.5rem 0' }}><Loader size={18} className="animate-spin" /> Loading</div>
