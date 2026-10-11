@@ -10417,9 +10417,24 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // carry a real photo are removed from the pool: process of
       // elimination, so a repeat customer's earlier visit stops
       // competing with the one still waiting to be recovered.
-      const { data: allBookings } = await supabase
-        .from('bookings').select('booking_code, customer_name, session_start, collection_date, table_number, collection_notes, party_size')
-        .eq('studio_id', STUDIO_ID).limit(1000);
+      // [11 Oct] Two fixes found on Stacey Brown and Jennifer McDonald.
+      // A cancelled booking was still a candidate, so a name with one live
+      // and one cancelled booking counted as a tie and nobody got the
+      // photo. And the read was capped at 1,000 rows in no order, so once
+      // the table grew past that, recent bookings could silently drop out.
+      // Last 180 days now, newest first, paged, cancelled and test left out.
+      const allBookings = [];
+      {
+        const since = new Date(Date.now() - 180 * 86400000).toISOString();
+        for (let from = 0; ; from += 1000) {
+          const { data: page } = await supabase
+            .from('bookings').select('booking_code, customer_name, session_start, collection_date, table_number, collection_notes, party_size, status, booking_type, created_at')
+            .eq('studio_id', STUDIO_ID).gte('session_start', since)
+            .order('session_start', { ascending: false }).range(from, from + 999);
+          allBookings.push(...(page || []).filter((b) => b.booking_type !== 'test' && !/cancel/i.test(b.status || '')));
+          if (!page || page.length < 1000) break;
+        }
+      }
       const { data: photographed } = await supabase
         .from('pottery_pieces').select('booking_id')
         .eq('studio_id', STUDIO_ID).not('reference_photo_url', 'is', null);
@@ -10653,8 +10668,20 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           // gambling someone's pottery onto the wrong name.
           // One clear candidate wins. Two still tied after the date has
           // had its say is exactly when a person should choose.
+          // [11 Oct] Daisy: keep the booking name; the pieces are collected
+          // under it. One customer sometimes books two tables at the same
+          // time (Jennifer McDonald: a 4 and a 2, made in the same second).
+          // That is one party, not a tie: the photo goes on the bigger
+          // booking, and the card for the other says it is the same party.
+          const nm = (x) => (x || '').toLowerCase().replace(/[^a-z]/g, '');
+          const oneParty = pool.length > 1 && !runnerUp
+            && pool.every((x) => nm(x.b.customer_name) === nm(pool[0].b.customer_name) && x.b.session_start === pool[0].b.session_start);
+          const partyLead = oneParty
+            ? [...pool].sort((x, y) => (y.b.party_size || 0) - (x.b.party_size || 0) || String(x.b.created_at || '').localeCompare(String(y.b.created_at || '')))[0].b
+            : null;
           const win = (qrBooking && !taken.has(qrBooking.booking_code)) ? qrBooking
             : pool.length === 1 ? pool[0].b
+            : partyLead ? partyLead
             : (pool.length > 1 && !runnerUp && pool[0].sc > pool[1].sc) ? pool[0].b
             : null;
           // Second shot of a table already photographed: exactly one

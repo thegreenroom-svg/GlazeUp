@@ -36,12 +36,15 @@ type NextStep = 'photo' | 'handover' | null;
 // fallbackDate is the date the card itself prints as "Ready", used when
 // the booking has none of its own saved.
 function cardStatus(
-  b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[]; is_wheel?: boolean; session_start?: string; session_end?: string | null; status?: string | null },
+  b: { arrived_at?: string | null; collected_at?: string | null; collection_date?: string | null; finished_at?: string | null; photo_count?: number; returns_waiting?: unknown[]; is_wheel?: boolean; session_start?: string; session_end?: string | null; status?: string | null; party_of?: string | null },
   fallbackDate?: string | null
 ): { label: string; colour: string; next: NextStep; hint?: string } {
   const today = new Date().toLocaleDateString('en-CA');
   if (b.collected_at) return { label: 'Collected', colour: '#3d7a4a', next: null, hint: 'All done.' };
   const photos = b.photo_count || 0;
+  // [11 Oct] Two bookings in one name at the same time are one party; the
+  // pieces go on one of them, and this card just says so.
+  if (b.party_of && !photos) return { label: 'Same party', colour: '#4a6a8a', next: null, hint: 'Booked as two tables in one name. The pieces are on the other booking.' };
   if (b.status === 'no_show' && !photos) return { label: 'No show', colour: '#8a8178', next: null, hint: 'Marked as a no-show in Square.' };
   // [9 Oct] Wheel hire and throwing: nothing painted on a table, so no
   // table photo to wait for.
@@ -104,6 +107,7 @@ interface Booking {
   status?: string | null;
   piece_count?: number;
   photo_count?: number;
+  party_of?: string | null;
   pottery_cents?: number;
   to_check?: number;
   guesses?: number;
@@ -144,7 +148,22 @@ function tableSetupFlags(notes: string | null): string[] {
 }
 
 export default function DailyCardsPage() {
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [rawBookings, setBookings] = useState<Booking[]>([]);
+  // [11 Oct] Same name, same start time: one party booked as two tables.
+  // The one with the photo (else the biggest) leads; the others point at it.
+  const bookings = useMemo(() => {
+    const key = (b: Booking) => `${(b.customer_name || '').toLowerCase().replace(/[^a-z]/g, '')}|${b.session_start}`;
+    const groups = new Map<string, Booking[]>();
+    rawBookings.forEach((b) => { if (!/cancel/i.test(b.status || '')) { const k = key(b); groups.set(k, [...(groups.get(k) || []), b]); } });
+    const lead = new Map<string, string>();
+    groups.forEach((g) => {
+      if (g.length < 2) return;
+      const l = [...g].sort((x, y) => (y.photo_count || 0) - (x.photo_count || 0) || (y.party_size || 0) - (x.party_size || 0))[0];
+      if (!(l.photo_count || 0)) return;
+      g.forEach((b) => { if (b.booking_code !== l.booking_code && !(b.photo_count || 0)) lead.set(b.booking_code, l.booking_code); });
+    });
+    return lead.size ? rawBookings.map((b) => (lead.has(b.booking_code) ? { ...b, party_of: lead.get(b.booking_code) } : b)) : rawBookings;
+  }, [rawBookings]);
   // Every booking the feed returned, not just the chosen day's -- the
   // Collecting view needs bookings painted on other days.
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
@@ -239,9 +258,9 @@ export default function DailyCardsPage() {
   // [11 Oct] Daisy: a card is for while the session is on. Once its photos
   // have come through (or it is collected) the card's job is done, so a tap
   // opens the booking page, with everything that has happened since.
-  const isDone = (b: { photo_count?: number; collected_at?: string | null }) => (b.photo_count || 0) > 0 || !!b.collected_at;
-  const tapCard = (b: { booking_code: string; photo_count?: number; collected_at?: string | null }) => {
-    if (isDone(b)) router.push(`/booking/${encodeURIComponent(b.booking_code)}`);
+  const isDone = (b: { photo_count?: number; collected_at?: string | null; party_of?: string | null }) => (b.photo_count || 0) > 0 || !!b.collected_at || !!b.party_of;
+  const tapCard = (b: { booking_code: string; photo_count?: number; collected_at?: string | null; party_of?: string | null }) => {
+    if (isDone(b)) router.push(`/booking/${encodeURIComponent(b.party_of || b.booking_code)}`);
     else openCard(b.booking_code);
   };
   const openCard = async (code: string) => {
