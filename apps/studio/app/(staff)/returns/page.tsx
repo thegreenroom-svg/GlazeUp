@@ -6,7 +6,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { EmptyState } from '@/components/EmptyState';
 import { PieceThumb } from '@/components/PieceBoxes';
-import { Loader, RotateCcw, Undo2, Check } from 'lucide-react';
+import { Row, Chip } from '@/components/Row';
+import { Section } from '@/components/Toolbar';
+import { Loader, RotateCcw, Undo2 } from 'lucide-react';
 
 // Daisy: a piece can be marked as returning on the table photo, which takes
 // it off that collection date and puts it on the returns shelf.
@@ -91,25 +93,32 @@ export default function ReturnsPage() {
   const done = (rows || []).filter((r) => r.settled);
 
   return (
-    <PageShell title="Returns shelf" subtitle="Unfinished pieces, waiting for their painter">
+    // [11 Oct] Arrived at from Collect and from the daily cards, so Back
+    // goes to Collect rather than making you pick out of the menu again.
+    <PageShell title="Returns shelf" subtitle="Unfinished pieces, waiting for their painter" back="/collect">
       {rows === null && (
         <p style={{ color: B.stone, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Loader size={15} className="animate-spin" /> Loading
         </p>
       )}
 
+      {/* [11 Oct] This was a tinted panel with its own bold heading inside
+          it. The heading is a section heading now, with the count in it, and
+          the tint has gone -- it stays at the top because it is the most
+          urgent thing on the page, not because it was shouting. The strip of
+          thumbnails stays: it is what you carry to the shelf. */}
       {!!due?.length && (
-        <div style={{ marginBottom: '1.5rem', padding: '0.9rem 1rem', borderRadius: 10, background: '#fdf3e4', border: '1px solid #e8c48a' }}>
-          <p style={{ fontWeight: 700, color: '#8a5200', marginBottom: '0.6rem' }}>Get these out: coming in soon</p>
+        <>
+          <Section tone="warn" n={due.length}>Get these out, coming in soon</Section>
           {due.map((d) => (
-            <div key={d.booking_code} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.5rem 0', borderTop: '1px solid #f0dcb8' }}>
+            <div key={d.booking_code} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', background: 'white', border: '1px solid #e8c48a', borderRadius: 'var(--radius-md)', padding: '0.5rem 0.6rem', marginBottom: '0.45rem' }}>
               <div style={{ display: 'flex', gap: '0.3rem', flexShrink: 0 }}>
                 {d.pieces.slice(0, 4).map((p: any) => (
                   <PieceThumb key={p.id} url={p.photo} box={p.box} size={40} ring="#A8651A" />
                 ))}
               </div>
               <div style={{ minWidth: 0 }}>
-                <p style={{ fontWeight: 600 }}>{d.customer_name}</p>
+                <p style={{ fontWeight: 700, color: B.text }}>{d.customer_name}</p>
                 <p style={{ fontSize: 'var(--text-sm)', color: '#7a6a58' }}>
                   {new Date(d.session_start).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}{' '}
                   {new Date(d.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
@@ -118,7 +127,7 @@ export default function ReturnsPage() {
               </div>
             </div>
           ))}
-        </div>
+        </>
       )}
 
       {rows !== null && rows.length === 0 && (
@@ -129,85 +138,68 @@ export default function ReturnsPage() {
         />
       )}
 
+      {/* [11 Oct] "4 waiting" on its own line above the list, and a
+          hand-rolled card with four stacked lines of text in it. The count
+          is in the heading now and each piece is the shared row: thumbnail,
+          who it belongs to, what it is, and the rest as small chips. The
+          Undo button is passed through as the row's action exactly as it
+          was, so it keeps its own disabled state while a tap is in flight. */}
       {open.length > 0 && (
         <>
-          <p style={{ color: B.text, fontWeight: 700, marginBottom: '0.6rem' }}>
-            {open.length} waiting
-          </p>
+          <Section n={open.length}>Waiting</Section>
           {open.map((r) => (
-            <div
+            <Row
               key={r.id}
-              style={{
-                display: 'flex', gap: '0.7rem', alignItems: 'flex-start',
-                padding: '0.75rem 0.8rem', marginBottom: '0.5rem',
-                borderRadius: 'var(--radius-md)', backgroundColor: '#fff',
-                border: `1px solid ${B.sand}`,
-              }}
-            >
-              <PieceThumb url={r.reference_photo_url} box={r.photo_box} size={52} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ color: B.text, fontWeight: 700, fontSize: 'var(--text-sm)' }}>
-                  {r.customer_name || r.booking_id || 'Unknown booking'}
-                </p>
-                <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>
-                  {r.piece_type || 'Piece'}{r.description ? ` — ${r.description}` : ''}
-                </p>
-                {/* The reason is the whole point of the shelf. Without it a
-                    returned piece is just a piece in the wrong place. */}
-                <p style={{
-                  color: '#a8651a', fontSize: 'var(--text-xs)', fontWeight: 600,
-                  marginTop: '0.25rem',
-                }}>
-                  {r.return_reason || 'Coming back to finish'}
-                </p>
-                <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.15rem' }}>
-                  On the shelf since {when(r.returned_at)}
-                  {r.returned_by ? ` by ${r.returned_by}` : ''}
-                  {r.collection_date ? ` · was due ${new Date(r.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
-                </p>
-              </div>
-              <button
-                onClick={() => undo(r.id)}
-                disabled={busy === r.id}
-                title="Put it back on its collection date"
-                style={{
-                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.3rem',
-                  padding: '0.35rem 0.6rem', borderRadius: 999, fontSize: 'var(--text-xs)',
-                  fontWeight: 700, border: `1px solid ${B.stone}`, backgroundColor: 'transparent',
-                  color: B.stone, opacity: busy === r.id ? 0.5 : 1,
-                }}
-              >
-                <Undo2 size={13} /> Undo
-              </button>
-            </div>
+              photo={r.reference_photo_url}
+              box={r.photo_box}
+              title={r.customer_name || r.booking_id || 'Unknown booking'}
+              detail={`${r.piece_type || 'Piece'}${r.description ? ` — ${r.description}` : ''}`}
+              chips={
+                <>
+                  {/* The reason is the whole point of the shelf. Without it a
+                      returned piece is just a piece in the wrong place. */}
+                  <Chip tone="post">{r.return_reason || 'Coming back to finish'}</Chip>
+                  <Chip>
+                    since {when(r.returned_at)}
+                    {r.returned_by ? ` by ${r.returned_by}` : ''}
+                  </Chip>
+                  {r.collection_date && (
+                    <Chip>was due {new Date(r.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Chip>
+                  )}
+                </>
+              }
+              action={
+                <button
+                  onClick={() => undo(r.id)}
+                  disabled={busy === r.id}
+                  title="Put it back on its collection date"
+                  style={{
+                    flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.3rem',
+                    minHeight: 36, padding: '0 0.6rem', borderRadius: 999, fontSize: 'var(--text-xs)',
+                    fontWeight: 700, border: `1px solid ${B.stone}`, backgroundColor: 'transparent',
+                    color: B.stone, opacity: busy === r.id ? 0.5 : 1,
+                  }}
+                >
+                  <Undo2 size={13} /> Undo
+                </button>
+              }
+            />
           ))}
         </>
       )}
 
       {done.length > 0 && (
         <>
-          <p style={{ color: B.stone, fontWeight: 700, margin: '1.3rem 0 0.6rem' }}>
-            {done.length} settled
-          </p>
+          <Section n={done.length}>Settled</Section>
           {done.map((r) => (
-            <div
+            // Green tint says settled, so the tick that used to sit in front
+            // of every one of these is doing nothing the row does not say.
+            <Row
               key={r.id}
-              style={{
-                display: 'flex', gap: '0.6rem', alignItems: 'center',
-                padding: '0.55rem 0.7rem', marginBottom: '0.35rem',
-                borderRadius: 'var(--radius-md)', backgroundColor: B.sand + '30',
-              }}
-            >
-              <Check size={15} color="#3d7a4a" style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ color: B.text, fontSize: 'var(--text-xs)', fontWeight: 600 }}>
-                  {r.customer_name || r.booking_id} — {r.piece_type || 'piece'}
-                </p>
-                <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>
-                  {r.return_reason || 'Coming back to finish'} · {when(r.returned_at)}
-                </p>
-              </div>
-            </div>
+              tone="done"
+              title={`${r.customer_name || r.booking_id} — ${r.piece_type || 'piece'}`}
+              detail={`${r.return_reason || 'Coming back to finish'} · ${when(r.returned_at)}`}
+            />
           ))}
         </>
       )}

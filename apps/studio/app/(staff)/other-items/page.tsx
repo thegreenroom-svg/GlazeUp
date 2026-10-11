@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { EmptyState } from '@/components/EmptyState';
+import { Collapse, Count, Tool, Toolbar } from '@/components/Toolbar';
 import { Loader, Check, Search, HelpCircle } from 'lucide-react';
 
 // What reaches this screen is only the genuinely unknowable.
@@ -93,7 +94,8 @@ export default function OtherItemsPage() {
   const totalLeft = left.reduce((a, r) => a + r.revenue_cents, 0);
 
   return (
-    <PageShell title="Unknown items" subtitle="Deleted from Square, so only you can say what they were">
+    // [11 Oct] This is one of the "needs a look" piles, so Back goes there.
+    <PageShell title="Unknown items" subtitle="Deleted from Square, so only you can say what they were" back="/needs-a-look">
 
       {rows === null && (
         <p style={{ color: B.stone, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -109,13 +111,23 @@ export default function OtherItemsPage() {
         />
       )}
 
+      {/* [11 Oct] Four lines of explanation sat between the title and the
+          first item, with the two numbers buried in the middle of them. The
+          numbers are the control line now and the explanation folds away,
+          because it is read once and known forever after. */}
       {left.length > 0 && (
-        <p style={{ color: B.stone, fontSize: 'var(--text-sm)', lineHeight: 1.55, marginBottom: '0.9rem' }}>
-          <b style={{ color: B.text }}>{left.length}</b> items worth{' '}
-          <b style={{ color: B.text }}>{money(totalLeft)}</b> were deleted from Square,
-          so there is nothing left to look them up by. Tap what it was. Bisque and cafe are on separate tabs.
-          Biggest first, and you can stop whenever you like.
-        </p>
+        <>
+          <Toolbar>
+            <Count>{left.length} items · {money(totalLeft)}</Count>
+          </Toolbar>
+          <Collapse summary="Why these are here">
+            <p style={{ color: B.stone, fontSize: 'var(--text-sm)', lineHeight: 1.55, margin: 0 }}>
+              These were deleted from Square, so there is nothing left to look them up by.
+              Tap what it was. Bisque and cafe are on separate tabs.
+              Biggest first, and you can stop whenever you like.
+            </p>
+          </Collapse>
+        </>
       )}
 
       {left.map((r) => (
@@ -134,17 +146,15 @@ export default function OtherItemsPage() {
                 {money(r.revenue_cents)} · {r.item_count} sold · across {r.days} day{r.days === 1 ? '' : 's'}
               </p>
             </div>
-            <button
+            {/* [11 Oct] Same chip as everywhere else, which also makes this
+                a 36px target instead of a 30px one. */}
+            <Tool
               onClick={() => { setOpen(open === r.square_item_id ? null : r.square_item_id); setQ(''); }}
-              style={{
-                flexShrink: 0, padding: '0.35rem 0.75rem', borderRadius: 999,
-                fontSize: 'var(--text-xs)', fontWeight: 700, border: `1px solid var(--clay)`,
-                backgroundColor: open === r.square_item_id ? 'var(--clay)' : 'transparent',
-                color: open === r.square_item_id ? '#fff' : 'var(--clay)',
-              }}
+              active={open === r.square_item_id}
+              tone="clay"
             >
               {open === r.square_item_id ? 'Close' : 'What was it?'}
-            </button>
+            </Tool>
           </div>
 
           {open === r.square_item_id && (
@@ -163,21 +173,15 @@ export default function OtherItemsPage() {
                   }}
                 />
               </div>
+              {/* [11 Oct] The group tabs wrapped onto two lines on the iPad
+                  and were only 28px high. One line that scrolls sideways,
+                  thumb-sized, like every other set of filters in the app. */}
               {!q.trim() && (
-                <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                <Toolbar>
                   {groups.map((g) => (
-                    <button
-                      key={g}
-                      onClick={() => setGroup(g)}
-                      style={{
-                        padding: '0.28rem 0.7rem', borderRadius: 999, fontSize: 'var(--text-xs)',
-                        fontWeight: 700, border: `1px solid ${g === group ? 'var(--clay)' : B.sand}`,
-                        backgroundColor: g === group ? 'var(--clay)' : 'transparent',
-                        color: g === group ? '#fff' : B.stone,
-                      }}
-                    >{g}</button>
+                    <Tool key={g} onClick={() => setGroup(g)} active={g === group} tone="clay">{g}</Tool>
                   ))}
-                </div>
+                </Toolbar>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                 {choices.map((s) => (

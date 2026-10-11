@@ -48,7 +48,9 @@ export default function NeedsALookPage() {
   const clear = counts ? piles.filter((p) => !p.n) : [];
 
   return (
-    <PageShell title="Needs a look" subtitle="Things a person has to settle. Biggest pile first.">
+    // [11 Oct] Reached from the menu, so Back undoes that one step rather
+    // than making you open the menu and choose again.
+    <PageShell title="Needs a look" subtitle="Things a person has to settle. Biggest pile first." back={true}>
       {err && <p style={{ color: '#C0392B', fontSize: 'var(--text-sm)' }}>Could not load the counts. The piles below still open.</p>}
       {counts && open.length === 0 && (
         <p style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '1rem', color: '#2E7D32', fontWeight: 700, display: 'flex', gap: '0.4rem', alignItems: 'center' }}>

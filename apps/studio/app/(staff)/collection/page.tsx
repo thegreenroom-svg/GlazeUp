@@ -8,8 +8,9 @@ import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { PageShell } from '@/components/PageShell';
 import { Row, RowAction } from '@/components/Row';
+import { Count, Section, Tool, Toolbar } from '@/components/Toolbar';
 import { QrScanner } from '@/components/QrScanner';
-import { Camera, Printer, Check, Loader, Undo2, PackageCheck } from 'lucide-react';
+import { Camera, Printer, Check, Loader, PackageCheck } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 
 // Collection, per Daisy's afternoon revelation: the girls already hand out a
@@ -115,14 +116,31 @@ export default function CollectionPage() {
     }
   };
 
+  const dueCount = due.reduce((a, d) => a + d.bookings.length, 0);
+
   return (
-    <PageShell title="Collection" subtitle="Print the card, or hand pottery over.">
-      <button
-        onClick={() => setScanning(true)}
-        style={{ width: '100%', padding: '0.9rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-md)', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-      >
-        <Camera size={18} /> Scan a collection card
-      </button>
+    <PageShell
+      title="Collection"
+      subtitle="Print the card, or hand pottery over."
+      // [11 Oct] Back closes an open card and otherwise goes to Collect,
+      // which is where nearly everyone arrives from. Opening a card used to
+      // be a one-way street: nothing but a hand-over put the list back.
+      back={card ? () => { setCard(null); setQr(null); } : '/collect'}
+    >
+      {/* [11 Oct] The clay "Scan a collection card" button was a full-width
+          band of its own above everything else. It is a chip on the one
+          control line now, with the quiet count of what is due beside it,
+          and Print joins the line when a card is open instead of sitting as
+          another full-width button under it. */}
+      <Toolbar>
+        {dueCount > 0 && <Count>{dueCount} due to collect</Count>}
+        <Tool onClick={() => setScanning(true)} tone="clay" active icon={<Camera size={15} />}>
+          Scan a card
+        </Tool>
+        {card && (
+          <Tool onClick={() => window.print()} icon={<Printer size={15} />}>Print card</Tool>
+        )}
+      </Toolbar>
 
       {scanning && (
         <QrScanner
@@ -195,12 +213,9 @@ export default function CollectionPage() {
             </div>
           )}
 
-          <button
-            onClick={() => window.print()}
-            style={{ width: '100%', padding: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid #ccc', background: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}
-          >
-            <Printer size={15} /> Print collection card
-          </button>
+          {/* [11 Oct] Print moved up to the control line. Handing over is
+              the one thing that stays a full-width button, because it is
+              what you are standing there to do. */}
           <button
             onClick={() => collect(card.booking_code)}
             disabled={busy}
@@ -213,15 +228,18 @@ export default function CollectionPage() {
 
       {!card && due.length > 0 && (
         <>
-          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0.5rem 0 0.6rem' }}>
-            Due to collect
-          </p>
+          {/* [11 Oct] A "Due to collect" label, then a bold date line, then
+              the rows: three bands to say one thing. The label is gone (the
+              page is called Collection) and the date is a section heading
+              carrying the booking count, with the piece total beside it. */}
           {due.map((d) => (
-            <div key={d.collection_date} style={{ marginBottom: '1rem' }}>
-              <p style={{ fontSize: 'var(--text-base)', fontWeight: 700, marginBottom: '0.4rem' }}>
+            <div key={d.collection_date}>
+              <Section
+                n={d.bookings.length}
+                right={<span style={{ fontSize: 'var(--text-xs)', color: '#8a8178', fontWeight: 700 }}>{d.total_pieces} piece{d.total_pieces === 1 ? '' : 's'}</span>}
+              >
                 {new Date(d.collection_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                <span style={{ color: '#777', fontWeight: 500 }}> · {d.total_pieces} piece{d.total_pieces === 1 ? '' : 's'}</span>
-              </p>
+              </Section>
               {d.bookings.map((b) => (
                 // [11 Oct] The same row as Collect and Packing: the name opens
                 // the card to check it, and handing over is one tap on the row.

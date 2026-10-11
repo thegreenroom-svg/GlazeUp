@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { EmptyState } from '@/components/EmptyState';
+import { PieceThumb, PieceBox } from '@/components/PieceBoxes';
+import { Count, Tool, Toolbar } from '@/components/Toolbar';
 import { Loader, PackageCheck, Check, Boxes } from 'lucide-react';
 
 // Daisy's design: "the AI has a button to say find the next packing from
@@ -24,9 +26,9 @@ interface NextPiece {
   description: string | null;
   box_number: string | null;
   shelf_photo_url: string | null;
-  shelf_box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null;
+  shelf_box: PieceBox | null;
   reference_photo_url: string | null;
-  photo_box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null;
+  photo_box: PieceBox | null;
 }
 
 interface NextBooking {
@@ -36,20 +38,15 @@ interface NextBooking {
   pieces: NextPiece[];
 }
 
-// Crops one piece out of a larger photo using its stored box. Reproduced
-// from the pattern already proven elsewhere in the app rather than
-// reinvented -- an earlier attempt at rewriting this from memory carried
-// two subtle bugs.
-function cropStyle(box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null) {
-  if (!box) return null;
-  const w = box.right_pct - box.left_pct;
-  const h = box.bottom_pct - box.top_pct;
-  if (w <= 0 || h <= 0) return null;
-  return {
-    backgroundSize: `${(100 / w) * 100}% ${(100 / h) * 100}%`,
-    backgroundPosition: `${(box.left_pct / (100 - w)) * 100}% ${(box.top_pct / (100 - h)) * 100}%`,
-    backgroundRepeat: 'no-repeat' as const,
-  };
+// Crops one piece out of a larger photo using its stored box. The maths
+// itself now lives in PieceThumb, which every other screen already uses --
+// this copy had been reproduced from the pattern proven elsewhere rather
+// than reinvented, because an earlier attempt at rewriting it from memory
+// carried two subtle bugs. [11 Oct] All that is left here is the question
+// of WHICH photo to crop, which is this screen's own.
+function usable(box: PieceBox | null) {
+  if (!box) return false;
+  return box.right_pct - box.left_pct > 0 && box.bottom_pct - box.top_pct > 0;
 }
 
 export default function NextPackingPage() {
@@ -113,7 +110,8 @@ export default function NextPackingPage() {
   };
 
   return (
-    <PageShell title="Next packing" subtitle="The first booking that's all out of the kiln">
+    // [11 Oct] You only get here from Packing, so Back goes there.
+    <PageShell title="Next packing" subtitle="The first booking that's all out of the kiln" back="/packing">
       {loading && (
         <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-base)', color: 'var(--muted)' }}>
           <Loader size={16} className="animate-spin" /> Looking…
@@ -137,26 +135,33 @@ export default function NextPackingPage() {
 
       {!loading && booking && (
         <>
-          <div style={{ marginBottom: '0.9rem' }}>
-            <p style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--charcoal)', margin: 0 }}>
-              {booking.customer_name}
-            </p>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', margin: '0.15rem 0 0' }}>
+          {/* [11 Oct] The name stays at the top: it is what the picking list
+              is for. Its second line of detail is the control line now, so
+              "Open this booking instead" comes up here as a chip rather than
+              sitting as a second full-width button under the tick list. */}
+          <p style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--charcoal)', margin: '0 0 0.5rem' }}>
+            {booking.customer_name}
+          </p>
+
+          <Toolbar>
+            <Count>
               {booking.pieces.length} piece{booking.pieces.length === 1 ? '' : 's'}
               {booking.collection_date && ` · for ${new Date(booking.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
               {alsoReady > 0 && ` · ${alsoReady} more ready after this`}
-            </p>
-          </div>
+            </Count>
+            <Tool onClick={() => router.push(`/packing?code=${encodeURIComponent(booking.booking_code)}`)}>
+              Open this booking
+            </Tool>
+          </Toolbar>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {booking.pieces.map((p, i) => {
               // The crop from the SHELF photo shows the piece as it sits in
               // its box right now. Falls back to the table photo, which at
               // least shows what it looks like.
-              const shelfCrop = p.shelf_photo_url ? cropStyle(p.shelf_box) : null;
-              const tableCrop = p.reference_photo_url ? cropStyle(p.photo_box) : null;
-              const url = shelfCrop ? p.shelf_photo_url : p.reference_photo_url;
-              const crop = shelfCrop || tableCrop;
+              const onShelf = !!p.shelf_photo_url && usable(p.shelf_box);
+              const url = onShelf ? p.shelf_photo_url : p.reference_photo_url;
+              const box = onShelf ? p.shelf_box : p.photo_box;
               const isPicked = picked.has(p.id);
               return (
                 <button
@@ -178,14 +183,10 @@ export default function NextPackingPage() {
                     {isPicked && <Check size={13} color="white" />}
                   </span>
 
-                  <span
-                    style={{
-                      flexShrink: 0, width: 64, height: 64, borderRadius: 'var(--radius-sm)',
-                      backgroundColor: '#f4f2ef', display: 'block',
-                      ...(url && crop ? { backgroundImage: `url(${url})`, ...crop } : {}),
-                      ...(url && !crop ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
-                    }}
-                  />
+                  {/* [11 Oct] Was a hand-cropped span; the shared thumbnail
+                      does the same crop and says "no photo" in words where
+                      there isn't one, the same as every other list. */}
+                  <PieceThumb url={url} box={box} size={64} />
 
                   <span style={{ minWidth: 0, flex: 1 }}>
                     <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>
@@ -224,13 +225,6 @@ export default function NextPackingPage() {
           >
             <PackageCheck size={16} />
             {saving ? 'Saving…' : allPicked ? 'Packed — find the next one' : `${booking.pieces.length - picked.size} still to find`}
-          </button>
-
-          <button
-            onClick={() => router.push(`/packing?code=${encodeURIComponent(booking.booking_code)}`)}
-            style={{ width: '100%', marginTop: '0.5rem', padding: '0.4rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
-          >
-            Open this booking instead
           </button>
         </>
       )}
