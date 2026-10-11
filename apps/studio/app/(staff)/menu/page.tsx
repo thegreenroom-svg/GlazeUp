@@ -165,17 +165,6 @@ export default function StudioHome() {
         })}
       </div>
 
-      {/* [11 Oct] The membership page, to show a customer on the iPad. */}
-      <button onClick={() => open({ key: 'membership', href: '/membership' })} disabled={!!opening}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: '0.85rem', padding: '0.9rem 1rem', borderRadius: 'var(--radius-lg)', border: '1px solid #e6ddd2', background: '#F7F4EE', color: 'var(--charcoal)', cursor: 'pointer', textAlign: 'left' }}>
-        <span><span style={{ display: 'block', fontWeight: 700, fontSize: 'var(--text-md)' }}>Membership cards</span>
-        <span style={{ fontSize: 'var(--text-sm)', color: '#777' }}>Show a customer the cards and prices</span></span>
-        <span style={{ color: 'var(--clay)', fontWeight: 800 }}>›</span>
-      </button>
-
-      {/* Deliberately quieter than the steps above: smaller, paler, no
-          numbers. These are places to go when something needs finding
-          or fixing, not work waiting to be done today. */}
       {/* [11 Oct] One list, one button, with how many things are waiting. */}
       <button onClick={() => open({ key: 'needs-a-look', href: '/needs-a-look' })} disabled={!!opening}
         style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', marginTop: '1.4rem', padding: '0.85rem 0.9rem', borderRadius: 'var(--radius-md)', border: '1px solid #ece5db', background: 'white', color: 'var(--charcoal)', cursor: 'pointer', textAlign: 'left' }}>

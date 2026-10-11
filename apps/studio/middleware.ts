@@ -8,12 +8,11 @@ import type { NextRequest } from 'next/server';
 // staff page is served, that the request carries a shift token signed by
 // the server (see shiftToken in the backend), using the same PIN_SECRET.
 //
-// Public: the customer's own booking page, the membership page, and the
-// root, where the PIN pad itself lives. Everything else under the app is
-// staff. With no PIN_SECRET set on this service the lock stays off, so a
+// Public: the customer's own booking page, and the root, where the PIN pad
+// itself lives. Everything else under the app is staff. With no PIN_SECRET set on this service the lock stays off, so a
 // half-configured deploy cannot lock everyone out.
 
-const PUBLIC = ['/', '/membership', '/my-booking'];
+const PUBLIC = ['/', '/my-booking'];
 
 async function verify(token: string, secret: string): Promise<boolean> {
   const dot = token.lastIndexOf('.');
