@@ -10,7 +10,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
-import { SHOW_PRICES } from '@/lib/trial';
 import { AlertTriangle, Check, CheckCircle2, ChevronRight, HelpCircle, Image as ImageIcon } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -41,9 +40,7 @@ export default function NeedsALookPage() {
       .then(setCounts).catch(() => setErr(true));
   }, []);
 
-  // During the trial run only the iPad photos matter: shapes, till items and
-  // paid-versus-photographed are all about money, which is parked for now.
-  const piles = PILES.filter((p) => (isOwner || !p.owner) && (SHOW_PRICES || p.key === 'backfill'))
+  const piles = PILES.filter((p) => isOwner || !p.owner)
     .map((p) => ({ ...p, n: counts ? counts[p.key] : null }))
     .sort((a, b) => (b.n || 0) - (a.n || 0));
   const open = counts ? piles.filter((p) => (p.n || 0) > 0) : piles;

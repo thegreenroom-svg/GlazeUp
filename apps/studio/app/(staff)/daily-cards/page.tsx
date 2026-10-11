@@ -11,7 +11,6 @@ import { useSearchParams } from 'next/navigation';
 import { Printer, RefreshCw, AlertCircle, CalendarDays, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Camera, Loader, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { EmptyState } from '@/components/EmptyState';
-import { SHOW_PRICES, TRIAL_RUN } from '@/lib/trial';
 
 // Same fix as PinGate.tsx: a plain fetch() has no timeout of its own. This
 // page gates real controls (Check for new bookings, Save on the table
@@ -955,7 +954,7 @@ export default function DailyCardsPage() {
               {([
                 ['all', `All ${dayCounts.all}`, '#8a8178'],
                 ['nophoto', `No photo ${dayCounts.nophoto}`, '#b03a2e'],
-                ...(SHOW_PRICES ? [['check', `To check ${dayCounts.check}`, '#A8651A'] as const] : []),
+                ['check', `To check ${dayCounts.check}`, '#A8651A'],
                 ['ready', `Ready ${dayCounts.ready}`, '#b8860b'],
                 ['wheel', `Wheel ${dayCounts.wheel}`, '#6a5a8a'],
               ] as const).filter(([k]) => k === 'all' || (dayCounts as any)[k] > 0).map(([k, label, colour]) => (
@@ -1138,7 +1137,7 @@ export default function DailyCardsPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.15rem', fontSize: 'var(--text-xs)' }}>
                     <span style={{ fontWeight: 800, color: st0.colour, textTransform: 'uppercase', letterSpacing: '.03em' }}>{st0.label}</span>
                     <span style={{ color: '#6b625a' }}>
-                      {[photos0 ? `${photos0} piece${photos0 === 1 ? '' : 's'}` : '', SHOW_PRICES && b.pottery_cents ? money(b.pottery_cents) : '', SHOW_PRICES && (b.to_check || 0) + (b.guesses || 0) ? `${(b.to_check || 0) + (b.guesses || 0)} to check` : ''].filter(Boolean).join(' · ')}
+                      {[photos0 ? `${photos0} piece${photos0 === 1 ? '' : 's'}` : '', b.pottery_cents ? money(b.pottery_cents) : '', (b.to_check || 0) + (b.guesses || 0) ? `${(b.to_check || 0) + (b.guesses || 0)} to check` : ''].filter(Boolean).join(' · ')}
                     </span>
                   </div>
                 </div>
@@ -1180,8 +1179,8 @@ export default function DailyCardsPage() {
                 const bits: string[] = [];
                 if (photos) bits.push(`${photos} piece${photos === 1 ? '' : 's'}`);
                 const toCheck = (b.to_check || 0) + (b.guesses || 0);
-                if (SHOW_PRICES && b.pottery_cents) bits.push(`${b.to_check ? 'from ' : ''}${money(b.pottery_cents)}`);
-                if (SHOW_PRICES && toCheck) bits.push(`${toCheck} to check`);
+                if (b.pottery_cents) bits.push(`${b.to_check ? 'from ' : ''}${money(b.pottery_cents)}`);
+                if (toCheck) bits.push(`${toCheck} to check`);
                 // [9 Oct] Fewer pieces than seats usually means a piece was
                 // missed off the photo, or is in a second photo.
                 const short = photos > 0 && !b.is_wheel && (b.party_size || 0) > photos;
@@ -1500,11 +1499,7 @@ export default function DailyCardsPage() {
                       {st.label === 'Collected' && (
                         <button onClick={() => markCollected(b, false)} style={undoLink}>Undo collected</button>
                       )}
-                      {/* Trial run: the iPad sends the photo, so no in-app camera prompt. */}
-                      {TRIAL_RUN && st.next === 'photo' && (
-                        <p style={{ marginTop: '0.45rem', fontSize: 'var(--text-sm)', color: '#6b625a' }}>The iPad photo lands here after the session.</p>
-                      )}
-                      {st.next && !(TRIAL_RUN && st.next === 'photo') && (
+                      {st.next && (
                         <button
                           onClick={() => {
                             if (st.next === 'photo') openSheet(b, '/floor');
@@ -1582,7 +1577,7 @@ export default function DailyCardsPage() {
                             <button key={p.id} onClick={() => show(k)} style={{ background: 'none', border: 'none', padding: 0, width: 84, textAlign: 'center', cursor: 'zoom-in' }}>
                               <PieceThumb url={p.reference_photo_url} box={p.photo_box} size={72} ring={p.returned_at ? '#A8651A' : undefined} />
                               <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.2rem', color: 'var(--charcoal)', textTransform: p.shape ? 'none' : 'capitalize' }}>{k + 1}. {p.shape?.name || p.piece_type || 'Piece'}</span>
-                              {SHOW_PRICES && p.shape?.price_cents > 0 && <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)' }}>{priceText(p.shape)}</span>}
+                              {p.shape?.price_cents > 0 && <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)' }}>{priceText(p.shape)}</span>}
                               {p.stage && <span style={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.25, color: p.returned_at ? '#A8651A' : 'var(--stone)', fontWeight: 600 }}>{p.returned_at ? 'to finish' : p.stage}</span>}
                               {p.returned_at && (
                                 <span
@@ -1597,7 +1592,7 @@ export default function DailyCardsPage() {
                           ))}
                         </div>
                       )}
-                      {SHOW_PRICES && tp.pieces.length > 0 && (
+                      {tp.pieces.length > 0 && (
                         <div style={{ maxWidth: 520, margin: '0.9rem auto 0', borderTop: '1px solid var(--sand, #e8dccb)', paddingTop: '0.6rem' }}>
                           {tp.pieces.map((p: any, k: number) => (
                             <div key={p.id} style={{ padding: '0.3rem 0', fontSize: 'var(--text-sm)' }}>

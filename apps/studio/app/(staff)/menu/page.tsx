@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { SHOW_PRICES, TRIAL_RUN } from '@/lib/trial';
 import { motion } from 'framer-motion';
 import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch, Calculator, HelpCircle, AlertTriangle, Activity, CheckCircle2, Flame, Clock } from 'lucide-react';
 
@@ -34,7 +33,7 @@ import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Sea
 type Link = { label: string; href: string };
 const STEPS: { key: string; label: string; detail: string; href: string; icon: typeof Printer; tint: string; also: Link[] }[] = [
   { key: 'cards', label: 'Today', detail: 'The cards. Photograph each table; done ones open their booking', href: '/daily-cards', icon: Printer, tint: '#8C6A4A',
-    also: TRIAL_RUN ? [] : [{ label: 'Photograph a table', href: '/floor' }, { label: 'Table total', href: '/table-total' }] },
+    also: [{ label: 'Photograph a table', href: '/floor' }, { label: 'Table total', href: '/table-total' }] },
   { key: 'firing', label: 'Kiln', detail: 'A shelf for each date: dip, fire, out', href: '/kiln', icon: Flame, tint: '#B8562E',
     also: [{ label: 'Kiln plan', href: '/kiln-plan' }, { label: 'Shelf labels', href: '/shelf-stickers' }, { label: 'Out of the kiln', href: '/out-of-kiln' }] },
   { key: 'packing', label: 'Collect', detail: 'Hand over, pack, and what is overdue', href: '/collect', icon: Package, tint: '#9C5A3C',
@@ -69,12 +68,12 @@ export default function StudioHome() {
     } catch { /* leave everything showing */ }
   }, []);
   const backroom = isOwner ? BACKROOM : [];
-  const [look, setLook] = useState<{ shapes: number; backfill: number; total: number } | null>(null);
+  const [look, setLook] = useState<{ shapes: number; total: number } | null>(null);
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/needs-a-look/counts`)
       .then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setLook(d); }).catch(() => {});
   }, []);
-  const lookCount = !look ? 0 : !SHOW_PRICES ? (isOwner ? look.backfill : 0) : (isOwner ? look.total : look.shapes);
+  const lookCount = look ? (isOwner ? look.total : look.shapes) : 0;
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
   // From the app review: the tiles said what each step IS but nothing
@@ -107,11 +106,6 @@ export default function StudioHome() {
       <div style={{ marginBottom: '1.4rem' }}>
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>The Kiln Cafe</h1>
         <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Four places. Everything else hangs off them.</p>
-        {TRIAL_RUN && (
-          <p style={{ fontSize: 'var(--text-xs)', color: '#6b625a', background: '#F3EDE4', borderRadius: 'var(--radius-md)', padding: '0.5rem 0.7rem', margin: '0.7rem 0 0' }}>
-            <b>Trial run.</b> Table photos come from the iPad after each session. Prices and the till are hidden while we test the kiln and collection flow.
-          </p>
-        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -188,7 +182,7 @@ export default function StudioHome() {
         <span style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 'var(--radius-md)', background: '#E0A23C', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={17} /></span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700 }}>Needs a look</span>
-          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>{!SHOW_PRICES ? 'iPad photos that matched no booking' : isOwner ? 'Shapes, iPad photos, missing pieces, unknown items' : 'Guessed shapes to confirm'}</span>
+          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>{isOwner ? 'Shapes, iPad photos, missing pieces, unknown items' : 'Guessed shapes to confirm'}</span>
         </span>
         {lookCount > 0 && <span style={{ flexShrink: 0, minWidth: 28, height: 28, padding: '0 0.5rem', borderRadius: 14, background: '#E0A23C', color: 'white', fontWeight: 800, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{lookCount}</span>}
       </button>
