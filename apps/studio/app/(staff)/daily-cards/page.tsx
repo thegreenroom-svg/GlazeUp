@@ -1214,10 +1214,16 @@ export default function DailyCardsPage() {
                     })()}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.55rem' }}>
                       {due && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#f6ece1', color: 'var(--clay)' }}>{b.collected_at ? 'Collected' : `Collect ${due}`}</span>}
-                      {b.kiln_stage && !b.collected_at && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fbe9e1', color: '#B8562E' }}>{b.kiln_stage}</span>}
+                      {/* [11 Oct] No buttons: the labels themselves go where they say. */}
+                      {b.collection_date && !b.collected_at && (
+                        <span role="link" onClick={(e) => { e.stopPropagation(); router.push(`/kiln?date=${String(b.collection_date).slice(0, 10)}`); }}
+                          style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fbe9e1', color: '#B8562E', cursor: 'pointer' }}>
+                          {b.kiln_stage || 'Kiln shelf'} ›
+                        </span>
+                      )}
                       {b.live_ticket_name && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#eef3ee', color: '#3d7a4a' }}>Till: {b.live_ticket_name}</span>}
                       {b.fulfilment_method === 'postal' && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A6761D' }}>Posting</span>}
-                      {back > 0 && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A8651A' }}>{back} on the returns shelf</span>}
+                      {back > 0 && <span role="link" onClick={(e) => { e.stopPropagation(); router.push('/returns'); }} style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A8651A', cursor: 'pointer' }}>{back} on the returns shelf ›</span>}
                       {(b.photo_count || 0) > 0 && !b.is_wheel && (b.party_size || 0) > (b.photo_count || 0) && (
                         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fff4d6', color: '#8a5a00' }}>{b.photo_count} for {b.party_size} seats</span>
                       )}
