@@ -139,6 +139,12 @@ export default function StockPage() {
     const hay = `${s.name} ${catLabel(s.category)} ${s.description || ''}`.toLowerCase();
     return words.every((w) => hay.includes(w));
   };
+  // [11 Oct] Daisy: flag the shapes with no reference photo. Recognition
+  // compares painted pieces against these photos, so a shape without one is
+  // much harder to spot on a table. The letters and numbers are the
+  // exception: the shape is the letter.
+  const [noPhoto, setNoPhoto] = useState(false);
+  const matchesPhoto = (s: Shape) => !noPhoto || !s.image_url;
   const matchesBand = (s: Shape) => !band || BANDS.find((b) => b.key === band)!.test(s.price_cents);
   const matchesStock = (s: Shape) => {
     if (stock === 'all') return true;
@@ -146,9 +152,9 @@ export default function StockPage() {
     return stock === 'in' ? st === 'in' || st === 'low' : st === stock;
   };
 
-  const base = useMemo(() => items.filter((s) => matchesSearch(s) && matchesBand(s) && matchesStock(s)),
+  const base = useMemo(() => items.filter((s) => matchesSearch(s) && matchesBand(s) && matchesStock(s) && matchesPhoto(s)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, q, band, stock]);
+    [items, q, band, stock, noPhoto]);
 
   const catCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -171,10 +177,11 @@ export default function StockPage() {
     all: items.length,
     out: items.filter((s) => stockState(s) === 'out').length,
     low: items.filter((s) => stockState(s) === 'low').length,
+    noPhoto: items.filter((s) => !s.image_url).length,
   }), [items]);
 
-  const clearAll = () => { setQ(''); setCat(null); setBand(null); setStock('all'); searchRef.current?.focus(); };
-  const filtered = q || cat || band || stock !== 'all';
+  const clearAll = () => { setQ(''); setCat(null); setBand(null); setStock('all'); setNoPhoto(false); searchRef.current?.focus(); };
+  const filtered = q || cat || band || stock !== 'all' || noPhoto;
 
   return (
     <PageShell title="Stock" subtitle="Every shape, its price, and how many are in" maxWidth={1100}>
@@ -219,6 +226,7 @@ export default function StockPage() {
             <Chip on={stock === 'in'} onClick={() => setStock('in')}>In stock</Chip>
             <Chip on={stock === 'low'} onClick={() => setStock('low')}>Running low {totals.low}</Chip>
             <Chip on={stock === 'out'} onClick={() => setStock('out')}>Out {totals.out}</Chip>
+            {totals.noPhoto > 0 && <Chip on={noPhoto} onClick={() => setNoPhoto(!noPhoto)}>No photo {totals.noPhoto}</Chip>}
             <span style={{ width: 1, backgroundColor: 'var(--stone)', margin: '0 0.25rem', flexShrink: 0 }} />
             {BANDS.map((b) => (
               <Chip key={b.key} on={band === b.key} onClick={() => setBand(band === b.key ? null : b.key)}>{b.label}</Chip>
