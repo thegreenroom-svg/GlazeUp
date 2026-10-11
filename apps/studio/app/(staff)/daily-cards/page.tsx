@@ -954,7 +954,6 @@ export default function DailyCardsPage() {
               {([
                 ['all', `All ${dayCounts.all}`, '#8a8178'],
                 ['nophoto', `No photo ${dayCounts.nophoto}`, '#b03a2e'],
-                ['check', `To check ${dayCounts.check}`, '#A8651A'],
                 ['ready', `Ready ${dayCounts.ready}`, '#b8860b'],
                 ['wheel', `Wheel ${dayCounts.wheel}`, '#6a5a8a'],
               ] as const).filter(([k]) => k === 'all' || (dayCounts as any)[k] > 0).map(([k, label, colour]) => (
@@ -1137,7 +1136,7 @@ export default function DailyCardsPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.15rem', fontSize: 'var(--text-xs)' }}>
                     <span style={{ fontWeight: 800, color: st0.colour, textTransform: 'uppercase', letterSpacing: '.03em' }}>{st0.label}</span>
                     <span style={{ color: '#6b625a' }}>
-                      {[photos0 ? `${photos0} piece${photos0 === 1 ? '' : 's'}` : '', b.pottery_cents ? money(b.pottery_cents) : '', (b.to_check || 0) + (b.guesses || 0) ? `${(b.to_check || 0) + (b.guesses || 0)} to check` : ''].filter(Boolean).join(' · ')}
+                      {[photos0 ? `${photos0} piece${photos0 === 1 ? '' : 's'}` : '', b.pottery_cents ? money(b.pottery_cents) : ''].filter(Boolean).join(' · ')}
                     </span>
                   </div>
                 </div>
@@ -1179,8 +1178,9 @@ export default function DailyCardsPage() {
                 const bits: string[] = [];
                 if (photos) bits.push(`${photos} piece${photos === 1 ? '' : 's'}`);
                 const toCheck = (b.to_check || 0) + (b.guesses || 0);
-                if (b.pottery_cents) bits.push(`${b.to_check ? 'from ' : ''}${money(b.pottery_cents)}`);
-                if (toCheck) bits.push(`${toCheck} to check`);
+                // [11 Oct] Daisy: just a price, no "guess" or "to check".
+                if (b.pottery_cents) bits.push(money(b.pottery_cents));
+                void toCheck;
                 // [9 Oct] Fewer pieces than seats usually means a piece was
                 // missed off the photo, or is in a second photo.
                 const short = photos > 0 && !b.is_wheel && (b.party_size || 0) > photos;
@@ -1606,7 +1606,7 @@ export default function DailyCardsPage() {
                                       </button>
                                     )}
                                   </span>
-                                  <span style={{ fontWeight: priceText(p.shape) ? 700 : 500, color: priceText(p.shape) ? 'var(--charcoal)' : 'var(--stone)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{!p.shape_sure && <span title="Recognised from the photo, not yet checked against the till or by a person" style={{ color: 'var(--stone)', fontWeight: 600, fontSize: 'var(--text-xs)' }}>guess · </span>}{p.shape.from_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>till · </span>}{priceText(p.shape) || 'priced at the till'}</span>
+                                  <span style={{ fontWeight: priceText(p.shape) ? 700 : 500, color: priceText(p.shape) ? 'var(--charcoal)' : 'var(--stone)', whiteSpace: 'nowrap' }}>{SHOW_TILL && p.on_bill && <span style={{ color: '#3d7a4a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>on bill · </span>}{priceText(p.shape) || 'priced at the till'}</span>
                                 </div>
                               ) : (
                                 <div>
@@ -1646,8 +1646,8 @@ export default function DailyCardsPage() {
                             const notes = [r.check ? `${r.check} to check` : '', r.atTill ? `${r.atTill} priced at the till` : ''].filter(Boolean).join(', ');
                             return (
                               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--sand, #e8dccb)', marginTop: '0.4rem', paddingTop: '0.5rem', fontWeight: 700, color: 'var(--charcoal)' }}>
-                                <span>Pottery{notes ? <span style={{ fontWeight: 500, color: 'var(--stone)' }}> ({notes})</span> : null}</span>
-                                <span>{r.atTill ? 'from ' : ''}{rangeText(r.lo, r.hi)}</span>
+                                <span>Pottery{void notes}</span>
+                                <span>{rangeText(r.lo, r.hi)}</span>
                               </div>
                             );
                           })()}

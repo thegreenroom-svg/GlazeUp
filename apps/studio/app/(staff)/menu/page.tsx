@@ -68,12 +68,12 @@ export default function StudioHome() {
     } catch { /* leave everything showing */ }
   }, []);
   const backroom = isOwner ? BACKROOM : [];
-  const [look, setLook] = useState<{ shapes: number; total: number } | null>(null);
+  const [look, setLook] = useState<{ shapes: number; backfill: number; total: number } | null>(null);
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/needs-a-look/counts`)
       .then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setLook(d); }).catch(() => {});
   }, []);
-  const lookCount = look ? (isOwner ? look.total : look.shapes) : 0;
+  const lookCount = look ? (isOwner ? look.total - (look.backfill || 0) : look.shapes) : 0;
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
   // From the app review: the tiles said what each step IS but nothing
@@ -182,7 +182,7 @@ export default function StudioHome() {
         <span style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 'var(--radius-md)', background: '#E0A23C', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={17} /></span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700 }}>Needs a look</span>
-          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>{isOwner ? 'Shapes, iPad photos, missing pieces, unknown items' : 'Guessed shapes to confirm'}</span>
+          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>{isOwner ? 'Shapes, missing pieces, unknown items' : 'Guessed shapes to confirm'}</span>
         </span>
         {lookCount > 0 && <span style={{ flexShrink: 0, minWidth: 28, height: 28, padding: '0 0.5rem', borderRadius: 14, background: '#E0A23C', color: 'white', fontWeight: 800, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{lookCount}</span>}
       </button>

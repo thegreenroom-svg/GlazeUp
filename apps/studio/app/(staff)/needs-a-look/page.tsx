@@ -10,16 +10,17 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
-import { AlertTriangle, Check, CheckCircle2, ChevronRight, HelpCircle, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, ChevronRight, HelpCircle } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 const API = process.env.NEXT_PUBLIC_API_URL;
 const OWNER_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
 
-type Counts = { shapes: number; backfill: number; unknown_items: number; short_pieces: number; total: number };
+type Counts = { shapes: number; unknown_items: number; short_pieces: number; total: number };
 const PILES = [
   { key: 'shapes', label: 'Guessed shapes', detail: 'Confirm or correct, one tap each', href: '/quick-check', icon: CheckCircle2, tint: '#3D7A4A', owner: false },
-  { key: 'backfill', label: 'iPad photos', detail: 'Matched no booking, or could not be read', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C', owner: true },
+  // [11 Oct] Daisy: "take out the backfill for now." The iPad photos still
+  // come in and match on their own; the unmatched pile is just not nagged.
   { key: 'short_pieces', label: 'Pieces missing from photos', detail: 'The till charged for more than were photographed', href: '/piece-check', icon: AlertTriangle, tint: '#E0A23C', owner: true },
   { key: 'unknown_items', label: 'Unknown till items', detail: 'Deleted from Square, waiting to be named', href: '/other-items', icon: HelpCircle, tint: '#A8651A', owner: true },
 ] as const;

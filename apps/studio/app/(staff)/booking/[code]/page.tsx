@@ -187,7 +187,7 @@ export default function BookingPage() {
                 <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>{i + 1}. {p.shape || p.piece_type || 'Piece'}</span>
                 {p.description && p.description !== p.shape && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#555' }}>{p.description}</span>}
                 <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>
-                  {p.price_cents ? money(p.price_cents) : ''}{p.shape && !p.shape_sure ? `${p.price_cents ? ' · ' : ''}guess` : ''}
+                  {p.price_cents ? money(p.price_cents) : ''}
                   {p.parts > 1 ? ` · ${p.parts} parts` : ''}{p.box_number ? ` · box ${p.box_number}` : ''}
                 </span>
                 <span style={{ display: 'block', fontSize: 'var(--text-xs)', fontWeight: 700, color: stageColour(p.stage) }}>{p.stage}</span>
