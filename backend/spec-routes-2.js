@@ -7899,7 +7899,7 @@ ${referenceImages.length
 
 If a number is written by hand ON A CARDBOARD BOX in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only.
 
-IGNORE ALL OTHER WRITING. The wooden shelf edges are chalked with collection dates like "19/9" or "26/9", and those are kiln batch labels for the whole shelf, not box numbers. Never report one as a box number. Ignore writing on cardboard sheets, paper, packaging and printed labels too. If there is no cardboard box with a marker number on it, return an empty string rather than offering a date.
+IGNORE ALL OTHER WRITING. Chalk on the wooden shelf edges -- usually dates like "19/9" or "26/9" -- is leftover from an old way of working. It is out of date, frequently wrong, and means nothing now. Never report it as a box number and never treat it as telling you anything about what is on the shelf. Ignore writing on cardboard sheets, paper, packaging and printed labels too. If there is no cardboard box with a marker number on it, return an empty string rather than offering a date.
 
 Writing on the POTTERY ITSELF is different and does still count -- a name or message painted onto a plate or mug is part of that piece and is worth using to identify it.
 
