@@ -354,6 +354,23 @@ async function callGeminiWithFallback(axios, apiKey, body, primaryModel = 'gemin
   }
 }
 
+// [12 Oct] WHERE THE REAL DATA STARTS.
+//
+// Daisy: "we're only going to be working on data since we had the
+// automation photographs in place." The iPad Shortcut began sending table
+// photos through on the morning of 9 October 2026 -- the earliest real
+// reference photo in the database is 07:05 that day, and the 126 piece
+// photos since then are all on or after it.
+//
+// Everything before is a different kind of data: bookings taken before
+// there was any way to photograph a table, plus a few September test
+// sweeps. Those old rows are not wrong and are not deleted; they are
+// simply not what the app is reasoning about, and letting them into a
+// screen produces nonsense like a shelf labelled "Box 2619" -- the date
+// 26/9 chalked on the shelf edge, read as a box number back when the
+// prompt still allowed that.
+export const AUTOMATION_START = '2026-10-09T00:00:00Z';
+
 // Spec pricing tiers (studios subscribe at GBP 29-79/month).
 const PLANS = [
   { id: 'starter', name: 'Starter', price_cents: 2900, blurb: 'Single studio, core booking and piece tracking' },
@@ -9769,6 +9786,15 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
         .from('shelf_sweeps')
         .select('id, photo_url, taken_by, candidates_checked, matches_found, succeeded, error_message, created_at, matched_details, box_number')
         .eq('studio_id', STUDIO_ID)
+        // [12 Oct] Daisy: "we're only going to be working on data since we
+        // had the automation photographs in place." Everything older is a
+        // handful of September test sweeps, and they were the whole of
+        // what she was looking at when she said the shelves were wrong --
+        // three of them labelled "Box 2619" and "Box 1919", which are the
+        // dates 26/9 and 19/9 chalked on the shelf edge, read as box
+        // numbers before that prompt was tightened. Nothing is deleted
+        // here; they are simply out of scope.
+        .gte('created_at', AUTOMATION_START)
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;

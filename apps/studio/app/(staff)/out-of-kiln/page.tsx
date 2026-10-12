@@ -101,7 +101,7 @@ export default function OutOfKilnPage() {
         <Tool onClick={() => setNumOpen((v) => !v)} active={numOpen || !!boxTyped.trim()} tone="dark">
           {boxTyped.trim() ? `Box ${boxTyped.trim()}` : 'Type the box number'}
         </Tool>
-        <Tool onClick={() => router.push('/shelves')} icon={<Boxes size={15} />}>Every box</Tool>
+        <Tool onClick={() => router.push('/shelves')} icon={<Boxes size={15} />}>Packing shots</Tool>
         <Tool onClick={() => router.push('/packing')} icon={<Layers size={15} />}>Packing</Tool>
       </Toolbar>
 

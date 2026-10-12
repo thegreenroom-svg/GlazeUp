@@ -144,7 +144,11 @@ export default function ShelvesPage() {
     // [11 Oct] Reached from Collect, from Packing and from Out of the kiln,
     // and it had no way back at all except the hamburger. Collect is its
     // home -- the menu files it under there too.
-    <PageShell title="Shelves" subtitle="Every shelf photographed, most recent first" back="/collect">
+    // [12 Oct] Called what it is. Daisy, looking at this screen: these are
+    // "packing shots" -- the photos taken while hunting for a booking's
+    // pieces, not a record of the kiln shelves. Naming it Shelves made it
+    // look like the kiln's own filing, which is a separate job.
+    <PageShell title="Packing shots" subtitle="Photos taken while finding pieces, most recent first" back="/packing">
       {sweeps === null && (
         <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-base)', color: 'var(--muted)' }}>
           <Loader size={16} className="animate-spin" /> Loading…

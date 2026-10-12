@@ -109,7 +109,7 @@ export default function CollectPage() {
         <Tool onClick={() => router.push('/returns')} icon={<RotateCcw size={15} />}>
           Returns{board.returns_waiting ? ` ${board.returns_waiting}` : ''}
         </Tool>
-        <Tool onClick={() => router.push('/shelves')} icon={<Layers size={15} />}>Shelves</Tool>
+        <Tool onClick={() => router.push('/shelves')} icon={<Layers size={15} />}>Packing shots</Tool>
         <Tool onClick={() => router.push('/out-of-kiln')}>Out of the kiln</Tool>
       </Toolbar>
 

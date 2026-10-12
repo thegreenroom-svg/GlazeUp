@@ -934,7 +934,7 @@ export default function PackingPage() {
 
         <Toolbar style={{ marginTop: '0.6rem' }}>
           <Tool onClick={() => router.push('/next-packing')} icon={<PackageCheck size={15} />}>Next packing</Tool>
-          <Tool onClick={() => router.push('/shelves')} icon={<Layers size={15} />}>Shelves</Tool>
+          <Tool onClick={() => router.push('/shelves')} icon={<Layers size={15} />}>Packing shots</Tool>
           <Tool onClick={() => router.push('/out-of-kiln')}>Out of the kiln</Tool>
           {foundSoFar.length > 0 && (
             <Tool onClick={() => { setFoundSoFar([]); setSweep(null); setSweepPhoto((old) => { if (old) URL.revokeObjectURL(old); return null; }); }}>
