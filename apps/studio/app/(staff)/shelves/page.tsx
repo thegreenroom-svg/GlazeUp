@@ -82,6 +82,9 @@ export default function ShelvesPage() {
   // stays blank until someone re-runs it, so hiding it with no way
   // back would strand it permanently.
   const [showBlanks, setShowBlanks] = useState(false);
+  // [12 Oct] Off by default: today's shots only, so this screen stays a
+  // short list rather than a pile to trawl through.
+  const [showOlder, setShowOlder] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
 
   // Pulled out of the effect so rejecting a match can refresh from the
@@ -119,8 +122,21 @@ export default function ShelvesPage() {
   // number cannot be told apart from each other at all, so they collapse to
   // the latest few with the rest behind a toggle: showing all of them
   // implies a distinctness that is not there.
-  const visibleSweeps = (sweeps || []).filter((sw) => showBlanks || (sw.matched_details || []).some((m) => m.box));
-  const blanks = (sweeps || []).filter((sw) => !(sw.matched_details || []).some((m) => m.box)).length;
+  // [12 Oct] Daisy: "just don't want loads of photos to trawl." A packing
+  // shot is working material -- it answers "where is this booking's
+  // pottery, right now" -- and it stops being interesting about as soon as
+  // the pottery is found. So the screen shows the last day's by default and
+  // keeps the rest one tap away. They are not deleted: a piece's "last seen
+  // on a shelf" points at the photo it was found in, and binning it on a
+  // clock would blank that while the pottery is still sitting on the shelf.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - DAY_MS;
+  const inWindow = (sw: Sweep) => new Date(sw.created_at).getTime() >= cutoff;
+  const older = (sweeps || []).filter((sw) => !inWindow(sw)).length;
+  const pool = showOlder ? (sweeps || []) : (sweeps || []).filter(inWindow);
+
+  const visibleSweeps = pool.filter((sw) => showBlanks || (sw.matched_details || []).some((m) => m.box));
+  const blanks = pool.filter((sw) => !(sw.matched_details || []).some((m) => m.box)).length;
   const unnumbered = visibleSweeps.filter((sw) => !(sw.box_number || '').trim()).length;
   const kept: Sweep[] = (() => {
     const seenBox = new Set<string>();
@@ -158,7 +174,7 @@ export default function ShelvesPage() {
       {sweeps?.length === 0 && (
         <EmptyState
           icon={<Layers size={24} />}
-          title="No shelf photos yet"
+          title="No packing shots yet"
           hint="Photograph a shelf from Packing and it'll appear here once pieces are recognised on it."
         />
       )}
@@ -170,7 +186,17 @@ export default function ShelvesPage() {
           wall starts straight after. Filled in means showing. */}
       {!!sweeps?.length && (
         <Toolbar>
-          <Count>{kept.length} {kept.length === 1 ? 'shelf' : 'shelves'}</Count>
+          {/* Suppressed at zero: the line underneath already says there is
+              nothing today, and "0 packing shots today" beside it is the
+              same sentence twice. */}
+          {kept.length > 0 && (
+            <Count>{kept.length} {kept.length === 1 ? 'packing shot' : 'packing shots'}{showOlder ? '' : ' today'}</Count>
+          )}
+          {older > 0 && (
+            <Tool onClick={() => setShowOlder((v) => !v)} active={showOlder} tone="dark">
+              {showOlder ? 'Just today' : `${older} from before today`}
+            </Tool>
+          )}
           {blanks > 0 && (
             <Tool onClick={() => setShowBlanks((v) => !v)} active={showBlanks} tone="clay">
               {blanks} found nothing
@@ -182,6 +208,14 @@ export default function ShelvesPage() {
             </Tool>
           )}
         </Toolbar>
+      )}
+
+      {/* Nothing photographed today, but there is a history: say so rather
+          than showing an empty grid under a chip. */}
+      {!!sweeps?.length && kept.length === 0 && !showOlder && older > 0 && (
+        <p style={{ color: 'var(--muted)', fontSize: 'var(--text-sm)', margin: '0 0 1rem' }}>
+          Nothing photographed today. The {older === 1 ? 'one' : older} from before {older === 1 ? 'is' : 'are'} a tap away.
+        </p>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', marginBottom: '1rem' }}>
