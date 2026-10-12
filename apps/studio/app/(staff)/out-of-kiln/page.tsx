@@ -36,6 +36,7 @@ export default function OutOfKilnPage() {
   const [error, setError] = useState<string | null>(null);
   const [found, setFound] = useState<FoundBooking[] | null>(null);
   const [boxRead, setBoxRead] = useState<string | null>(null);
+  const [shelfDate, setShelfDate] = useState<string | null>(null);
   const [boxTyped, setBoxTyped] = useState('');
   const [numOpen, setNumOpen] = useState(false);
   const [candidates, setCandidates] = useState(0);
@@ -45,6 +46,7 @@ export default function OutOfKilnPage() {
     setError(null);
     setFound(null);
     setBoxRead(null);
+    setShelfDate(null);
     try {
       const fd = new FormData();
       fd.append('photo', file);
@@ -57,6 +59,7 @@ export default function OutOfKilnPage() {
       if (!res.ok) throw new Error(d.error || 'Could not read the box');
       setFound(d.bookings || []);
       setBoxRead(d.box_number_read || null);
+      setShelfDate(d.shelf_date_read || null);
       setCandidates(d.candidates || 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not read the box');
@@ -134,6 +137,11 @@ export default function OutOfKilnPage() {
           </Section>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', margin: '0 0 0.6rem' }}>
             {totalFound} piece{totalFound === 1 ? '' : 's'} recognised of {candidates} waiting
+            {/* [12 Oct] The collection date chalked along the shelf lip. It
+                has its own line to land on now, which is what stops it
+                being read as a box number -- "26/9" became "box 2619"
+                three times in September. Shown, never acted on alone. */}
+            {shelfDate && ` · shelf chalked ${shelfDate}`}
             {!boxTyped.trim() && (boxRead ? ' · wrong number? Type it above and photograph again' : ' · type it above and photograph again to record it')}
           </p>
 

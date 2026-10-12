@@ -7899,7 +7899,11 @@ ${referenceImages.length
 
 If a number is written by hand ON A CARDBOARD BOX in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only.
 
-IGNORE ALL OTHER WRITING. Chalk on the wooden shelf edges -- usually dates like "19/9" or "26/9" -- is leftover from an old way of working. It is out of date, frequently wrong, and means nothing now. Never report it as a box number and never treat it as telling you anything about what is on the shelf. Ignore writing on cardboard sheets, paper, packaging and printed labels too. If there is no cardboard box with a marker number on it, return an empty string rather than offering a date.
+A DATE CHALKED ON THE FRONT OF A SHELF IS NOT A BOX NUMBER. The metal shelves have a front lip about 3cm deep, and a collection date is chalked along it -- "19/9", "26/9", "17/10" -- as a short line of text on a narrow horizontal strip. That date belongs to the whole shelf, not to any box or piece on it. Report it as shelf_date, in the form written. NEVER report it as box_number: "26/9" is the twenty-sixth of September, not box 2619.
+
+Chalk written on a cardboard box, as opposed to the shelf lip, is left over from an older way of working. It is out of date and means nothing; ignore it.
+
+IGNORE ALL OTHER WRITING -- cardboard sheets, paper, packaging, printed labels. If there is no cardboard box with a marker number on it, return an empty string for box_number rather than offering a date.
 
 Writing on the POTTERY ITSELF is different and does still count -- a name or message painted onto a plate or mug is part of that piece and is worth using to identify it.
 
@@ -7950,6 +7954,16 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
           box_number: {
             type: 'string',
             description: 'Number written in marker on a CARDBOARD BOX, digits only. Never a date chalked on a shelf edge. Empty string if there is no box number.',
+          },
+          // [12 Oct] Daisy: "collection dates are chalked onto metal
+          // shelves front approx 3cm thick". Giving the date somewhere of
+          // its own to go is what stops it being forced into box_number,
+          // which is how three September sweeps ended up labelled "Box
+          // 2619" -- the 26th of September. Read, never trusted silently:
+          // it is shown back the same way a box number is.
+          shelf_date: {
+            type: 'string',
+            description: 'Collection date chalked along the front lip of the shelf, as written, e.g. "26/9" or "17/10". Empty string if nothing is chalked there.',
           },
         },
         required: ['matches'],
@@ -8163,6 +8177,10 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         waiting_total: eligible.length,
         not_searched: notSearched,
         box_number_read: (parsed.box_number || '').toString().trim() || null,
+        // [12 Oct] The collection date chalked along the shelf lip, as read.
+        // Shown back for confirmation the same way a box number is, never
+        // acted on by itself -- chalk on a 3cm strip misreads easily.
+        shelf_date_read: (parsed.shelf_date || '').toString().trim() || null,
         placed_on_shelf: placed,
         bookings: Array.from(byBooking.entries())
           .map(([code, v]) => ({
