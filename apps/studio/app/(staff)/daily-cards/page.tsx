@@ -18,6 +18,12 @@ import { EmptyState } from '@/components/EmptyState';
 // stalls rather than failing outright, the flag never resets and the
 // button stays disabled forever, indistinguishable from the page being
 // broken. Guarantees every call here resolves or rejects within 20s.
+// [12 Oct] How long to wait on the first call of the session. The studio
+// server sleeps when nobody has used it for a while, and waking it takes
+// far longer than any warm request -- so the first call of the morning
+// gets a minute rather than the twenty seconds that is right once it is up.
+const COLD_MS = 60000;
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -305,6 +311,10 @@ export default function DailyCardsPage() {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  // [12 Oct] True while the first call of the session is waiting on a
+  // server that has slept overnight, so the wait can be explained rather
+  // than looking like the app has hung.
+  const [waking, setWaking] = useState(false);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
   // Daisy: "don't need qr it's not at all good."
   //
@@ -457,31 +467,69 @@ export default function DailyCardsPage() {
       // someone taps refresh -- not on every 60-second tick from every open
       // tab. The server runs its own sync every five minutes regardless, so
       // the tick only needs to re-read what is already here.
-      if (isFirstLoad) try {
-        const syncRes = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        // Real, visible error instead of a silent console.warn --
-        // exactly the class of thing that hid the real cause here:
-        // this page's own sync could have been failing with a genuine
-        // Square error (permission scope, expired token, etc.) with
-        // zero visible sign anything was wrong.
-        if (!syncRes.ok) {
-          const body = await syncRes.json().catch(() => ({}));
-          setSyncError(`Booking sync failed: ${body.error || `HTTP ${syncRes.status}`}`);
-        } else {
-          setSyncError(null);
-        }
-      } catch (e: any) {
-        setSyncError(e?.name === 'AbortError' ? 'Booking sync timed out.' : `Could not reach the sync: ${e?.message || e}`);
+      // [12 Oct] The sync no longer runs BEFORE the cards.
+      //
+      // Daisy, first thing on a Monday: "Booking sync timed out" in red,
+      // with the day still saying Loading underneath it. The server sleeps
+      // overnight, and this sync is not a quick call even when it is awake
+      // -- it pages a month of bookings out of Square and writes them back.
+      // Waiting on it meant the first person in saw an alarm instead of
+      // their day, for something that was only ever a freshness top-up:
+      // the day's cards come from our own database, which already has
+      // last night's bookings in it, and the server syncs itself every
+      // five minutes regardless.
+      //
+      // So the cards load first and the sync runs behind them. When it
+      // finishes and has actually changed something, the day quietly
+      // re-reads. Nothing is shown for a sync that is merely slow.
+      if (isFirstLoad) {
+        void (async () => {
+          try {
+            const syncRes = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            }, COLD_MS);
+            // A real error still shows. This is the class of thing that hid
+            // the original cause: the sync failing with a genuine Square
+            // error (permission scope, expired token, a window Square
+            // rejects) with zero visible sign anything was wrong.
+            if (!syncRes.ok) {
+              const body = await syncRes.json().catch(() => ({}));
+              setSyncError(`Booking sync failed: ${body.error || `HTTP ${syncRes.status}`}`);
+              return;
+            }
+            setSyncError(null);
+            const out = await syncRes.json().catch(() => ({} as any));
+            if (out && typeof out.synced === 'number' && out.synced > 0) load(false);
+          } catch {
+            // A timeout here is a slow server, not a fault worth a red
+            // banner: the cards on screen are already the right day.
+            setSyncError(null);
+          }
+        })();
       }
-      
+
       // Fetch bookings for the selected date
       const dateStr = cardDateRef.current;
       // [11 Oct] The day being shown plus two weeks before it (for the
       // morning check), rather than "the newest 250 whatever the day".
-      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings?date=${encodeURIComponent(dateStr)}&days=14`);
+      // [12 Oct] First load of the morning waits longer and tries twice:
+      // the very first request has to wake the server, which takes far
+      // more than the twenty seconds a warm call needs.
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings?date=${encodeURIComponent(dateStr)}&days=14`;
+      let res: Response;
+      if (isFirstLoad) {
+        setWaking(true);
+        try {
+          try {
+            res = await fetchWithTimeout(url, {}, COLD_MS);
+          } catch {
+            res = await fetchWithTimeout(url, {}, COLD_MS);
+          }
+        } finally { setWaking(false); }
+      } else {
+        res = await fetchWithTimeout(url);
+      }
       // A failed fetch keeps the cards already on screen rather than
       // emptying them (and then calling everything "new" next minute).
       if (!res.ok) throw new Error(`bookings HTTP ${res.status}`);
@@ -1084,7 +1132,15 @@ export default function DailyCardsPage() {
           </div>
         )}
 
-        {loading && <p style={{ color: '#666' }}>Loading...</p>}
+        {/* [12 Oct] "Loading..." with a red alarm under it is what greeted
+            Daisy at ten past seven. The first open of the day waits on a
+            server that has slept all night, so it says so. */}
+        {loading && (
+          <p style={{ color: waking ? '#8a5a00' : '#666', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <RefreshCw size={14} className="animate-spin" />
+            {waking ? 'Waking the studio server, this takes a few seconds first thing' : 'Loading…'}
+          </p>
+        )}
         {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
         {syncError && <div style={{ padding: '1rem', backgroundColor: '#5a2a2a', color: '#ffcccc', borderRadius: '4px', marginBottom: '1rem' }}>{syncError}</div>}
 
