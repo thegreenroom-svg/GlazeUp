@@ -10,8 +10,9 @@ import { Count, Section, Tally, Tool, Toolbar } from '@/components/Toolbar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { PhotoWithBoxes, PieceThumb, PieceBox, PIECE_COLOURS } from '@/components/PieceBoxes';
+import { PieceViewer, ViewerPiece } from '@/components/PieceViewer';
 import { postOrQueue } from '@/lib/outbox';
-import { Check, ChevronDown, ChevronRight, Flame, Package, Printer } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Flame, Package, Printer, ZoomIn } from 'lucide-react';
 
 // [14 Oct] PACKING, ON ONE PAGE, WITH NOTHING TO SEARCH FOR.
 //
@@ -108,6 +109,12 @@ export default function PackingPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<null | { title: string; body?: string; confirmLabel: string; destructive?: boolean; run: () => void }>(null);
+  // [14 Oct] David: "want to be able to selects and expand all images zoom
+  // etc." Every picture on this screen is small by necessity and is the one
+  // thing being judged: is this the piece. The full-screen viewer already
+  // existed for the cards and the booking page, with the close-up, the zoom
+  // and the whole photo underneath, so packing uses the same one.
+  const [viewer, setViewer] = useState<null | { pieces: ViewerPiece[]; start: number; title: string }>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -142,6 +149,23 @@ export default function PackingPage() {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+
+  // Which photo was tapped decides what you swipe through: tap the table
+  // shot and you move between pieces on the table, tap a fired crop and you
+  // move between the pieces as they came out. Mixing the two in one strip
+  // would make "2 of 4" mean nothing.
+  const viewerList = (b: BookingRow, which: 'table' | 'kiln'): ViewerPiece[] =>
+    b.pieces.map((p) => {
+      const kiln = which === 'kiln' && p.out && p.kiln_photo_url;
+      return {
+        photo: kiln ? p.kiln_photo_url : p.table_photo_url,
+        box: kiln ? p.kiln_box : p.table_box,
+        piece_type: p.piece_type,
+        description: p.description,
+        note: [p.notes, p.assigned_to ? `For ${p.assigned_to}` : null, !p.out ? 'Still in the kiln' : null]
+          .filter(Boolean).join(' · ') || null,
+      };
+    });
 
   const markPacked = async (b: BookingRow, ids: string[]) => {
     setSaving(true);
@@ -256,7 +280,14 @@ export default function PackingPage() {
                   <PhotoWithBoxes
                     src={photo}
                     pieces={b.pieces.map((p) => ({ piece_type: p.piece_type, description: p.description, box: p.table_box }))}
+                    onPick={(i) => setViewer({ pieces: viewerList(b, 'table'), start: i, title: `${b.customer_name} · on the table` })}
                   />
+                  <button
+                    onClick={() => setViewer({ pieces: viewerList(b, 'table'), start: 0, title: `${b.customer_name} · on the table` })}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.3rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    <ZoomIn size={13} /> Open it full screen
+                  </button>
                 </div>
               )}
 
@@ -291,12 +322,22 @@ export default function PackingPage() {
                       {/* The same number and colour as its box on the photo,
                           which is the only thing tying the two together. */}
                       <span style={{ position: 'relative', flexShrink: 0 }}>
-                        <PieceThumb
-                          url={p.out ? p.kiln_photo_url : p.table_photo_url}
-                          box={p.out ? p.kiln_box : p.table_box}
-                          size={60}
-                          ring={PIECE_COLOURS[i % 6]}
-                        />
+                        {/* Opens the picture rather than ticking the row --
+                            the two things you do with a thumbnail are tick it
+                            off and look harder at it, and only one of them
+                            needs the whole row as its target. */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setViewer({ pieces: viewerList(b, p.out ? 'kiln' : 'table'), start: i, title: `${b.customer_name} · ${p.out ? 'out of the kiln' : 'on the table'}` }); }}
+                          aria-label={`Open the photo of ${p.piece_type || 'this piece'}`}
+                          style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in', display: 'block' }}
+                        >
+                          <PieceThumb
+                            url={p.out ? p.kiln_photo_url : p.table_photo_url}
+                            box={p.out ? p.kiln_box : p.table_box}
+                            size={60}
+                            ring={PIECE_COLOURS[i % 6]}
+                          />
+                        </button>
                         <span style={{ position: 'absolute', top: -7, left: -7, width: 20, height: 20, borderRadius: '50%', background: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
                           {i + 1}
                         </span>
@@ -453,6 +494,15 @@ export default function PackingPage() {
       )}
 
       <div style={{ paddingBottom: '4.5rem' }} />
+
+      {viewer && (
+        <PieceViewer
+          pieces={viewer.pieces}
+          start={viewer.start}
+          title={viewer.title}
+          onClose={() => setViewer(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={!!pendingConfirm}

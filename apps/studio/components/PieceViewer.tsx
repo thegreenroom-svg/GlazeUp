@@ -132,7 +132,11 @@ export function PieceViewer({
       }}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
-        backgroundColor: 'rgba(20,16,12,0.96)', color: '#f6f1ea',
+        // [14 Oct] Opaque. At 96% the page ghosted through it -- the header,
+        // the home button, the booking details -- which on a screen whose
+        // entire job is looking closely at one photograph is exactly the
+        // wrong thing to have in the corner of your eye.
+        backgroundColor: '#15110d', color: '#f6f1ea',
         overflowY: 'auto', textAlign: 'center',
         padding: 'calc(env(safe-area-inset-top, 0px) + 0.8rem) 1rem calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
       }}
@@ -174,7 +178,7 @@ export function PieceViewer({
 
       {p.photo && (
         <div style={{ marginTop: '1.2rem', maxWidth: 560, marginInline: 'auto', borderRadius: 8, overflow: 'hidden' }}>
-          <p style={{ fontSize: 'var(--text-xs)', opacity: 0.6, marginBottom: '0.4rem', textAlign: 'left' }}>The table it came from. Tap another piece to switch.</p>
+          <p style={{ fontSize: 'var(--text-xs)', opacity: 0.6, marginBottom: '0.4rem', textAlign: 'left' }}>The photo it came from. Tap another piece to switch.</p>
           <PhotoWithBoxes
             src={p.photo}
             pieces={samePhoto.map(({ q, k }) => ({ index: k + 1, piece_type: q.piece_type, box: q.box }))}

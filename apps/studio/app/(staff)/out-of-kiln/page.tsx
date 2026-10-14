@@ -9,6 +9,7 @@ import { Collapse, Count, Section, Tool, Toolbar } from '@/components/Toolbar';
 import { Row, RowAction, Chip } from '@/components/Row';
 import { ArrowRight, Camera, Loader, Boxes, HelpCircle, Layers, Check, HelpingHand, Search, X } from 'lucide-react';
 import { BeforeAfter, PieceThumb, PieceBox } from '@/components/PieceBoxes';
+import { PieceViewer, ViewerPiece } from '@/components/PieceViewer';
 
 // Daisy's kiln-unloading step, in her words: pieces come out into
 // numbered boxes, "not too tightly, leaving some separation, obviously
@@ -142,6 +143,12 @@ export default function OutOfKilnPage() {
   const [boxTyped, setBoxTyped] = useState('');
   const [numOpen, setNumOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  // [14 Oct] David: "want to be able to selects and expand all images zoom
+  // etc." Here it matters most on the pairs: deciding whether the chalky
+  // thing on the table and the glossy thing in the box are the same piece is
+  // exactly the judgement a 56px square cannot support. Tapping one opens
+  // both full screen, before then after, with the zoom.
+  const [viewer, setViewer] = useState<null | { pieces: ViewerPiece[]; start: number; title: string }>(null);
 
   const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -355,7 +362,13 @@ export default function OutOfKilnPage() {
   // One unknown item, as a crop of the photo it was seen in.
   const UnplacedRow = ({ u, inTray }: { u: Unplaced; inTray: boolean }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.4rem 0', borderTop: '1px solid #f1e9dd' }}>
-      <PieceThumb url={u.shot_url} box={u.box} size={52} ring="#A6761D" />
+      <button
+        onClick={() => setViewer({ title: u.description, start: 0, pieces: [{ photo: u.shot_url, box: u.box, piece_type: u.description, description: (u.reason && REASON[u.reason]) || null, note: `${shelfName(u.shelf_no)}` }] })}
+        aria-label="Open this photo"
+        style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in', display: 'block', flexShrink: 0 }}
+      >
+        <PieceThumb url={u.shot_url} box={u.box} size={52} ring="#A6761D" />
+      </button>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600 }}>{u.description}</span>
         <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>
@@ -583,7 +596,20 @@ export default function OutOfKilnPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0 0 0 0.3rem' }}>
                   {b.pieces.map((p) => (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minHeight: 44 }}>
-                      <BeforeAfter before={p.reference_photo_url} beforeBox={p.photo_box} after={p.shot_url} afterBox={p.box} />
+                      <button
+                        onClick={() => setViewer({
+                          title: `${b.customer_name} · ${p.piece_type || 'piece'}`,
+                          start: 0,
+                          pieces: [
+                            { photo: p.reference_photo_url || null, box: p.photo_box || null, piece_type: p.piece_type, description: p.description, note: 'On the table, before firing' },
+                            { photo: p.shot_url || null, box: p.box || null, piece_type: p.piece_type, description: p.description, note: 'Out of the kiln' },
+                          ],
+                        })}
+                        aria-label={`Open the photos of ${p.piece_type || 'this piece'}`}
+                        style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in', display: 'block', flexShrink: 0 }}
+                      >
+                        <BeforeAfter before={p.reference_photo_url} beforeBox={p.photo_box} after={p.shot_url} afterBox={p.box} />
+                      </button>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-xs)', color: '#6b625a' }}>
                         <b style={{ color: 'var(--charcoal)', textTransform: 'capitalize' }}>{p.piece_type || 'Piece'}</b>
                         {p.description ? ` · ${p.description}` : ''}
@@ -615,7 +641,13 @@ export default function OutOfKilnPage() {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                         {b.missing.map((m) => (
                           <span key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <PieceThumb url={m.reference_photo_url} box={m.photo_box} size={44} ring="#E0B872" />
+                            <button
+                              onClick={() => setViewer({ title: `${b.customer_name} · not out yet`, start: 0, pieces: [{ photo: m.reference_photo_url || null, box: m.photo_box || null, piece_type: m.piece_type, description: m.description, note: 'Not photographed out of the kiln yet' }] })}
+                              aria-label="Open this photo"
+                              style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in', display: 'block', flexShrink: 0 }}
+                            >
+                              <PieceThumb url={m.reference_photo_url} box={m.photo_box} size={44} ring="#E0B872" />
+                            </button>
                             <span style={{ fontSize: 'var(--text-xs)', color: '#8a6a2a', maxWidth: 110 }}>
                               {m.description || m.piece_type || 'piece'}
                             </span>
@@ -662,6 +694,10 @@ export default function OutOfKilnPage() {
         <Tool onClick={() => router.push('/packing')} icon={<Layers size={15} />}>Packing</Tool>
         <Tool onClick={() => router.push('/kiln')}>Kiln</Tool>
       </Toolbar>
+
+      {viewer && (
+        <PieceViewer pieces={viewer.pieces} start={viewer.start} title={viewer.title} onClose={() => setViewer(null)} />
+      )}
 
       <Collapse summary="How to empty a kiln and photograph it" icon={<HelpCircle size={16} color="#8a8178" />}>
         <p style={{ fontSize: 'var(--text-xs)', fontWeight: 800, color: '#8a8178', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0.2rem 0 0.4rem' }}>
