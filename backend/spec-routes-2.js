@@ -10248,11 +10248,28 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
       if (bErr) throw bErr;
       const byCode = new Map((bookingRows || []).map((b) => [b.booking_code, b]));
 
+      // [14 Oct, evening] WHAT COUNTS AS OUT OF THE KILN.
+      //
+      // It was last_seen_at, which is set by ANY sweep -- including every
+      // shelf-hunting photo taken back when packing was a search. So the
+      // board was showing a crop from some unrelated shelf photo under the
+      // heading "Out of the kiln", and David was looking at a round white
+      // pot where a rectangular planter should be. 78 of 135 live pieces
+      // carry one of those old sightings and not one of them came from a
+      // kiln being emptied.
+      //
+      // A piece is out of the kiln when it was photographed coming out of
+      // one, which means it is ON a shelf: shelf_id is written only by a
+      // sweep that carried a shelf, and only the unload screen sends one.
+      // Anything else is a sighting, not a stocktake, and has no business
+      // moving a booking into Ready to pack.
+      const outIds = new Set(live.filter((p) => p.shelf_id).map((p) => p.id));
+
       // The kiln-out photo each piece was found in. One lookup for the whole
       // board rather than one per booking on drill-down -- these are URLs
       // and crop boxes, not images, so the payload stays small and the
       // browser only fetches the pictures for whichever booking is opened.
-      const sweepIds = Array.from(new Set(live.map((p) => p.last_seen_sweep_id).filter(Boolean)));
+      const sweepIds = Array.from(new Set(live.filter((p) => outIds.has(p.id)).map((p) => p.last_seen_sweep_id).filter(Boolean)));
       const sweepById = new Map();
       if (sweepIds.length) {
         const { data: sws } = await supabase
@@ -10277,7 +10294,7 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
         const ps = live.filter((p) => p.booking_id === code);
         const b = byCode.get(code);
         const shelf = ps.map((p) => p.shelf_id).find(Boolean);
-        const out = ps.filter((p) => !!p.last_seen_at).length;
+        const out = ps.filter((p) => outIds.has(p.id)).length;
         return {
           booking_code: code,
           customer_name: b?.customer_name || code,
@@ -10307,7 +10324,8 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
           photo_taken_by: ps.map((p) => p.photo_taken_by).find(Boolean) || null,
           table_photo_taken_at: ps.map((p) => p.reference_photo_taken_at).find(Boolean) || null,
           pieces: ps.map((p) => {
-            const sw = p.last_seen_sweep_id ? sweepById.get(p.last_seen_sweep_id) : null;
+            const isOut = outIds.has(p.id);
+            const sw = isOut && p.last_seen_sweep_id ? sweepById.get(p.last_seen_sweep_id) : null;
             return {
               id: p.id,
               piece_type: p.piece_type,
@@ -10316,13 +10334,14 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
               notes: p.notes,
               posting: p.fulfilment === 'post',
               packed: p.status === 'collected',
-              out: !!p.last_seen_at,
-              out_at: p.last_seen_at || null,
-              box_number: p.last_seen_box_number || null,
+              out: isOut,
+              out_at: isOut ? p.last_seen_at || null : null,
+              box_number: isOut ? p.last_seen_box_number || null : null,
               table_photo_url: p.reference_photo_url || null,
               table_box: p.photo_box || null,
+              // Never a crop from a photo that was not a kiln being emptied.
               kiln_photo_url: sw?.photo_url || null,
-              kiln_box: p.last_seen_box || null,
+              kiln_box: isOut ? p.last_seen_box || null : null,
             };
           }),
         };

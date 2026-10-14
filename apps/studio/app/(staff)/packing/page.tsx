@@ -477,7 +477,7 @@ export default function PackingPage() {
           icon={<Package size={24} />}
           title="Nothing complete yet"
           hint={board.waiting.length
-            ? 'Bookings appear here the moment every one of their pieces has been photographed coming out of the kiln.'
+            ? 'A booking lands here the moment every one of its pieces has been photographed coming out of a kiln. Unload one and they will arrive on their own.'
             : 'Nothing is waiting to be packed.'}
         />
       ) : (
