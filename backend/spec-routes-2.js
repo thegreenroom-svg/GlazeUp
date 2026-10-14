@@ -10250,26 +10250,25 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
 
       // [14 Oct, evening] WHAT COUNTS AS OUT OF THE KILN.
       //
-      // It was last_seen_at, which is set by ANY sweep -- including every
-      // shelf-hunting photo taken back when packing was a search. So the
-      // board was showing a crop from some unrelated shelf photo under the
-      // heading "Out of the kiln", and David was looking at a round white
-      // pot where a rectangular planter should be. 78 of 135 live pieces
-      // carry one of those old sightings and not one of them came from a
-      // kiln being emptied.
+      // First answer: a piece on a shelf, since shelf_id is written only by
+      // a sweep that carried one and only the unload screen sends one. That
+      // was wrong, and David said why: "all pics today were out of the
+      // kiln". Today's photographs ARE the kiln coming out; they went
+      // through the old sweep, which never set a shelf, so requiring one
+      // threw away the real thing to avoid the stale thing.
       //
-      // A piece is out of the kiln when it was photographed coming out of
-      // one, which means it is ON a shelf: shelf_id is written only by a
-      // sweep that carried a shelf, and only the unload screen sends one.
-      // Anything else is a sighting, not a stocktake, and has no business
-      // moving a booking into Ready to pack.
-      const outIds = new Set(live.filter((p) => p.shelf_id).map((p) => p.id));
+      // So any sighting counts, and the stale ones are handled where they
+      // can actually be judged: every pair carries the day it was seen and a
+      // way to say no to it. The app will keep being wrong occasionally --
+      // it is reading photographs of near-identical pottery -- and the
+      // person holding the piece is the only one who can settle it.
+      const outIds = new Set(live.filter((p) => p.last_seen_at).map((p) => p.id));
 
       // The kiln-out photo each piece was found in. One lookup for the whole
       // board rather than one per booking on drill-down -- these are URLs
       // and crop boxes, not images, so the payload stays small and the
       // browser only fetches the pictures for whichever booking is opened.
-      const sweepIds = Array.from(new Set(live.filter((p) => outIds.has(p.id)).map((p) => p.last_seen_sweep_id).filter(Boolean)));
+      const sweepIds = Array.from(new Set(live.map((p) => p.last_seen_sweep_id).filter(Boolean)));
       const sweepById = new Map();
       if (sweepIds.length) {
         const { data: sws } = await supabase
@@ -10336,6 +10335,10 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
               packed: p.status === 'collected',
               out: isOut,
               out_at: isOut ? p.last_seen_at || null : null,
+              // So the screen can say no to this match. Without it a wrong
+              // pairing can only be looked at, not corrected, which is the
+              // worst of both: a confident answer nobody can overrule.
+              sweep_id: isOut ? p.last_seen_sweep_id || null : null,
               box_number: isOut ? p.last_seen_box_number || null : null,
               table_photo_url: p.reference_photo_url || null,
               table_box: p.photo_box || null,

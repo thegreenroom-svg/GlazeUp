@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { PhotoWithBoxes, PieceThumb, PieceBox, PIECE_COLOURS } from '@/components/PieceBoxes';
 import { PieceViewer, ViewerPiece } from '@/components/PieceViewer';
 import { postOrQueue } from '@/lib/outbox';
-import { Check, ChevronDown, ChevronRight, Flame, Package, Printer, ZoomIn } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Flame, Package, Printer, X, ZoomIn } from 'lucide-react';
 
 // [14 Oct] PACKING, ON ONE PAGE, WITH NOTHING TO SEARCH FOR.
 //
@@ -59,6 +59,7 @@ interface Piece {
   packed: boolean;
   out: boolean;
   out_at: string | null;
+  sweep_id: string | null;
   box_number: string | number | null;
   table_photo_url: string | null;
   table_box: PieceBox | null;
@@ -115,6 +116,8 @@ export default function PackingPage() {
   // existed for the cards and the booking page, with the close-up, the zoom
   // and the whole photo underneath, so packing uses the same one.
   const [viewer, setViewer] = useState<null | { pieces: ViewerPiece[]; start: number; title: string }>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [confirmReject, setConfirmReject] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -197,6 +200,26 @@ export default function PackingPage() {
         });
       }
     } finally { setSaving(false); }
+  };
+
+  // [14 Oct, evening] David: "wrong images". Sometimes they will be. The
+  // app is reading photographs of near-identical pottery, and the person
+  // holding the piece is the only one who can settle it -- so the pair can
+  // be rejected from the screen where you can see it is wrong, exactly as
+  // it can on the unload screen. The piece drops back to waiting and
+  // somebody goes and finds the real one.
+  const rejectMatch = async (p: Piece) => {
+    if (!p.sweep_id) return;
+    setRejecting(p.id);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps/${p.sweep_id}/reject/${p.id}`, { method: 'POST' });
+      await load();
+    } catch {
+      setError('Could not reject that match. Try again.');
+    } finally {
+      setRejecting(null);
+      setConfirmReject(null);
+    }
   };
 
   const markBroken = async (b: BookingRow, p: Piece) => {
@@ -350,9 +373,32 @@ export default function PackingPage() {
                         {p.assigned_to && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--clay)', fontWeight: 600 }}>For {p.assigned_to}</span>}
                         {p.notes && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#A6761D' }}>{p.notes}</span>}
                         {!p.out && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#A6761D', fontWeight: 600 }}>Still in the kiln</span>}
-                        {p.out && p.box_number != null && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>Box {p.box_number}</span>}
+                        {p.out && (
+                          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>
+                            {p.box_number != null ? `Box ${p.box_number} · ` : ''}
+                            seen {p.out_at ? new Date(p.out_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'at some point'}
+                          </span>
+                        )}
                       </span>
                       {p.packed && <Check size={17} style={{ color: '#2E7D32', flexShrink: 0 }} />}
+                      {p.out && !p.packed && p.sweep_id && (
+                        confirmReject === p.id ? (
+                          <span style={{ display: 'inline-flex', gap: '0.25rem', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                            <Tool onClick={() => rejectMatch(p)} tone="late" small disabled={rejecting === p.id}>
+                              {rejecting === p.id ? 'Removing' : 'Not this'}
+                            </Tool>
+                            <Tool onClick={() => setConfirmReject(null)} small>Keep</Tool>
+                          </span>
+                        ) : (
+                          // In its own span because Tool does not hand back
+                          // the event, and without stopping it here saying
+                          // "this is wrong" would also tick the piece as
+                          // packed on the way past.
+                          <span style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                            <Tool onClick={() => setConfirmReject(p.id)} small label="Wrong match" icon={<X size={13} />} />
+                          </span>
+                        )
+                      )}
                       {/* The only way a piece leaves this list without ever
                           being photographed out of the kiln. Without it a
                           broken piece holds its booking in "waiting" for
