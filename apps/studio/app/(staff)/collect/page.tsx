@@ -13,7 +13,7 @@ import { PageShell } from '@/components/PageShell';
 import { PieceBox } from '@/components/PieceBoxes';
 import { Row as ListRow, RowAction, Chip } from '@/components/Row';
 import { Section, Tally, Tool, Toolbar } from '@/components/Toolbar';
-import { AlertTriangle, Check, Layers, Package, Phone, RotateCcw, Truck } from 'lucide-react';
+import { AlertTriangle, Check, Package, Phone, RotateCcw, Truck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -109,7 +109,6 @@ export default function CollectPage() {
         <Tool onClick={() => router.push('/returns')} icon={<RotateCcw size={15} />}>
           Returns{board.returns_waiting ? ` ${board.returns_waiting}` : ''}
         </Tool>
-        <Tool onClick={() => router.push('/shelves')} icon={<Layers size={15} />}>Packing shots</Tool>
         <Tool onClick={() => router.push('/out-of-kiln')}>Out of the kiln</Tool>
       </Toolbar>
 

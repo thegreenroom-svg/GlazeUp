@@ -10028,6 +10028,155 @@ export function registerNextPackingRoute(app, supabase, STUDIO_ID, logger) {
 }
 
 // ============================================================================
+// THE PACKING BOARD -- every booking the kiln photos have answered
+// ----------------------------------------------------------------------------
+// [14 Oct] David: "what I need really is one page for packing... which shows
+// the out of the kiln picture for identification and the original table photo
+// for identification. I'm not going to use the photo recognition for the
+// table to find the pieces for this stage, so we can cut that bit out."
+//
+// So the question this answers is no longer "where is this booking's
+// pottery?" -- which is what the shelf sweep on the packing screen was for,
+// and what made packing a search. Every piece is now photographed as its
+// shelf comes out of the kiln, which means the answer already exists before
+// anyone goes looking: a booking is either fully accounted for or it is not.
+//
+// Two lists, in the order Jenny works:
+//   ready   -- every outstanding piece has been seen in a kiln-out photo.
+//              These can be packed now, soonest collection date first.
+//   waiting -- some pieces are out, some are not. Openable, because the
+//              useful thing there is WHICH piece is still in the kiln.
+//
+// Both crops travel with every piece: the table shot it was painted on and
+// the kiln shot it came out in. One is what the customer painted, the other
+// is what is in your hand, and holding them side by side is the whole check.
+//
+// Deliberately NOT here: anything that reads a photograph. Nothing on this
+// route calls the AI. Pricing is settled on the till and identification is
+// settled by the kiln photo, so the packing step costs nothing to run.
+// ============================================================================
+
+export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/packing/board', async (req, res) => {
+    try {
+      const { data: pieces, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, status, assigned_to, fulfilment, notes, postal_postcode, reference_photo_url, photo_box, photo_taken_by, reference_photo_taken_at, last_seen_at, last_seen_box, last_seen_box_number, last_seen_sweep_id, shelf_id, created_at')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .neq('status', 'collected')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+
+      // Same two exclusions as the old queue: a piece held back for a
+      // return visit is not part of this parcel, and a broken one is never
+      // coming, so neither should stop a booking ever reading as complete.
+      const live = (pieces || []).filter((p) => p.fulfilment !== 'return_visit' && p.status !== 'damaged');
+      const held = {};
+      for (const p of pieces || []) {
+        if (p.fulfilment === 'return_visit') held[p.booking_id] = (held[p.booking_id] || 0) + 1;
+      }
+      if (!live.length) return res.json({ today: new Date().toISOString().slice(0, 10), ready: [], waiting: [] });
+
+      const codes = Array.from(new Set(live.map((p) => p.booking_id)));
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, phone, session_start, collection_date')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', codes);
+      const byCode = new Map((bookingRows || []).map((b) => [b.booking_code, b]));
+
+      // The kiln-out photo each piece was found in. One lookup for the whole
+      // board rather than one per booking on drill-down -- these are URLs
+      // and crop boxes, not images, so the payload stays small and the
+      // browser only fetches the pictures for whichever booking is opened.
+      const sweepIds = Array.from(new Set(live.map((p) => p.last_seen_sweep_id).filter(Boolean)));
+      const sweepById = new Map();
+      if (sweepIds.length) {
+        const { data: sws } = await supabase
+          .from('shelf_sweeps')
+          .select('id, photo_url, created_at')
+          .in('id', sweepIds);
+        (sws || []).forEach((s) => sweepById.set(s.id, s));
+      }
+
+      const shelfIds = Array.from(new Set(live.map((p) => p.shelf_id).filter(Boolean)));
+      const shelfById = new Map();
+      if (shelfIds.length) {
+        const { data: shelves } = await supabase
+          .from('kiln_shelves')
+          .select('id, label, out_of_kiln_at')
+          .eq('studio_id', STUDIO_ID)
+          .in('id', shelfIds);
+        (shelves || []).forEach((sh) => shelfById.set(sh.id, sh));
+      }
+
+      const rows = codes.map((code) => {
+        const ps = live.filter((p) => p.booking_id === code);
+        const b = byCode.get(code);
+        const shelf = ps.map((p) => p.shelf_id).find(Boolean);
+        const out = ps.filter((p) => !!p.last_seen_at).length;
+        return {
+          booking_code: code,
+          customer_name: b?.customer_name || code,
+          phone: b?.phone || null,
+          collection_date: b?.collection_date || null,
+          session_start: b?.session_start || null,
+          total: ps.length,
+          out,
+          packed: ps.filter((p) => p.status === 'collected').length,
+          on_hold: held[code] || 0,
+          posting: ps.filter((p) => p.fulfilment === 'post').length,
+          postal_postcode: ps.map((p) => p.postal_postcode).find(Boolean) || null,
+          shelf_label: shelf ? (shelfById.get(shelf)?.label || null) : null,
+          // The photographer and the time, carried from the table shot --
+          // the one piece of accountability on this screen, and the thing
+          // that gets a bad table photo noticed before packing day.
+          photo_taken_by: ps.map((p) => p.photo_taken_by).find(Boolean) || null,
+          table_photo_taken_at: ps.map((p) => p.reference_photo_taken_at).find(Boolean) || null,
+          pieces: ps.map((p) => {
+            const sw = p.last_seen_sweep_id ? sweepById.get(p.last_seen_sweep_id) : null;
+            return {
+              id: p.id,
+              piece_type: p.piece_type,
+              description: p.description,
+              assigned_to: p.assigned_to,
+              notes: p.notes,
+              posting: p.fulfilment === 'post',
+              packed: p.status === 'collected',
+              out: !!p.last_seen_at,
+              out_at: p.last_seen_at || null,
+              box_number: p.last_seen_box_number || null,
+              table_photo_url: p.reference_photo_url || null,
+              table_box: p.photo_box || null,
+              kiln_photo_url: sw?.photo_url || null,
+              kiln_box: p.last_seen_box || null,
+            };
+          }),
+        };
+      })
+        // Due first, longest-waiting within a date, undated last. An unknown
+        // date is not an urgent one.
+        .sort((a, b) => {
+          const da = a.collection_date || '9999-12-31';
+          const db = b.collection_date || '9999-12-31';
+          if (da !== db) return da < db ? -1 : 1;
+          return String(a.session_start || '').localeCompare(String(b.session_start || ''));
+        });
+
+      res.json({
+        today: new Date().toISOString().slice(0, 10),
+        ready: rows.filter((r) => r.out === r.total),
+        waiting: rows.filter((r) => r.out < r.total),
+      });
+    } catch (err) {
+      logger.error('packing board failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
 // BACKFILL FROM THE IPAD LIBRARY
 // Its own register function because it needs axios, sharp and the file
 // system, none of which the kiln-shelf routes are handed.

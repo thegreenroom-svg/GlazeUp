@@ -37,9 +37,9 @@ const STEPS: { key: string; label: string; detail: string; href: string; icon: t
   { key: 'cards', label: 'Today', detail: 'The cards. Photograph each table; done ones open their booking', href: '/daily-cards', icon: Printer, tint: '#8C6A4A',
     also: [{ label: 'Photograph a table', href: '/floor' }, { label: 'Table total', href: '/table-total' }] },
   { key: 'firing', label: 'Kiln', detail: 'A shelf for each date: dip, fire, out', href: '/kiln', icon: Flame, tint: '#B8562E',
-    also: [{ label: 'Kiln plan', href: '/kiln-plan' }, { label: 'Shelf labels', href: '/shelf-stickers' }, { label: 'Out of the kiln', href: '/out-of-kiln' }] },
+    also: [{ label: 'Kiln plan', href: '/kiln-plan' }, { label: 'Shelf labels', href: '/shelf-stickers' }, { label: 'Out of the kiln', href: '/out-of-kiln' }, { label: 'Kiln photos', href: '/shelves' }] },
   { key: 'packing', label: 'Collect', detail: 'Hand over, pack, and what is overdue', href: '/collect', icon: Package, tint: '#9C5A3C',
-    also: [{ label: 'Packing shots', href: '/shelves' }, { label: 'Returns shelf', href: '/returns' }] },
+    also: [{ label: 'Packing', href: '/packing' }, { label: 'Returns shelf', href: '/returns' }] },
   { key: 'find', label: 'Find', detail: 'Any name or date, opens the booking', href: '/find', icon: Search, tint: '#4F6D7A', also: [] },
 ];
 

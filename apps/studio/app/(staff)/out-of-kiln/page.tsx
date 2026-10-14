@@ -401,7 +401,7 @@ export default function OutOfKilnPage() {
       )}
 
       <Toolbar>
-        <Tool onClick={() => router.push('/shelves')} icon={<Boxes size={15} />}>Packing shots</Tool>
+        <Tool onClick={() => router.push('/shelves')} icon={<Boxes size={15} />}>Kiln photos</Tool>
         <Tool onClick={() => router.push('/packing')} icon={<Layers size={15} />}>Packing</Tool>
         <Tool onClick={() => router.push('/kiln')}>Kiln</Tool>
       </Toolbar>

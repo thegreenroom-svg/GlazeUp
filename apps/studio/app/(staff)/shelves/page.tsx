@@ -164,7 +164,11 @@ export default function ShelvesPage() {
     // "packing shots" -- the photos taken while hunting for a booking's
     // pieces, not a record of the kiln shelves. Naming it Shelves made it
     // look like the kiln's own filing, which is a separate job.
-    <PageShell title="Packing shots" subtitle="Photos taken while finding pieces, most recent first" back="/packing">
+    // [14 Oct] And now they ARE the kiln's own filing. Nobody photographs a
+    // shelf to hunt for pieces any more -- the photos on this page are the
+    // ones taken as each shelf comes out of the kiln, so the page belongs
+    // behind that step and is named for it.
+    <PageShell title="Kiln photos" subtitle="Taken as each shelf came out, most recent first" back="/out-of-kiln">
       {sweeps === null && (
         <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-base)', color: 'var(--muted)' }}>
           <Loader size={16} className="animate-spin" /> Loading…
