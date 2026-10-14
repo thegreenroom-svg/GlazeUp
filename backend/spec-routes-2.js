@@ -7960,7 +7960,9 @@ CRITICAL -- THE TWO PHOTOS SHOW DIFFERENT STAGES. The reference photos and descr
 
 So judge on FORM, PATTERN and MOTIF, none of which change in the kiln -- the shape of the piece, where the decoration sits, the drawing, any lettering, the number and arrangement of elements. Treat colour as a hint about which family a piece is in, never as the deciding evidence, and never rule a piece out because it looks brighter or darker than its description.
 
-Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
+A PIECE CUT OFF BY THE EDGE OF THE PHOTO IS NOT A MATCH. If an object is clipped by the frame -- half a plate at the bottom corner, a rim leaving the side -- you are looking at a fraction of it, and a fraction of a white plate is every white plate. Report it as unplaced with reason "obscured". Do not match it, however well the visible part agrees.
+
+Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. This photograph is a kiln being emptied, and a match means a piece is accounted for and ready to be packed and handed over. A piece you leave out is simply reported as still in the kiln, which is honest and costs nothing -- the next photo can find it. A piece you match wrongly sends someone to a box that does not contain their pottery.
 
 WORDS BEAT EVERYTHING. If a description mentions a name, a word or lettering, that lettering decides it. A mug described as carrying the name FLO is NOT the mug in the photo reading MILL -- different words mean a different piece, however well the shape, colour and glaze agree. Painted lettering is the most reliable evidence on a shelf because it is unique to one customer, so treat any disagreement in it as a rejection rather than a detail to overlook. Lettering you cannot read clearly is not agreement either: leave it out.
 
@@ -8103,14 +8105,44 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
         return res.status(500).json({ error: 'Could not read the response from Gemini' });
       }
 
-      // Deliberately strict floor. Below this the guess is worse than
-      // useless on a shelf of near-identical mugs.
-      const MIN_CONFIDENCE = 0.55;
+      // [14 Oct, evening] 0.55 was the floor while this was a hunt, when a
+      // speculative match cost a glance at the wrong shelf. Looked at two of
+      // today's kiln photos against what the app claimed was in them:
+      //   - Stacey Brown's "white mug with blue spots and the name GRAN"
+      //     matched to a white jar with grey vertical stripes. Her mug is
+      //     not in that photo at all.
+      //   - Her "white plate with large yellow sunflower centre" matched to
+      //     a plate at the bottom-right corner that is nine tenths outside
+      //     the frame. There is no sunflower plate in that photo either.
+      // Both scored above 0.55. They are "could be" answers, and a could-be
+      // now marks a piece ready to pack.
+      //
+      // The costs have swapped round. A miss is cheap: the piece shows as
+      // still in the kiln, which is true, and the next photo can find it. A
+      // wrong match sends someone to a box that does not contain their
+      // pottery.
+      const MIN_CONFIDENCE = 0.75;
+
+      // And nothing that is falling off the edge of the photograph. A piece
+      // clipped by the frame shows a fraction of itself -- a rim, a corner
+      // -- which is never enough to tell one white plate from another, and
+      // is exactly where the sunflower plate went wrong. The model is asked
+      // not to do this; this is the part that does not depend on asking.
+      const clipped = (box) => {
+        if (!box) return false;
+        const w = box.right_pct - box.left_pct;
+        const h = box.bottom_pct - box.top_pct;
+        const touches = box.left_pct <= 1 || box.top_pct <= 1 || box.right_pct >= 99 || box.bottom_pct >= 99;
+        return touches && w * h < 150; // under about 12% by 12% of the frame
+      };
+
       const byBooking = new Map();
+      let rejectedClipped = 0;
       for (const m of parsed.matches || []) {
         const piece = pieces[m.number - 1];
         if (!piece) continue;
         if ((m.confidence ?? 0) < MIN_CONFIDENCE) continue;
+        if (clipped(boxFromGemini(m.box_2d))) { rejectedClipped++; continue; }
         const cur = byBooking.get(piece.booking_id) || { pieces: [], total_in_booking: 0 };
         cur.pieces.push({
           id: piece.id,
@@ -8257,6 +8289,9 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
         waiting_total: eligible.length,
         not_searched: notSearched,
         box_number_read: (parsed.box_number || '').toString().trim() || null,
+        // Dropped for falling off the edge of the frame. Worth saying: it
+        // usually means stand back and take the photo again.
+        clipped_dropped: rejectedClipped,
         // [12 Oct] The collection date chalked along the shelf lip, as read.
         // Shown back for confirmation the same way a box number is, never
         // acted on by itself -- chalk on a 3cm strip misreads easily.

@@ -128,7 +128,7 @@ export default function OutOfKilnPage() {
   // a piece that shows in two shots is not counted twice.
   const [found, setFound] = useState<FoundBooking[]>([]);
   const [shots, setShots] = useState(0);
-  const [lastShot, setLastShot] = useState<{ box: string | null; date: string | null; found: number } | null>(null);
+  const [lastShot, setLastShot] = useState<{ box: string | null; date: string | null; found: number; clipped: number } | null>(null);
   const [candidates, setCandidates] = useState(0);
 
   // Asked about straight after the photo, and whatever is not settled
@@ -261,6 +261,7 @@ export default function OutOfKilnPage() {
         box: (d.box_number_read || '').trim() || null,
         date: (d.shelf_date_read || '').trim() || null,
         found: fresh.reduce((n: number, b: FoundBooking) => n + b.found, 0),
+        clipped: d.clipped_dropped || 0,
       });
       setCandidates(d.candidates || 0);
     } catch (err) {
@@ -476,6 +477,7 @@ export default function OutOfKilnPage() {
               {lastShot.found
                 ? `Last photo found ${lastShot.found}`
                 : 'Last photo recognised nothing. Try more space between the pieces, or a little more light.'}
+              {!!lastShot.clipped && ` · ${lastShot.clipped} ignored for falling off the edge of the frame`}
               {lastShot.box && ` · read box ${lastShot.box}`}
               {lastShot.date && ` · shelf chalked ${lastShot.date}`}
               {candidates ? ` · ${candidates} still waiting` : ''}
