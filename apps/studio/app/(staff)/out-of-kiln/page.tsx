@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { Collapse, Count, Section, Tool, Toolbar } from '@/components/Toolbar';
 import { Row, RowAction, Chip } from '@/components/Row';
-import { Camera, Loader, Boxes, HelpCircle, Layers, Check, ArrowRight, Search, X } from 'lucide-react';
-import { PieceThumb, PieceBox } from '@/components/PieceBoxes';
+import { Camera, Loader, Boxes, HelpCircle, Layers, Check, Search, X } from 'lucide-react';
+import { BeforeAfter, PieceThumb, PieceBox } from '@/components/PieceBoxes';
 
 // Daisy's kiln-unloading step, in her words: pieces come out into
 // numbered boxes, "not too tightly, leaving some separation, obviously
@@ -65,34 +65,6 @@ interface FoundBooking {
   missing: FoundPiece[];
 }
 interface Shelf { id: string; label: string }
-
-/**
- * [14 Oct] BEFORE AND AFTER, SIDE BY SIDE. David: "it would be really good
- * to have a comparison shot between the unfired piece and previously photo
- * table to the fired piece coming out of the kiln."
- *
- * The app has been asserting matches and nobody has been able to check one
- * without opening two screens. Both crops already existed in the sweep's
- * answer: where the piece was on its table photo, and where it is in the
- * box photo just taken. Putting them next to each other turns a claim into
- * something a person can agree or disagree with at a glance, which is also
- * the only way the matching ever gets measured.
- *
- * The colour shift between them is expected and worth seeing: chalky and
- * pale on the left, saturated and glossy on the right. Shape and where the
- * pattern sits are what should agree.
- */
-function BeforeAfter({ p, size = 56 }: { p: FoundPiece; size?: number }) {
-  const before = p.reference_photo_url || null;
-  const after = p.shot_url || null;
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
-      <PieceThumb url={before} box={p.photo_box} size={size} />
-      <ArrowRight size={13} color="#b5aca2" style={{ flexShrink: 0 }} />
-      <PieceThumb url={after} box={p.box} size={size} ring="#B8562E" />
-    </span>
-  );
-}
 
 export default function OutOfKilnPage() {
   const router = useRouter();
@@ -367,7 +339,7 @@ export default function OutOfKilnPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0 0 0 0.3rem' }}>
                   {b.pieces.map((p) => (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minHeight: 44 }}>
-                      <BeforeAfter p={p} />
+                      <BeforeAfter before={p.reference_photo_url} beforeBox={p.photo_box} after={p.shot_url} afterBox={p.box} />
                       <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-xs)', color: '#6b625a' }}>
                         <b style={{ color: 'var(--charcoal)', textTransform: 'capitalize' }}>{p.piece_type || 'Piece'}</b>
                         {p.description ? ` · ${p.description}` : ''}

@@ -24,6 +24,8 @@
 // One component, not one page. The steps stay where they belong in the
 // day; the thing in your hand becomes the same object every time.
 
+import { ArrowRight } from 'lucide-react';
+
 export type PieceBox = {
   left_pct: number;
   top_pct: number;
@@ -238,5 +240,52 @@ export function PieceThumb({
         ...pieceCropStyle(url, box),
       }}
     />
+  );
+}
+
+/**
+ * [14 Oct] BEFORE AND AFTER, SIDE BY SIDE. David: "it would be really good
+ * to have a comparison shot between the unfired piece and previously photo
+ * table to the fired piece coming out of the kiln... it's also a very good
+ * cross-reference for any missing pieces."
+ *
+ * The app has been asserting matches and nobody has been able to check one
+ * without opening two screens. Both crops already existed: where the piece
+ * was on its table photo, and where it was found in a box or shelf photo.
+ * Putting them next to each other turns a claim into something a person can
+ * agree or disagree with at a glance, which is also the only way the
+ * matching ever gets measured.
+ *
+ * The colour shift between them is expected and worth seeing: chalky and
+ * pale on the left, saturated and glossy on the right. Shape and where the
+ * pattern sits are what should agree.
+ *
+ * Lives here rather than on the unload screen because packing needs the
+ * same pair -- Jenny packs from the table photo by eye, and the fired crop
+ * is what is actually in her hand.
+ */
+export function BeforeAfter({
+  before,
+  beforeBox,
+  after,
+  afterBox,
+  size = 56,
+  beforeRing,
+}: {
+  before?: string | null;
+  beforeBox?: PieceBox | null;
+  after?: string | null;
+  afterBox?: PieceBox | null;
+  size?: number;
+  // The piece's own colour where a screen numbers its pieces, so the pair
+  // still ties back to the boxes drawn on the table photo below it.
+  beforeRing?: string;
+}) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+      <PieceThumb url={before} box={beforeBox} size={size} ring={beforeRing} />
+      <ArrowRight size={13} color="#b5aca2" style={{ flexShrink: 0 }} />
+      <PieceThumb url={after} box={afterBox} size={size} ring="#B8562E" />
+    </span>
   );
 }

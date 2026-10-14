@@ -31,7 +31,7 @@ import { compressPhotoForUpload } from '@/lib/compressPhoto';
 // Palette and box drawing now live in the shared component, so a piece
 // numbered 3 is the same colour on this screen, the floor and the
 // backfill. They were three separate copies of these six hex codes.
-import { PIECE_COLOURS, pieceColour, PhotoWithBoxes } from '@/components/PieceBoxes';
+import { BeforeAfter, PIECE_COLOURS, pieceColour, PhotoWithBoxes } from '@/components/PieceBoxes';
 
 type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number };
 
@@ -342,15 +342,38 @@ export default function PackingPage() {
               over the table photo, which shows it chalky and unfired.
               The table shot is still the fallback for anything a sweep
               has not found yet. */}
-          {(shelfCrop(p) || (p.reference_photo_url && p.photo_box)) && (
+          {/* [14 Oct] Both crops, big, when both exist -- unfired on the
+              left, fired on the right. Before this the fired crop simply
+              replaced the table one, which meant the moment the app had
+              most to prove was the moment it showed least: a packer could
+              see what it claimed to be holding but not what that claim was
+              based on. Shape and where the pattern sits are what should
+              agree; the colour jumping from chalky to glossy is the firing
+              doing its job. */}
+          {shelfCrop(p) && p.reference_photo_url && p.photo_box ? (
+            <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-md)', border: '2px solid #e2d8cb', ...cropStyle(p.reference_photo_url, p.photo_box) }} />
+                <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: '0.3rem 0 0', textAlign: 'center' }}>On the table</p>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `3px solid ${colour}`, ...shelfCrop(p) }} />
+                <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: '0.3rem 0 0', textAlign: 'center' }}>Out of the kiln</p>
+              </div>
+            </div>
+          ) : (shelfCrop(p) || (p.reference_photo_url && p.photo_box)) ? (
             <div style={{ marginTop: '0.75rem', width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `3px solid ${colour}`, ...(shelfCrop(p) || cropStyle(p.reference_photo_url as string, p.photo_box as PieceBox)) }} />
-          )}
+          ) : null}
           {p.reference_photo_url && (
             <div style={{ position: 'relative', marginTop: '0.75rem' }}>
               {/* Same accountability line as the booking view -- this is
                   the other place a bad photo actually gets noticed. */}
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: 0 }}>On the table</p>
+                {/* "The whole table", matching the booking view -- the crop
+                    directly above this is already captioned "On the table",
+                    and the same two words twice running read as a repeat
+                    rather than as two different pictures. */}
+                <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: 0 }}>The whole table</p>
                 {p.photo_taken_by && (
                   <p style={{ fontSize: 'var(--text-xs)', color: '#888', margin: 0 }}>
                     Photographed by <strong style={{ color: 'var(--charcoal)' }}>{p.photo_taken_by}</strong>
@@ -733,7 +756,26 @@ export default function PackingPage() {
                 onClick={() => setOpenPiece({ piece: p, index: i })}
                 style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', textAlign: 'left', flex: 1, minWidth: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
               >
-                {shelfCrop(p) || p.reference_photo_url ? (
+                {/* [14 Oct] BOTH, not one or the other. This thumbnail used
+                    to be `shelfCrop(p) || p.reference_photo_url` -- the
+                    fired crop if a sweep had found the piece, otherwise the
+                    chalky table crop, and never the pair. David: the
+                    comparison "is also a very good cross-reference for any
+                    missing pieces", and Jenny packs from the table photo by
+                    eye anyway, so the table shot is what she is matching
+                    and the fired shot is what is in her hand. Falls back to
+                    whichever single crop exists when a piece has not been
+                    found on a shelf yet. */}
+                {shelfCrop(p) && p.reference_photo_url ? (
+                  <BeforeAfter
+                    before={p.reference_photo_url}
+                    beforeBox={p.photo_box}
+                    after={lastSeen?.photo_url}
+                    afterBox={p.last_seen_box}
+                    size={54}
+                    beforeRing={PIECE_COLOURS[i % 6]}
+                  />
+                ) : shelfCrop(p) || p.reference_photo_url ? (
                   <div style={{
                     width: 60, height: 60, borderRadius: 'var(--radius-sm)', flexShrink: 0,
                     border: `2px solid ${PIECE_COLOURS[i % 6]}`,
@@ -886,7 +928,7 @@ export default function PackingPage() {
                 piece has no square on it. */}
             {packablePieces.some((p) => !p.photo_box) && (
               <p style={{ fontSize: 'var(--text-xs)', color: '#A6761D', marginTop: '0.3rem' }}>
-                {packablePieces.filter((p) => !p.photo_box).length} piece{packablePieces.filter((p) => !p.photo_box).length === 1 ? '' : 's'} have no marked position on this photo.
+                {packablePieces.filter((p) => !p.photo_box).length} piece{packablePieces.filter((p) => !p.photo_box).length === 1 ? ' has' : 's have'} no marked position on this photo.
               </p>
             )}
           </div>
