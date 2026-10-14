@@ -218,6 +218,27 @@ export default function PackingPage() {
 
         {isOpen && (
           <div style={{ padding: '0 0.7rem 0.7rem' }}>
+            {/* [14 Oct] David, looking at an opened booking: "it needs to
+                open the whole booking, so we can get the details, the
+                address, etc." Packing is where you find out it is going in
+                the post, or that there is a note about it, and this screen
+                deliberately carries only what you need to put pottery in a
+                box. So the way through to everything else sits at the top
+                of the opened card, where the name is -- rather than as one
+                more chip in a line of chips below the pieces. */}
+            <button
+              onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', minHeight: 46, marginBottom: '0.5rem', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid #e6ddd2', background: 'white', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700 }}>Open the booking</span>
+                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>
+                  {b.posting > 0 ? 'Postal address, phone, everything else' : 'Phone, notes, history, everything else'}
+                </span>
+              </span>
+              <ChevronRight size={16} style={{ flexShrink: 0, color: '#8a8178' }} />
+            </button>
+
             {/* The pairs. Left is what the customer painted, right is what
                 came out of the kiln and is about to go in the box. The
                 colour shift between them is the firing; the shape and where
@@ -321,7 +342,6 @@ export default function PackingPage() {
                   The whole table
                 </Tool>
               )}
-              <Tool onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}>Booking</Tool>
               <Tool onClick={() => router.push(`/print-label?code=${encodeURIComponent(b.booking_code)}`)} icon={<Printer size={15} />}>
                 Print label
               </Tool>

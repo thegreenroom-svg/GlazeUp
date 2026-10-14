@@ -10233,11 +10233,19 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
       if (!live.length) return res.json({ today: new Date().toISOString().slice(0, 10), ready: [], waiting: [] });
 
       const codes = Array.from(new Set(live.map((p) => p.booking_id)));
-      const { data: bookingRows } = await supabase
+      // [14 Oct] customer_phone, not phone. Asking for a column that does not
+      // exist fails the whole select, and because the error was being
+      // dropped on the floor every booking quietly fell back to its own
+      // code: a packing list headed "booking-20261008-tf3a7iug" instead of
+      // Rachael Calvert, with no collection dates either. Named right, and
+      // thrown rather than swallowed -- a lookup this load-bearing failing
+      // silently is worse than the page not loading at all.
+      const { data: bookingRows, error: bErr } = await supabase
         .from('bookings')
-        .select('booking_code, customer_name, phone, session_start, collection_date')
+        .select('booking_code, customer_name, customer_phone, session_start, collection_date, fulfilment_method, shipping_postcode')
         .eq('studio_id', STUDIO_ID)
         .in('booking_code', codes);
+      if (bErr) throw bErr;
       const byCode = new Map((bookingRows || []).map((b) => [b.booking_code, b]));
 
       // The kiln-out photo each piece was found in. One lookup for the whole
@@ -10273,7 +10281,7 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
         return {
           booking_code: code,
           customer_name: b?.customer_name || code,
-          phone: b?.phone || null,
+          phone: b?.customer_phone || null,
           collection_date: b?.collection_date || null,
           session_start: b?.session_start || null,
           total: ps.length,
@@ -10281,7 +10289,7 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
           packed: ps.filter((p) => p.status === 'collected').length,
           on_hold: held[code] || 0,
           posting: ps.filter((p) => p.fulfilment === 'post').length,
-          postal_postcode: ps.map((p) => p.postal_postcode).find(Boolean) || null,
+          postal_postcode: ps.map((p) => p.postal_postcode).find(Boolean) || b?.shipping_postcode || null,
           shelf_label: shelf ? (shelfById.get(shelf)?.label || null) : null,
           // The photographer and the time, carried from the table shot --
           // the one piece of accountability on this screen, and the thing
