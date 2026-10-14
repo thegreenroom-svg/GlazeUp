@@ -8182,6 +8182,11 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         // acted on by itself -- chalk on a 3cm strip misreads easily.
         shelf_date_read: (parsed.shelf_date || '').toString().trim() || null,
         placed_on_shelf: placed,
+        // [14 Oct] So the screen that just took this photo can say no to one
+        // of its matches. Without it the reject route is unreachable from
+        // the moment a wrong match is easiest to spot: while the piece is
+        // still in your hand.
+        sweep_id: sweepId || null,
         bookings: Array.from(byBooking.entries())
           .map(([code, v]) => ({
             booking_code: code,
@@ -8194,6 +8199,25 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
             complete: v.pieces.length === v.total_in_booking,
             collection_date: collectionDateByCode.get(code) || null,
             pieces: v.pieces,
+            // [14 Oct] WHAT IS NOT IN THE BOX. David: "it's also a very
+            // good cross-reference for any missing pieces."
+            //
+            // "2 of 4" tells you two are missing; it does not tell you
+            // WHICH two, and the person reading it is standing at the kiln
+            // with the shelves still in front of them. These are the
+            // booking's waiting pieces this sweep did not see, each with
+            // its table photo and the box it sits in on that photo, so the
+            // screen can show the unfired piece and someone can go and
+            // look for it while looking is still easy.
+            missing: (pieces || [])
+              .filter((p) => p.booking_id === code && !v.pieces.some((q) => q.id === p.id))
+              .map((p) => ({
+                id: p.id,
+                piece_type: p.piece_type,
+                description: p.description,
+                reference_photo_url: p.reference_photo_url || null,
+                photo_box: p.photo_box || null,
+              })),
           }))
           // Daisy: "is it set to find the most chronologically expected
           // full orders on the table? Not part orders... that will speed
@@ -9787,8 +9811,16 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
       // Only cleared if THIS sweep is the one that placed it. A later
       // sweep may have found the piece properly since, and rejecting an
       // old bad match should not undo a good one.
+      //
+      // [14 Oct] shelf_id goes too, and that is the part that matters now
+      // that unloading works in groups. A shelf being marked out of the
+      // kiln moves every piece ON IT to ready, so a rejected match left
+      // holding its shelf_id would be waved through to packing as part of
+      // the group -- the exact confident-wrong-answer this route exists to
+      // undo, arriving one step later. The piece goes back to having no
+      // shelf, which is where a piece nobody has found belongs.
       await supabase.from('pottery_pieces')
-        .update({ last_seen_at: null, last_seen_box: null, last_seen_box_number: null, last_seen_sweep_id: null })
+        .update({ last_seen_at: null, last_seen_box: null, last_seen_box_number: null, last_seen_sweep_id: null, shelf_id: null })
         .eq('studio_id', STUDIO_ID).eq('id', pieceId).eq('last_seen_sweep_id', id);
 
       res.json({ ok: true, remaining: details.length });
