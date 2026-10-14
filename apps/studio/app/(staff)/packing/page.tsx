@@ -9,9 +9,9 @@ import { Chip } from '@/components/Row';
 import { Count, Section, Tally, Tool, Toolbar } from '@/components/Toolbar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
-import { BeforeAfter, PhotoWithBoxes, PieceThumb, PieceBox, PIECE_COLOURS } from '@/components/PieceBoxes';
+import { PhotoWithBoxes, PieceThumb, PieceBox, PIECE_COLOURS } from '@/components/PieceBoxes';
 import { postOrQueue } from '@/lib/outbox';
-import { Check, ChevronDown, ChevronRight, Flame, Image as ImageIcon, Package, Printer } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Flame, Package, Printer } from 'lucide-react';
 
 // [14 Oct] PACKING, ON ONE PAGE, WITH NOTHING TO SEARCH FOR.
 //
@@ -35,9 +35,16 @@ import { Check, ChevronDown, ChevronRight, Flame, Image as ImageIcon, Package, P
 //
 // What is left in the periphery is deliberate. Breakage stays, because a
 // piece that broke in the kiln is the one thing that will never appear in a
-// kiln photo and would otherwise hold a booking open forever. The whole
-// table photo stays behind a tap, because Jenny packs from it by eye. The
-// booking page stays one tap away for everything else.
+// kiln photo and would otherwise hold a booking open forever.
+//
+// [14 Oct, evening] And nothing is behind a tap any more. Opening a booking
+// opens the table photograph itself, big, with every piece numbered on it,
+// and the same numbers beside it against the pieces as they came out of the
+// kiln. David: "this needs to open on big pic of table photo and alongside
+// pics of fired pieces and this section can just be called packing so merge
+// them." So the booking came in too -- phone, address, notes -- because
+// opening a second screen to read an address is how a parcel goes out to the
+// wrong one.
 //
 // Nothing on this page calls the AI.
 
@@ -62,6 +69,11 @@ interface BookingRow {
   booking_code: string;
   customer_name: string;
   phone: string | null;
+  email: string | null;
+  notes: string | null;
+  collection_notes: string | null;
+  fulfilment_method: string | null;
+  address: string[];
   collection_date: string | null;
   session_start: string | null;
   total: number;
@@ -93,7 +105,6 @@ export default function PackingPage() {
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const [showTable, setShowTable] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<null | { title: string; body?: string; confirmLabel: string; destructive?: boolean; run: () => void }>(null);
@@ -124,7 +135,7 @@ export default function PackingPage() {
 
   // Selection belongs to whichever booking is open. Carrying it across would
   // mean ticking off someone else's pottery.
-  useEffect(() => { setSelected(new Set()); setShowTable(null); }, [open]);
+  useEffect(() => { setSelected(new Set()); }, [open]);
 
   const toggle = (id: string) => setSelected((prev) => {
     const next = new Set(prev);
@@ -218,109 +229,148 @@ export default function PackingPage() {
 
         {isOpen && (
           <div style={{ padding: '0 0.7rem 0.7rem' }}>
-            {/* [14 Oct] David, looking at an opened booking: "it needs to
-                open the whole booking, so we can get the details, the
-                address, etc." Packing is where you find out it is going in
-                the post, or that there is a note about it, and this screen
-                deliberately carries only what you need to put pottery in a
-                box. So the way through to everything else sits at the top
-                of the opened card, where the name is -- rather than as one
-                more chip in a line of chips below the pieces. */}
-            <button
-              onClick={() => router.push(`/booking/${encodeURIComponent(b.booking_code)}`)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', minHeight: 46, marginBottom: '0.5rem', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid #e6ddd2', background: 'white', textAlign: 'left', cursor: 'pointer' }}
-            >
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700 }}>Open the booking</span>
-                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>
-                  {b.posting > 0 ? 'Postal address, phone, everything else' : 'Phone, notes, history, everything else'}
-                </span>
-              </span>
-              <ChevronRight size={16} style={{ flexShrink: 0, color: '#8a8178' }} />
-            </button>
-
-            {/* The pairs. Left is what the customer painted, right is what
-                came out of the kiln and is about to go in the box. The
-                colour shift between them is the firing; the shape and where
-                the pattern sits are what should agree. */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {b.pieces.map((p, i) => {
-                const picked = selected.has(p.id);
-                const canPick = kind === 'ready' && !p.packed;
-                return (
-                  <div
-                    key={p.id}
-                    onClick={canPick ? () => toggle(p.id) : undefined}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.55rem', minHeight: 48,
-                      padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)',
-                      border: `1px solid ${picked ? 'var(--clay)' : '#efe8df'}`,
-                      background: p.packed ? '#F1F6F1' : picked ? '#FBF2EA' : 'white',
-                      cursor: canPick ? 'pointer' : 'default',
-                      opacity: p.packed ? 0.65 : 1,
-                    }}
-                  >
-                    {canPick && (
-                      <input
-                        type="checkbox"
-                        checked={picked}
-                        onChange={() => toggle(p.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ width: 24, height: 24, flexShrink: 0, cursor: 'pointer' }}
-                        aria-label={`Select ${p.piece_type || 'piece'} ${i + 1}`}
-                      />
-                    )}
-                    {p.out ? (
-                      <BeforeAfter
-                        before={p.table_photo_url}
-                        beforeBox={p.table_box}
-                        after={p.kiln_photo_url}
-                        afterBox={p.kiln_box}
-                        size={50}
-                        beforeRing={PIECE_COLOURS[i % 6]}
-                      />
-                    ) : (
-                      <PieceThumb url={p.table_photo_url} box={p.table_box} size={50} ring={PIECE_COLOURS[i % 6]} />
-                    )}
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
-                        {i + 1}. {p.piece_type || 'Piece'}
-                      </span>
-                      {p.description && (
-                        <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</span>
-                      )}
-                      {p.assigned_to && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--clay)', fontWeight: 600 }}>For {p.assigned_to}</span>}
-                      {p.notes && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#A6761D' }}>{p.notes}</span>}
-                      {/* Said plainly on the piece itself, because this is
-                          the one that stops the booking being packed. */}
-                      {!p.out && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#A6761D', fontWeight: 600 }}>Still in the kiln</span>}
-                      {p.out && p.box_number != null && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>Box {p.box_number}</span>}
-                    </span>
-                    {p.packed && <Check size={17} style={{ color: '#2E7D32', flexShrink: 0 }} />}
-                    {/* The only way a piece leaves this list without ever
-                        being photographed out of the kiln. Without it a
-                        broken piece holds its booking in "waiting" for
-                        good. */}
-                    {!p.out && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPendingConfirm({
-                            title: 'It broke in the kiln?',
-                            body: 'The booking stops waiting on it, and a message to the customer is drafted on the booking page for someone to send.',
-                            confirmLabel: 'It broke',
-                            destructive: true,
-                            run: () => { void markBroken(b, p); },
-                          });
-                        }}
-                        style={{ flexShrink: 0, minHeight: 36, padding: '0 0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid #e6ddd2', background: 'white', color: '#A33', fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        Broke
-                      </button>
-                    )}
+            {/* [14 Oct] THE TABLE PHOTO IS THE SCREEN, NOT A TOGGLE.
+                David: "this needs to open on big pic of table photo and
+                alongside pics of fired pieces and this section can just be
+                called packing so merge them."
+                Jenny packs by looking at the table shot and finding each
+                piece, so it leads, big, with every piece numbered on it.
+                Beside it, the same numbers against the pieces as they came
+                out of the kiln: the photo says where it was, the crop says
+                what is in your hand. The per-row table crop went with it --
+                the whole table is right there, so cropping it again into a
+                50px square beside its own photograph was saying the same
+                thing twice.
+                And the booking came with it. Opening a second screen to read
+                an address is how a parcel goes to the wrong one. */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-start' }}>
+              {photo && (
+                <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <p style={{ fontSize: 'var(--text-xs)', color: '#8a8178', margin: 0 }}>On the table</p>
+                    <p style={{ fontSize: 'var(--text-xs)', color: '#8a8178', margin: 0, textAlign: 'right' }}>
+                      {b.photo_taken_by ? <>by <strong style={{ color: 'var(--charcoal)' }}>{b.photo_taken_by}</strong></> : 'photographer not recorded'}
+                      {b.table_photo_taken_at && ` · ${new Date(b.table_photo_taken_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
                   </div>
-                );
-              })}
+                  <PhotoWithBoxes
+                    src={photo}
+                    pieces={b.pieces.map((p) => ({ piece_type: p.piece_type, description: p.description, box: p.table_box }))}
+                  />
+                </div>
+              )}
+
+              <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: '#8a8178', margin: '0 0 0.05rem' }}>Out of the kiln</p>
+                {b.pieces.map((p, i) => {
+                  const picked = selected.has(p.id);
+                  const canPick = kind === 'ready' && !p.packed;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={canPick ? () => toggle(p.id) : undefined}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.55rem', minHeight: 52,
+                        padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)',
+                        border: `1px solid ${picked ? 'var(--clay)' : '#efe8df'}`,
+                        background: p.packed ? '#F1F6F1' : picked ? '#FBF2EA' : 'white',
+                        cursor: canPick ? 'pointer' : 'default',
+                        opacity: p.packed ? 0.65 : 1,
+                      }}
+                    >
+                      {canPick && (
+                        <input
+                          type="checkbox"
+                          checked={picked}
+                          onChange={() => toggle(p.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ width: 24, height: 24, flexShrink: 0, cursor: 'pointer' }}
+                          aria-label={`Select ${p.piece_type || 'piece'} ${i + 1}`}
+                        />
+                      )}
+                      {/* The same number and colour as its box on the photo,
+                          which is the only thing tying the two together. */}
+                      <span style={{ position: 'relative', flexShrink: 0 }}>
+                        <PieceThumb
+                          url={p.out ? p.kiln_photo_url : p.table_photo_url}
+                          box={p.out ? p.kiln_box : p.table_box}
+                          size={60}
+                          ring={PIECE_COLOURS[i % 6]}
+                        />
+                        <span style={{ position: 'absolute', top: -7, left: -7, width: 20, height: 20, borderRadius: '50%', background: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                          {i + 1}
+                        </span>
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600 }}>{p.piece_type || 'Piece'}</span>
+                        {p.description && (
+                          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>{p.description}</span>
+                        )}
+                        {p.assigned_to && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--clay)', fontWeight: 600 }}>For {p.assigned_to}</span>}
+                        {p.notes && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#A6761D' }}>{p.notes}</span>}
+                        {!p.out && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#A6761D', fontWeight: 600 }}>Still in the kiln</span>}
+                        {p.out && p.box_number != null && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>Box {p.box_number}</span>}
+                      </span>
+                      {p.packed && <Check size={17} style={{ color: '#2E7D32', flexShrink: 0 }} />}
+                      {/* The only way a piece leaves this list without ever
+                          being photographed out of the kiln. Without it a
+                          broken piece holds its booking in "waiting" for
+                          good. */}
+                      {!p.out && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingConfirm({
+                              title: 'It broke in the kiln?',
+                              body: 'The booking stops waiting on it, and a message to the customer is drafted on the booking page for someone to send.',
+                              confirmLabel: 'It broke',
+                              destructive: true,
+                              run: () => { void markBroken(b, p); },
+                            });
+                          }}
+                          style={{ flexShrink: 0, minHeight: 36, padding: '0 0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid #e6ddd2', background: 'white', color: '#A33', fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Broke
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* The booking, as much of it as packing ever needs. Phone and
+                email are tappable, because the two reasons to want them here
+                are "they are at the counter and this is wrong" and "this one
+                broke". */}
+            <div style={{ marginTop: '0.6rem', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', background: 'white', border: '1px solid #efe8df', display: 'flex', flexWrap: 'wrap', gap: '0.3rem 1.1rem' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: '#8a8178' }}>
+                <strong style={{ color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>{b.customer_name}</strong>
+                {b.collection_date && ` · collect ${new Date(`${b.collection_date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`}
+                {b.session_start && ` · painted ${new Date(b.session_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+              </span>
+              {b.phone && (
+                <a href={`tel:${b.phone}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)', textDecoration: 'none' }}>{b.phone}</a>
+              )}
+              {b.email && (
+                <a href={`mailto:${b.email}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)', textDecoration: 'none', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.email}</a>
+              )}
+              {b.posting > 0 && (
+                <span style={{ flexBasis: '100%', fontSize: 'var(--text-xs)', color: 'var(--charcoal)' }}>
+                  <strong style={{ color: '#8a4a2a' }}>Posting:</strong>{' '}
+                  {b.address.length ? b.address.join(', ') : 'no address on the booking yet'}
+                </span>
+              )}
+              {(b.collection_notes || b.notes) && (
+                <span style={{ flexBasis: '100%', fontSize: 'var(--text-xs)', color: '#A6761D' }}>
+                  {[b.collection_notes, b.notes].filter(Boolean).join(' · ')}
+                </span>
+              )}
+              {b.on_hold > 0 && (
+                <span style={{ flexBasis: '100%', fontSize: 'var(--text-xs)', color: '#A6761D' }}>
+                  {b.on_hold} piece{b.on_hold === 1 ? '' : 's'} held back for a return visit, not in this parcel.
+                </span>
+              )}
             </div>
 
             <Toolbar style={{ marginTop: '0.55rem' }}>
@@ -333,38 +383,10 @@ export default function PackingPage() {
                   {allSelected ? 'Deselect all' : 'Select all'}
                 </Tool>
               )}
-              {photo && (
-                <Tool
-                  onClick={() => setShowTable((v) => (v === b.booking_code ? null : b.booking_code))}
-                  active={showTable === b.booking_code}
-                  icon={<ImageIcon size={15} />}
-                >
-                  The whole table
-                </Tool>
-              )}
               <Tool onClick={() => router.push(`/print-label?code=${encodeURIComponent(b.booking_code)}`)} icon={<Printer size={15} />}>
                 Print label
               </Tool>
             </Toolbar>
-
-            {/* Jenny packs from the table shot by eye, so it stays -- one
-                tap away rather than always on screen, with the same numbers
-                and colours as the rows above. */}
-            {showTable === b.booking_code && photo && (
-              <div style={{ marginTop: '0.55rem' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                  <p style={{ fontSize: 'var(--text-xs)', color: '#8a8178', margin: 0 }}>The whole table</p>
-                  <p style={{ fontSize: 'var(--text-xs)', color: '#8a8178', margin: 0, textAlign: 'right' }}>
-                    {b.photo_taken_by ? <>Photographed by <strong style={{ color: 'var(--charcoal)' }}>{b.photo_taken_by}</strong></> : 'Photographer not recorded'}
-                    {b.table_photo_taken_at && ` · ${new Date(b.table_photo_taken_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
-                  </p>
-                </div>
-                <PhotoWithBoxes
-                  src={photo}
-                  pieces={b.pieces.map((p) => ({ piece_type: p.piece_type, description: p.description, box: p.table_box }))}
-                />
-              </div>
-            )}
 
             {kind === 'ready' && selected.size > 0 && (
               <button

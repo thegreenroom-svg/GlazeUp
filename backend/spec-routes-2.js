@@ -10242,7 +10242,7 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
       // silently is worse than the page not loading at all.
       const { data: bookingRows, error: bErr } = await supabase
         .from('bookings')
-        .select('booking_code, customer_name, customer_phone, session_start, collection_date, fulfilment_method, shipping_postcode')
+        .select('booking_code, customer_name, customer_phone, customer_email, session_start, collection_date, collection_notes, notes, fulfilment_method, shipping_address_line1, shipping_address_line2, shipping_city, shipping_postcode, shipping_country')
         .eq('studio_id', STUDIO_ID)
         .in('booking_code', codes);
       if (bErr) throw bErr;
@@ -10282,6 +10282,16 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
           booking_code: code,
           customer_name: b?.customer_name || code,
           phone: b?.customer_phone || null,
+          // [14 Oct] Everything a packer used to leave this screen for.
+          // David: "this section can just be called packing so merge them."
+          // Opening a booking in a second place to read an address is how a
+          // parcel goes out to the wrong one, so the address comes here.
+          email: b?.customer_email || null,
+          notes: b?.notes || null,
+          collection_notes: b?.collection_notes || null,
+          fulfilment_method: b?.fulfilment_method || null,
+          address: [b?.shipping_address_line1, b?.shipping_address_line2, b?.shipping_city, b?.shipping_postcode, b?.shipping_country]
+            .map((x) => (x || '').toString().trim()).filter(Boolean),
           collection_date: b?.collection_date || null,
           session_start: b?.session_start || null,
           total: ps.length,
