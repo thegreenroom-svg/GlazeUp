@@ -371,6 +371,28 @@ async function callGeminiWithFallback(axios, apiKey, body, primaryModel = 'gemin
 // prompt still allowed that.
 export const AUTOMATION_START = '2026-10-09T00:00:00Z';
 
+// [14 Oct] And the same line drawn for the other half of the pairing.
+// David: "we should only match against fired pieces from today's photos,
+// everything else is irrelevant. Table photos matched against fired pieces
+// only from now."
+//
+// A table photo is matched against a photograph of the same piece fired.
+// Before today, photographs of fired pottery were taken to HUNT for a
+// booking -- point a camera at whatever shelf you were standing in front
+// of, see whose is on it -- and the matching was tuned for that: generous,
+// because a near miss on a hunt costs nothing and you are about to look at
+// the shelf anyway. One of those sweeps matched 24 of 49 waiting pieces in
+// a single photo.
+//
+// From today a photograph of fired pottery means a kiln being emptied, and
+// a match means a piece is accounted for and can be packed. Same engine,
+// different stakes. The old sightings are not deleted and are not wrong
+// about what someone saw on a shelf on the tenth; they are simply not
+// evidence that anything came out of a kiln, and showing one beside a
+// customer's name under "Out of the kiln" is how a packer ends up holding
+// the wrong pot.
+export const FIRED_PHOTOS_FROM = '2026-10-14T00:00:00Z';
+
 // Spec pricing tiers (studios subscribe at GBP 29-79/month).
 const PLANS = [
   { id: 'starter', name: 'Starter', price_cents: 2900, blurb: 'Single studio, core booking and piece tracking' },
@@ -7759,8 +7781,19 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
       // A piece with no description can't be looked for, and one held for a
       // return visit was never in the kiln -- including either would send
       // someone hunting a shelf for something that isn't there.
+      //
+      // [14 Oct] And neither can one with no photograph of itself. David:
+      // "table photos matched against fired pieces only from now." The
+      // pairing this engine exists to make is one picture against another;
+      // a piece with only a line of text behind it is matched on the
+      // description alone, and "white mug" agrees with every white mug on
+      // the shelf. Those pieces were a fair bet while this was a hunt and
+      // are a liability now that a match means a piece is accounted for.
+      // They are not lost -- they show as still in the kiln, which is what
+      // the app honestly knows about them.
       const eligible = (allPieces || [])
         .filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit' && !excludeIds.includes(p.id))
+        .filter((p) => p.reference_photo_url && p.photo_box)
         .filter((p) => !onlyBookingCode || p.booking_id === onlyBookingCode);
 
       if (!eligible.length) {
@@ -7770,8 +7803,8 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
           note: excludeIds.length
             ? 'Everything found across your photos so far -- nothing left to search for.'
             : onlyBookingCode
-              ? 'Nothing waiting for this booking -- it may already be fully packed.'
-              : 'Nothing is waiting to go out',
+              ? 'Nothing waiting for this booking with a table photo to match against.'
+              : 'Nothing waiting has a table photo to match against',
         });
       }
 
@@ -10250,19 +10283,20 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
 
       // [14 Oct, evening] WHAT COUNTS AS OUT OF THE KILN.
       //
-      // First answer: a piece on a shelf, since shelf_id is written only by
-      // a sweep that carried one and only the unload screen sends one. That
-      // was wrong, and David said why: "all pics today were out of the
-      // kiln". Today's photographs ARE the kiln coming out; they went
-      // through the old sweep, which never set a shelf, so requiring one
-      // threw away the real thing to avoid the stale thing.
+      // Twice wrong before this. Requiring a shelf_id threw away today's
+      // real kiln photos, which went through the old sweep and never got
+      // one. Accepting any sighting brought back a crop from the tenth.
       //
-      // So any sighting counts, and the stale ones are handled where they
-      // can actually be judged: every pair carries the day it was seen and a
-      // way to say no to it. The app will keep being wrong occasionally --
-      // it is reading photographs of near-identical pottery -- and the
-      // person holding the piece is the only one who can settle it.
-      const outIds = new Set(live.filter((p) => p.last_seen_at).map((p) => p.id));
+      // The line is the date, per David: only photographs of fired pottery
+      // taken from today count, because only from today do they mean a kiln
+      // being emptied. Everything a piece carries from before is a sighting
+      // on a shelf during a hunt, which is not the same claim.
+      //
+      // Within that, the app will still be wrong occasionally -- it is
+      // reading photographs of near-identical pottery -- so every pair
+      // carries the day it was seen and a way to say no to it. The person
+      // holding the piece is the only one who can settle that.
+      const outIds = new Set(live.filter((p) => p.last_seen_at && p.last_seen_at >= FIRED_PHOTOS_FROM).map((p) => p.id));
 
       // The kiln-out photo each piece was found in. One lookup for the whole
       // board rather than one per booking on drill-down -- these are URLs
