@@ -245,7 +245,7 @@ export default function KilnPage() {
           and with the shelf count in front of them so the page says how
           much there is before you start scrolling through it. */}
       <Toolbar>
-        <Count>{shelves.length} shelf{shelves.length === 1 ? '' : 'ves'}</Count>
+        <Count>{shelves.length === 1 ? '1 shelf' : `${shelves.length} shelves`}</Count>
         {([['Kiln plan', '/kiln-plan'], ['Shelf labels', '/shelf-stickers'], ['Out of the kiln', '/out-of-kiln']] as const).map(([label, href]) => (
           <Tool key={href} onClick={() => router.push(href)}>{label}</Tool>
         ))}
@@ -330,12 +330,23 @@ export default function KilnPage() {
               const plan = s.stage?.plan_fire_date ? String(s.stage.plan_fire_date).slice(0, 10) : null;
               const suggested = fireBy(s.date);
               const shown = plan || suggested;
+              // [14 Oct] A day that has already gone is not a plan. This read
+              // "Fire by Sat 10 Oct" on the fourteenth, which is not a thing
+              // anyone can do: the suggestion is two open days before
+              // collection and nobody had fired it, so it just sat there
+              // quietly naming a date in the past. Says what is true instead,
+              // which is that it is late and the day to fire it is today.
+              const overdue = shown < isoOf(new Date());
               return (
                 <div style={{ padding: '0 0.9rem 0.6rem' }}>
-                  <button onClick={() => { setPlanning(planning === s.date ? null : s.date); setPlanVal(shown); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', minHeight: 40, padding: '0 0.7rem', borderRadius: 10, border: `1px ${plan ? 'solid' : 'dashed'} #e3c9b4`, background: plan ? '#fbf3ea' : 'white', color: '#8a4a2a', fontSize: 'var(--text-sm)', fontWeight: 600, textAlign: 'left' }}>
+                  <button onClick={() => { setPlanning(planning === s.date ? null : s.date); setPlanVal(overdue ? isoOf(new Date()) : shown); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', minHeight: 40, padding: '0 0.7rem', borderRadius: 10, border: `1px ${overdue ? 'solid #d8a28a' : plan ? 'solid #e3c9b4' : 'dashed #e3c9b4'}`, background: overdue ? '#fbeee8' : plan ? '#fbf3ea' : 'white', color: overdue ? '#b03a2e' : '#8a4a2a', fontSize: 'var(--text-sm)', fontWeight: overdue ? 700 : 600, textAlign: 'left' }}>
                     <Flame size={14} />
-                    <span style={{ flex: 1 }}>{plan ? 'Fire on' : 'Fire by'} {dayName(shown)}</span>
+                    <span style={{ flex: 1 }}>
+                      {overdue
+                        ? `Fire today — ${plan ? 'was planned for' : 'should have gone in by'} ${dayName(shown)}`
+                        : `${plan ? 'Fire on' : 'Fire by'} ${dayName(shown)}`}
+                    </span>
                     <span style={{ fontSize: 'var(--text-xs)', color: '#A8651A' }}>{planning === s.date ? 'close' : plan ? 'change' : 'plan'}</span>
                   </button>
                   {planning === s.date && (
@@ -736,7 +747,7 @@ const addDays = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:0
 function KilnCalendar({ shelves, onPick }: { shelves: Shelf[]; onPick: (date: string) => void }) {
   const today = isoDay(new Date());
   const days = Array.from({ length: 21 }, (_, i) => addDays(today, i - 2));
-  type Mark = { date: string; kind: 'collect' | 'fireby' | 'plan' | 'dip' | 'in' | 'out' | 'left'; label: string };
+  type Mark = { date: string; kind: 'collect' | 'fireby' | 'plan' | 'late' | 'dip' | 'in' | 'out' | 'left'; label: string };
   const marks = new Map<string, Mark[]>();
   const put = (day: string, m: Mark) => { if (!marks.has(day)) marks.set(day, []); marks.get(day)!.push(m); };
   for (const s of shelves) {
@@ -745,9 +756,18 @@ function KilnCalendar({ shelves, onPick }: { shelves: Shelf[]; onPick: (date: st
     put(s.date, { date: s.date, kind: 'collect', label: `Collect ${pieces}` });
     if (!s.stage?.into_kiln_at) {
       const plan = s.stage?.plan_fire_date ? String(s.stage.plan_fire_date).slice(0, 10) : null;
-      let fb = plan || fireBy(s.date);
-      if (fb < today) fb = today;
-      put(fb, { date: s.date, kind: plan ? 'plan' : 'fireby', label: `${plan ? 'Fire' : 'Fire by'} ${chalk(s.date).split(' ').slice(1).join(' ')}` });
+      // [14 Oct] The chip sits on the day something must go in the kiln and
+      // names the shelf it is for, so "Fire by 14 OCT" on the 14th read as
+      // its own deadline rather than as the shelf collecting that day. It
+      // says who it is for now; dashed still means latest, and a shelf whose
+      // day has already gone turns red rather than silently moving to today.
+      const want = plan || fireBy(s.date);
+      const lateFire = want < today;
+      put(lateFire ? today : want, {
+        date: s.date,
+        kind: lateFire ? 'late' : plan ? 'plan' : 'fireby',
+        label: `${lateFire ? 'Late: ' : ''}for ${chalk(s.date).split(' ').slice(1).join(' ')}`,
+      });
     }
     if (s.stage?.dipped_at && !s.stage?.into_kiln_at) put(isoDay(new Date(s.stage.dipped_at)), { date: s.date, kind: 'dip', label: 'Dipped' });
     if (s.stage?.into_kiln_at) put(isoDay(new Date(s.stage.into_kiln_at)), { date: s.date, kind: 'in', label: 'In kiln' });
@@ -758,6 +778,7 @@ function KilnCalendar({ shelves, onPick }: { shelves: Shelf[]; onPick: (date: st
     collect: { background: '#2f3330', color: '#f4f1ea' },
     fireby: { background: 'white', color: '#B8562E', border: '1px dashed #B8562E' },
     plan: { background: '#fbe3d3', color: '#8a3a16', border: '1px solid #B8562E' },
+    late: { background: '#b03a2e', color: 'white', border: '1px solid #8c2d23' },
     dip: { background: '#e3eef3', color: '#2d5566', border: '1px solid #b9cfd9' },
     in: { background: '#B8562E', color: 'white' },
     out: { background: '#3D7A4A', color: 'white' },
@@ -801,7 +822,7 @@ function KilnCalendar({ shelves, onPick }: { shelves: Shelf[]; onPick: (date: st
         })}
       </div>
       <p style={{ fontSize: 10.5, color: '#8a8178', padding: '0.45rem 0.8rem 0', lineHeight: 1.4 }}>
-        <b style={{ color: '#2f3330' }}>Collect</b> day · <b style={{ color: '#B8562E' }}>Fire</b> planned (dashed: the latest it should go in) · <b style={{ color: '#2d5566' }}>Dipped</b>, <b style={{ color: '#B8562E' }}>In kiln</b> and <b style={{ color: '#3D7A4A' }}>Out</b> when they happened. Tap to jump to the shelf.
+        <b style={{ color: '#2f3330' }}>Collect</b> day · <b style={{ color: '#B8562E' }}>for</b> a shelf is the day to fire it (dashed: the latest it should go in, <b style={{ color: '#b03a2e' }}>red: already late</b>) · <b style={{ color: '#2d5566' }}>Dipped</b>, <b style={{ color: '#B8562E' }}>In kiln</b> and <b style={{ color: '#3D7A4A' }}>Out</b> when they happened. Tap to jump to the shelf.
       </p>
     </div>
   );
