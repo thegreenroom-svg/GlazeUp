@@ -82,7 +82,18 @@ export default function KilnPage() {
   const [err, setErr] = useState<string | null>(null);
   const [view, setView] = useState<{ booking: Booking; index: number; date: string } | null>(null);
   // [10 Oct] "Did everything fit?" -- asked when a shelf goes into the kiln.
-  const [fit, setFit] = useState<{ date: string; picking: boolean } | null>(null);
+  // [14 Oct] Now a short sequence rather than one panel. David: "a series of
+  // like, I don't know, buttons and arrows for the next stage... half load
+  // for collection date or two kilns, full load".
+  //   kiln    -- which kiln, which program
+  //   fill    -- how full it ends up
+  //   bring   -- a half load asks what else could go in with it
+  //   picking -- an overflowing one asks what had to stay behind
+  const [fit, setFit] = useState<{ date: string; step: 'kiln' | 'fill' | 'bring' | 'picking' } | null>(null);
+  // [14 Oct] And the other end: a finished firing hands over to unloading
+  // rather than just ticking a box, because the photographs taken as it
+  // comes out are now what identifies every piece downstream.
+  const [outPrompt, setOutPrompt] = useState<string | null>(null);
   const [leftSel, setLeftSel] = useState<Set<string>>(new Set());
   const [scan, setScan] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
   const camRef = useRef<HTMLInputElement>(null);
@@ -167,11 +178,16 @@ export default function KilnPage() {
   };
 
   // Everything went in, or the picked pieces stay behind and the rest go in.
-  const intoKiln = async (date: string, leftIds: string[]) => {
+  // [14 Oct] alsoDate is the shelf brought forward to fill a half load: it
+  // goes into the same firing, keeping its own collection date, so packing
+  // and collection still treat the two batches separately afterwards.
+  const intoKiln = async (date: string, leftIds: string[], alsoDate?: string) => {
     setBusy(date); setErr(null);
     try {
       if (leftIds.length) await post('/api/spec/kiln/left-out', { piece_ids: leftIds });
-      await post(`/api/spec/batch/${date}/move`, { stage: 'kiln', by: who(), kilns: Array.from(kilnPick.kilns), fire_program: kilnPick.program });
+      const body = { stage: 'kiln', by: who(), kilns: Array.from(kilnPick.kilns), fire_program: kilnPick.program };
+      await post(`/api/spec/batch/${date}/move`, body);
+      if (alsoDate) await post(`/api/spec/batch/${alsoDate}/move`, body);
       setFit(null); setLeftSel(new Set()); setScan({ busy: false, note: null });
       await load();
     } catch { setErr('Could not save that. Try again.'); } finally { setBusy(null); }
@@ -348,7 +364,7 @@ export default function KilnPage() {
             {!isNone && (
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', padding: '0 0.9rem 0.7rem' }}>
                 {todo && s.bookings.length > 0 && (
-                  <button disabled={busy === s.date} onClick={() => (todo.key === 'kiln' ? setFit({ date: s.date, picking: false }) : todo.key === 'dipped' ? setDip({ date: s.date, ticks: new Set() }) : step(s.date, todo.key))}
+                  <button disabled={busy === s.date} onClick={() => (todo.key === 'kiln' ? setFit({ date: s.date, step: 'kiln' }) : todo.key === 'dipped' ? setDip({ date: s.date, ticks: new Set() }) : todo.key === 'out' ? setOutPrompt(s.date) : step(s.date, todo.key))}
                     style={{ flex: '1 1 180px', minHeight: 44, borderRadius: 'var(--radius-md)', border: 'none', background: todo.key === 'kiln' ? '#B8562E' : 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
                     {busy === s.date ? <Loader size={15} className="animate-spin" /> : todo.key === 'kiln' ? <Flame size={15} /> : <Check size={15} />}
                     {todo.doLabel}
@@ -364,6 +380,35 @@ export default function KilnPage() {
                     undo &ldquo;{last.doneLabel.toLowerCase()}&rdquo;
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* [14 Oct] THE FIRING IS DONE. David: "another prompt when the
+                kiln is being finished and ready, press that button, takes
+                you to another prompt, photographs top shelf, photograph
+                second shelf, etc. until the kiln's empty."
+                Photographing is the way out of here, not an optional extra:
+                every piece coming out of a kiln is identified by that photo
+                now, and packing reads nothing else. Marking it out without
+                photographing is still possible and still honest, it just
+                leaves the pieces unaccounted for, so it says so. */}
+            {outPrompt === s.date && (
+              <div style={{ margin: '0 0.9rem 0.8rem', padding: '0.75rem', borderRadius: 'var(--radius-md)', background: '#fbf3ea', border: '1px solid #ecd9c3' }}>
+                <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>Emptying the kiln</p>
+                <p style={{ fontSize: 'var(--text-xs)', color: '#6b625a', marginTop: '0.15rem' }}>
+                  One photo per shelf from the top down. That is what names every piece for packing.
+                </p>
+                <button onClick={() => router.push('/out-of-kiln?start=1')}
+                  style={{ width: '100%', minHeight: 50, marginTop: '0.6rem', borderRadius: 'var(--radius-md)', border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                  <Camera size={16} /> Start photographing it out
+                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                  <button disabled={busy === s.date} onClick={async () => { await step(s.date, 'out'); setOutPrompt(null); }}
+                    style={{ flex: 1, minHeight: 42, borderRadius: 'var(--radius-md)', border: '1px solid #e3c9b4', background: 'white', color: '#8a4a2a', fontWeight: 600, fontSize: 'var(--text-xs)' }}>
+                    {busy === s.date ? 'Saving' : 'Just mark it out, no photos'}
+                  </button>
+                  <button onClick={() => setOutPrompt(null)} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>Cancel</button>
+                </div>
               </div>
             )}
 
@@ -397,9 +442,14 @@ export default function KilnPage() {
 
             {fit?.date === s.date && (() => {
               const toFire = s.bookings.flatMap((b) => b.pieces.map((p, i) => ({ p, i, b })).filter((x) => x.p.stage === 'to_fire'));
+              // [14 Oct] What else could go in alongside a half load. Only
+              // shelves that are not in a kiln already and have something on
+              // them, soonest collection first -- bringing a date forward is
+              // only ever worth offering in the order things are due.
+              const couldComeToo = (shelves || []).filter((x) => x.date !== 'none' && x.date !== s.date && !x.stage?.into_kiln_at && x.to_fire > 0);
               return (
                 <div style={{ margin: '0 0.9rem 0.8rem', padding: '0.75rem', borderRadius: 'var(--radius-md)', background: '#fbf3ea', border: '1px solid #ecd9c3' }}>
-                  {!fit.picking ? (
+                  {fit.step === 'kiln' ? (
                     <>
                       <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>Which kiln?</p>
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
@@ -421,18 +471,81 @@ export default function KilnPage() {
                           </button>
                         ))}
                       </div>
-                      <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)', marginTop: '0.8rem' }}>Did everything on this shelf fit in?</p>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                        <button disabled={busy === s.date} onClick={() => intoKiln(s.date, [])}
-                          style={{ flex: '1 1 160px', minHeight: 44, borderRadius: 'var(--radius-md)', border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
-                          {busy === s.date ? 'Saving' : 'Yes, everything went in'}
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.8rem' }}>
+                        <button disabled={kilnPick.kilns.size === 0} onClick={() => setFit({ date: s.date, step: 'fill' })}
+                          style={{ flex: 1, minHeight: 46, borderRadius: 'var(--radius-md)', border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', opacity: kilnPick.kilns.size ? 1 : 0.5 }}>
+                          Next <ChevronRight size={15} />
                         </button>
-                        <button onClick={() => { setFit({ date: s.date, picking: true }); setLeftSel(new Set()); setScan({ busy: false, note: null }); }}
-                          style={{ flex: '1 1 160px', minHeight: 44, borderRadius: 'var(--radius-md)', border: '1px solid #B8562E', background: 'white', color: '#B8562E', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
-                          Some were left out
+                        <button onClick={() => setFit(null)} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>Cancel</button>
+                      </div>
+                    </>
+                  ) : fit.step === 'fill' ? (
+                    <>
+                      {/* [14 Oct] The question David wanted asked out loud at
+                          this moment. A half load is not a failure, it is a
+                          decision -- and the useful thing to do about it is
+                          to offer what else could go in rather than just
+                          record that the kiln was half empty. */}
+                      <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>How full is it?</p>
+                      <p style={{ fontSize: 'var(--text-xs)', color: '#6b625a', marginTop: '0.15rem' }}>
+                        {Array.from(kilnPick.kilns).join(' + ')} · {kilnPick.program}
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.6rem' }}>
+                        <button disabled={busy === s.date} onClick={() => setFit({ date: s.date, step: 'bring' })}
+                          style={{ minHeight: 48, borderRadius: 'var(--radius-md)', border: '1px solid #B8562E', background: 'white', color: '#B8562E', fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.85rem' }}>
+                          <span>Half full, there is room</span>
+                          <ChevronRight size={15} />
+                        </button>
+                        <button disabled={busy === s.date} onClick={() => intoKiln(s.date, [])}
+                          style={{ minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                          {busy === s.date ? 'Saving' : 'Full, everything went in'}
+                        </button>
+                        <button disabled={busy === s.date} onClick={() => { setFit({ date: s.date, step: 'picking' }); setLeftSel(new Set()); setScan({ busy: false, note: null }); }}
+                          style={{ minHeight: 48, borderRadius: 'var(--radius-md)', border: '1px solid #B8562E', background: 'white', color: '#B8562E', fontWeight: 700, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.85rem' }}>
+                          <span>Overflowing, some stayed out</span>
+                          <ChevronRight size={15} />
                         </button>
                       </div>
-                      <button onClick={() => setFit(null)} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.4rem', padding: 0 }}>Cancel</button>
+                      <button onClick={() => setFit({ date: s.date, step: 'kiln' })} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.5rem', padding: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <ChevronLeft size={13} /> Back
+                      </button>
+                    </>
+                  ) : fit.step === 'bring' ? (
+                    <>
+                      <p style={{ fontWeight: 700, color: 'var(--charcoal)', fontSize: 'var(--text-sm)' }}>Bring another date forward to fill it?</p>
+                      <p style={{ fontSize: 'var(--text-xs)', color: '#6b625a', marginTop: '0.15rem' }}>
+                        It fires now, with this shelf, and keeps its own collection date.
+                      </p>
+                      {couldComeToo.length === 0 ? (
+                        <p style={{ fontSize: 'var(--text-xs)', color: '#8a8178', marginTop: '0.5rem' }}>
+                          Nothing else is dipped and waiting. Fire it half full.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.6rem' }}>
+                          {couldComeToo.slice(0, 4).map((x) => (
+                            <button key={x.date} disabled={busy === s.date} onClick={() => intoKiln(s.date, [], x.date)}
+                              style={{ minHeight: 50, borderRadius: 'var(--radius-md)', border: '1px solid #B8562E', background: 'white', color: 'var(--charcoal)', fontWeight: 600, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.85rem', textAlign: 'left' }}>
+                              <span style={{ minWidth: 0 }}>
+                                <b style={{ display: 'block', color: '#8a4a2a' }}>{chalk(x.date)}</b>
+                                <span style={{ fontSize: 'var(--text-xs)', color: '#6b625a' }}>
+                                  {x.to_fire} piece{x.to_fire === 1 ? '' : 's'} · {when(x.days_left)}
+                                  {x.stage?.dipped_at ? ' · dipped' : ' · not dipped yet'}
+                                </span>
+                              </span>
+                              <ChevronRight size={15} color="#B8562E" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.7rem' }}>
+                        <button disabled={busy === s.date} onClick={() => intoKiln(s.date, [])}
+                          style={{ flex: 1, minHeight: 46, borderRadius: 'var(--radius-md)', border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                          {busy === s.date ? 'Saving' : 'No, fire it half full'}
+                        </button>
+                        <button onClick={() => setFit({ date: s.date, step: 'fill' })} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <ChevronLeft size={13} /> Back
+                        </button>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -466,7 +579,9 @@ export default function KilnPage() {
                           style={{ flex: '1 1 200px', minHeight: 44, borderRadius: 'var(--radius-md)', border: 'none', background: '#B8562E', color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', opacity: leftSel.size ? 1 : 0.5 }}>
                           {busy === s.date ? 'Saving' : `${leftSel.size} left out, the rest into the kiln`}
                         </button>
-                        <button onClick={() => setFit(null)} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>Cancel</button>
+                        <button onClick={() => setFit({ date: s.date, step: 'fill' })} style={{ border: 'none', background: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <ChevronLeft size={13} /> Back
+                        </button>
                       </div>
                     </>
                   )}

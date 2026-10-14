@@ -7657,6 +7657,13 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
     // case it is wanted. Fire-and-forget: a storage failure must never
     // stop a sweep that would otherwise have worked.
     let sweepId = null;
+    // [14 Oct] The archived photo's own URL, handed back with the result.
+    // The screen used to keep the file it had just uploaded as a blob URL
+    // so it could show the fired crop, which meant every crop died on a
+    // page refresh -- and an unload that survives a refresh is the whole
+    // point of putting one behind a shelf. This is the same picture, from
+    // somewhere that still exists tomorrow.
+    let sweepPhotoUrl = null;
     // Daisy: "want re run ai these". Photos are archived now, so a retry
     // sources the same image from storage instead of another trip to the
     // shelf. Hoisted here because recordSweep is a closure defined
@@ -7683,6 +7690,7 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
           ...extra,
         }).select('id').maybeSingle();
         sweepId = data?.id || null;
+        sweepPhotoUrl = pub.publicUrl;
       } catch (err) {
         logger.warn(`[shelf-sweep] could not archive photo: ${err.message}`);
       }
@@ -7927,7 +7935,19 @@ THE DISTINGUISHING DETAIL MUST BE VISIBLE. Each description ends with whatever s
 
 CHECK IT IS THE SAME KIND OF OBJECT. A spoon rest is not a butter dish, a teapot is not a bowl, a jug is not a vase. Getting the class of object wrong is not a near miss, it is a different piece.
 
-For each match give the number, a confidence from 0 to 1, and its bounding box in the photo.`;
+For each match give the number, a confidence from 0 to 1, and its bounding box in the photo.
+
+LAST, THE POTTERY YOU COULD NOT PLACE. Report every piece of customer pottery in this photo that you did NOT match to a number, as unplaced. This matters as much as the matches: a kiln is emptied against this photo, and anything you leave unreported is something nobody knows is there.
+
+Four kinds turn up, and all four belong in unplaced:
+- A PART of something. Lids, bases, saucers, plinths and halves are fired separately and laid out separately, but were photographed at the table as one piece, so no description will ever name them on their own. A lid with no pot beside it is unplaced, not ignored.
+- A piece whose description you can see belongs to one of the numbers, but not confidently enough to match. Say which number you suspect in maybe_number.
+- A piece you can see clearly that matches nothing on the list at all.
+- A piece too obscured, too far back or too dark to judge.
+
+For each, give its bounding box and a short plain description of what you see -- "small blue lid", "white bowl, pink flowers", "base of a tall jug" -- enough for a person holding it to recognise it. Say in reason which of the four it is.
+
+This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays of unpainted stock and drinks are not pottery and are not reported anywhere. Only report something as unplaced if you are confident it is a customer's painted piece or part of one.`;
 
       const schema = {
         type: 'object',
@@ -7964,6 +7984,33 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
           shelf_date: {
             type: 'string',
             description: 'Collection date chalked along the front lip of the shelf, as written, e.g. "26/9" or "17/10". Empty string if nothing is chalked there.',
+          },
+          // [14 Oct] David, on emptying a kiln: "if there are any pieces
+          // unidentified that may be half pieces, bases, lids, that weren't
+          // in the photo originally, as separated, or pieces that aren't
+          // identified need to be flagged at that stage".
+          //
+          // Until now a sweep only ever said what it FOUND, which was fine
+          // while it was a search -- you were looking for one booking and
+          // everything else was somebody else's problem. Emptying a kiln is
+          // the opposite job: the photo is a stocktake, and the piece
+          // nobody can name is the one that gets left on the shelf for
+          // three weeks. A lid is the common case and the one no
+          // description will ever match, because at the table it was
+          // photographed sitting on its pot as a single piece.
+          unplaced: {
+            type: 'array',
+            description: 'Customer pottery visible in the photo that was not matched to a number. Never packaging, kiln furniture or unpainted stock.',
+            items: {
+              type: 'object',
+              properties: {
+                description: { type: 'string', description: 'Short plain description, e.g. "small blue lid"' },
+                reason: { type: 'string', description: 'part | unsure | no match | obscured' },
+                maybe_number: { type: 'integer', description: 'The number from the list this might belong to, if any' },
+                box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
+              },
+              required: ['description'],
+            },
           },
         },
         required: ['matches'],
@@ -8187,6 +8234,41 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         // the moment a wrong match is easiest to spot: while the piece is
         // still in your hand.
         sweep_id: sweepId || null,
+        photo_url: sweepPhotoUrl,
+        // [14 Oct] What the photo shows and nobody can name. David, on
+        // emptying a kiln: "pieces that aren't identified need to be
+        // flagged at that stage". A lid is the usual one -- it was
+        // photographed sitting on its pot at the table, so no description
+        // will ever match it on its own, and it is exactly the thing that
+        // gets left on a shelf after everything else has gone home.
+        //
+        // Reported, never acted on: a box on a photo and a guess at what
+        // it is, for a person holding the piece to settle.
+        unplaced: (parsed.unplaced || [])
+          .filter((u) => u && typeof u.description === 'string' && u.description.trim())
+          .slice(0, 12)
+          .map((u, i) => ({
+            key: `${sweepId || 'sweep'}-${i}`,
+            description: u.description.trim(),
+            reason: (u.reason || '').toString().trim().toLowerCase() || null,
+            // The piece it might belong to, where the model had a hunch --
+            // carried as the actual piece so the screen can offer it as
+            // the first thing to tap rather than making someone search.
+            maybe: (() => {
+              const p = Number.isInteger(u.maybe_number) ? pieces[u.maybe_number - 1] : null;
+              if (!p) return null;
+              return {
+                id: p.id,
+                piece_type: p.piece_type,
+                description: p.description,
+                booking_code: p.booking_id,
+                customer_name: nameByCode.get(p.booking_id) || p.booking_id,
+                reference_photo_url: p.reference_photo_url || null,
+                photo_box: p.photo_box || null,
+              };
+            })(),
+            box: boxFromGemini(u.box_2d),
+          })),
         bookings: Array.from(byBooking.entries())
           .map(([code, v]) => ({
             booking_code: code,
@@ -9826,6 +9908,78 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
       res.json({ ok: true, remaining: details.length });
     } catch (err) {
       logger.error(`[sweep-reject] ${err.message}`);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // [14 Oct] SAYING YES TO SOMETHING THE AI COULD NOT PLACE.
+  //
+  // The mirror of rejecting a match, and the other half of emptying a kiln
+  // honestly. The sweep now reports the pottery it could not name -- a lid,
+  // a base, a piece too far back to judge -- and the person holding it
+  // usually can name it in a second. This is them saying so.
+  //
+  // Written exactly as a confident match is written, because that is what
+  // it is: the piece gets this photo as its last-seen position, joins the
+  // shelf being unloaded, and is carried to packing with the rest of its
+  // booking. The only difference is who decided, which is recorded.
+  app.post('/api/spec/shelf/sweeps/:id/assign/:pieceId', async (req, res) => {
+    try {
+      const { id, pieceId } = req.params;
+      const { data: sweep } = await supabase
+        .from('shelf_sweeps').select('id, photo_url, box_number, matched_piece_ids, matched_details')
+        .eq('studio_id', STUDIO_ID).eq('id', id).maybeSingle();
+      if (!sweep) return res.status(404).json({ error: 'No such sweep' });
+
+      const { data: piece } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, reference_photo_url, photo_box')
+        .eq('studio_id', STUDIO_ID).eq('id', pieceId).maybeSingle();
+      if (!piece) return res.status(404).json({ error: 'No such piece' });
+
+      const box = req.body?.box || null;
+      const by = (req.body?.by || '').toString().trim() || null;
+
+      if (!(sweep.matched_piece_ids || []).includes(pieceId)) {
+        const details = [...(sweep.matched_details || []), {
+          piece_id: piece.id,
+          piece_type: piece.piece_type,
+          description: piece.description,
+          box,
+          booking_code: piece.booking_id,
+          reference_photo_url: piece.reference_photo_url || null,
+          reference_box: piece.photo_box || null,
+          // Not the AI's answer. Worth being able to tell apart later, when
+          // anyone asks how well the matching is actually doing.
+          by_hand: true,
+          by,
+        }];
+        await supabase.from('shelf_sweeps')
+          .update({
+            matched_details: details,
+            matched_piece_ids: [...(sweep.matched_piece_ids || []), pieceId],
+            matches_found: details.length,
+          })
+          .eq('id', id);
+      }
+
+      const update = {
+        last_seen_sweep_id: id,
+        last_seen_at: new Date().toISOString(),
+        last_seen_box: box,
+        last_seen_box_number: sweep.box_number || null,
+        updated_at: new Date().toISOString(),
+      };
+      // Onto the shelf being unloaded, where one given, so it travels with
+      // the group it was actually found in.
+      if (req.body?.shelf_id) update.shelf_id = req.body.shelf_id;
+      await supabase.from('pottery_pieces')
+        .update(update)
+        .eq('studio_id', STUDIO_ID).eq('id', pieceId);
+
+      res.json({ ok: true, piece_id: pieceId, booking_code: piece.booking_id });
+    } catch (err) {
+      logger.error(`[sweep-assign] ${err.message}`);
       res.status(500).json({ error: err.message });
     }
   });
