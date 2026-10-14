@@ -7935,7 +7935,7 @@ Below is a numbered list of pieces the studio is currently waiting to hand out. 
 ${list}
 
 ${referenceImages.length
-  ? `The reference photos that follow show what each of those pieces actually looks like -- marked "[reference photo attached]" above, in the same order as this sentence. Those were taken AT THE TABLE, BEFORE FIRING. COMPARE THEM VISUALLY against the shelf photo, but expect the fired piece to be more saturated and glossier than its reference. Shape, decoration and where the pattern sits are the reliable evidence; exact colour is not.`
+  ? `The reference photos that follow show what each of those pieces actually looks like -- marked "[reference photo attached]" above, in the same order as this sentence. Those were taken AT THE TABLE, BEFORE FIRING. COMPARE THEM VISUALLY against the shelf photo. The fired piece is the same piece: same shape, same colours, same pattern in the same places, only shinier and a shade deeper. Treat all of that as evidence that has to agree.`
   : `No reference photos are attached this time -- go on the written descriptions alone.`}
 
 If a number is written by hand ON A CARDBOARD BOX in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only.
@@ -7956,9 +7956,13 @@ Look at the shelf photo and decide which of the numbered pieces you can actually
 
 A shelving unit holds several batches at once, so pieces due on different dates sit on different shelves in the same photo. Judge every piece on what it looks like. Do not use the chalked dates to decide what is or is not on the shelf -- they label the wood, not the pottery, and a piece can easily sit on the wrong shelf.
 
-CRITICAL -- THE TWO PHOTOS SHOW DIFFERENT STAGES. The reference photos and descriptions were made at the table BEFORE firing, when the paint is chalky and pale. The shelf photo is AFTER firing and glazing, when that same paint is far more saturated, glossy and often several shades deeper. A piece recorded as "pale green" can come out of the kiln a strong green, and the white clay warms up.
+THE TWO PHOTOS SHOW THE SAME PIECE AT DIFFERENT STAGES, AND LESS CHANGES THAN YOU WOULD THINK. The reference photo was taken at the table before firing, when the glaze is chalky and matt. Firing makes it glossy and a little deeper. It does not repaint it.
 
-So judge on FORM, PATTERN and MOTIF, none of which change in the kiln -- the shape of the piece, where the decoration sits, the drawing, any lettering, the number and arrangement of elements. Treat colour as a hint about which family a piece is in, never as the deciding evidence, and never rule a piece out because it looks brighter or darker than its description.
+So the piece keeps its SHAPE and it keeps its COLOURS. A mug painted with blue spots comes out of the kiln a glossier mug with blue spots. A pale green plate comes out a slightly stronger green plate. White stays white. What changes is the shine and a step of saturation, nothing else.
+
+This means colour is evidence, not a hint. If the description says blue spots and the object in front of you has grey stripes, that is a different object, however well the shape agrees. If the description says pink and the object is green, it is a different object. Do not excuse a colour disagreement as "the firing changed it", because firing does not do that.
+
+Judge on all of it together: the shape, the colours, where the decoration sits, the drawing, any lettering, the number and arrangement of elements. Each has to agree. The only allowance you make for firing is that the fired piece is shinier and slightly deeper in tone than its reference photo.
 
 A PIECE CUT OFF BY THE EDGE OF THE PHOTO IS NOT A MATCH. If an object is clipped by the frame -- half a plate at the bottom corner, a rim leaving the side -- you are looking at a fraction of it, and a fraction of a white plate is every white plate. Report it as unplaced with reason "obscured". Do not match it, however well the visible part agrees.
 
