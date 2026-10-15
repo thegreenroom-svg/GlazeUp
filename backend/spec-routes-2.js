@@ -5303,18 +5303,34 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
   // fulfilment, postal_postcode and hold_reason -- it silently ignores any
   // status passed to it, so packing would have appeared to work and saved
   // nothing at all.
+  // [15 Oct] PACKED IS NOT COLLECTED.
+  //
+  // This wrote status='collected', which is the same value the real
+  // handover writes when a customer walks out with their box. Both boards
+  // then threw the booking away: packing excludes collected pieces, and so
+  // does the collect board before it ever looks at bookings.collected_at.
+  // So the first booking Jenny packed would have vanished off both screens
+  // and never reached hand-over -- packed, on the shelf, and invisible.
+  //
+  // Nothing had been packed through here yet (checked: zero rows with
+  // packed_at set or status collected in the whole table), so this is a
+  // latent fault rather than a mess to clean up.
+  //
+  // packed_at is the truth for packed, which is what ops-routes already
+  // reads in eight places. status='collected' is left to the handover
+  // alone, so the two events stay two events.
   app.post('/api/spec/pieces/:id/packed', async (req, res) => {
     try {
       const packed = req.body?.packed !== false;
       const { data, error } = await supabase
         .from('pottery_pieces')
-        .update({ status: packed ? 'collected' : 'queued', updated_at: new Date().toISOString() })
+        .update({ packed_at: packed ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
         .eq('id', req.params.id)
         .eq('studio_id', STUDIO_ID)
         // Never let a hold get packed by accident -- a piece kept back for
         // a return visit must not leave the studio in someone else's box.
         .neq('fulfilment', 'return_visit')
-        .select('id, status')
+        .select('id, packed_at')
         .maybeSingle();
       if (error) throw error;
       if (!data) return res.status(404).json({ error: 'Piece not found, or it is on hold for a return visit' });
@@ -9295,19 +9311,18 @@ export function registerCustomerBookingRoute(app, supabase, STUDIO_ID, logger) {
 
       const { data: pieces } = await supabase
         .from('pottery_pieces')
-        .select('id, status')
+        .select('id, status, packed_at')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', req.params.code)
         .neq('archived', true);
 
       const total = (pieces || []).length;
-      // A piece with status='collected' means packed and sitting ready --
-      // the SAME status this schema uses once a customer has actually
-      // been handed their order too. The two are told apart only by
-      // bookings.collected_at, set once by the real handover in
-      // Collection, never by packing alone. Checked directly against the
-      // route that sets it before writing this, rather than assumed.
-      const allPacked = total > 0 && (pieces || []).every((p) => p.status === 'collected');
+      // [15 Oct] Packed is packed_at; handed over is status='collected'
+      // plus bookings.collected_at. Until today packing wrote the handover
+      // status too, so these were the same thing and this line could not
+      // tell them apart. It can now. The || keeps it honest for any
+      // booking packed under the old behaviour.
+      const allPacked = total > 0 && (pieces || []).every((p) => p.packed_at || p.status === 'collected');
       const alreadyCollected = !!booking.collected_at;
 
       res.json({
@@ -9900,9 +9915,12 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
     try {
       const { data: pieces, error } = await supabase
         .from('pottery_pieces')
-        .select('id, booking_id, piece_type, description, status, assigned_to, fulfilment, notes, postal_postcode, reference_photo_url, photo_box, photo_taken_by, reference_photo_taken_at, last_seen_at, last_seen_box, last_seen_box_number, last_seen_sweep_id, shelf_id, created_at')
+        .select('id, booking_id, piece_type, description, status, assigned_to, fulfilment, notes, postal_postcode, reference_photo_url, photo_box, photo_taken_by, reference_photo_taken_at, last_seen_at, last_seen_box, last_seen_box_number, last_seen_sweep_id, shelf_id, packed_at, created_at')
         .eq('studio_id', STUDIO_ID)
         .neq('archived', true)
+        // status='collected' is now only ever written by the real handover,
+        // so this means gone, not boxed. Boxed pieces stay in, because a
+        // booking half-packed has to keep showing the ticks already made.
         .neq('status', 'collected')
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -9998,8 +10016,19 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
           session_start: b?.session_start || null,
           total: ps.length,
           out,
-          packed: ps.filter((p) => p.status === 'collected').length,
+          packed: ps.filter((p) => p.packed_at).length,
           on_hold: held[code] || 0,
+          // How long the oldest unfound piece on this booking has been
+          // waiting, in days since its table photo. No date to maintain:
+          // it is read off the photo that already exists. Null once
+          // everything is out, because then nothing is waiting.
+          waiting_days: (() => {
+            const stamps = ps.filter((p) => !outIds.has(p.id))
+              .map((p) => p.reference_photo_taken_at || p.created_at).filter(Boolean);
+            if (!stamps.length) return null;
+            const oldest = stamps.sort()[0];
+            return Math.floor((Date.now() - new Date(oldest).getTime()) / 86400000);
+          })(),
           posting: ps.filter((p) => p.fulfilment === 'post').length,
           postal_postcode: ps.map((p) => p.postal_postcode).find(Boolean) || b?.shipping_postcode || null,
           shelf_label: shelf ? (shelfById.get(shelf)?.label || null) : null,
@@ -10018,7 +10047,7 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
               assigned_to: p.assigned_to,
               notes: p.notes,
               posting: p.fulfilment === 'post',
-              packed: p.status === 'collected',
+              packed: !!p.packed_at,
               out: isOut,
               out_at: isOut ? p.last_seen_at || null : null,
               // So the screen can say no to this match. Without it a wrong
@@ -10044,10 +10073,37 @@ export function registerPackingBoardRoute(app, supabase, STUDIO_ID, logger) {
           return String(a.session_start || '').localeCompare(String(b.session_start || ''));
         });
 
+      // [15 Oct] WHAT HAPPENS WHEN A PIECE NEVER COMES OUT.
+      //
+      // The kiln photograph is the only accounting event left, which is the
+      // point -- but it means a piece that is lost, or simply missed by a
+      // shelf photo, looks exactly like a piece that has not been fired
+      // yet. Both read "still in the kiln" and neither ever nudges. The
+      // first you would know is a customer ringing up.
+      //
+      // Not a date system, and not a deadline: one number, read off the
+      // table photo that already exists. Two weeks is a long turnaround
+      // even for a busy fortnight, so anything past it has a question to
+      // answer.
+      const STALE_DAYS = 14;
+      const waiting = rows.filter((r) => r.out < r.total);
+      const packedOut = rows.filter((r) => r.out === r.total && r.packed === r.total);
       res.json({
         today: new Date().toISOString().slice(0, 10),
-        ready: rows.filter((r) => r.out === r.total),
-        waiting: rows.filter((r) => r.out < r.total),
+        // A booking with every piece boxed has nothing left to pack. It is
+        // on the collection shelf now, so it belongs on Collect, not here.
+        ready: rows.filter((r) => r.out === r.total && r.packed < r.total),
+        waiting,
+        packed_waiting_handover: packedOut.length,
+        stale: waiting
+          .filter((r) => (r.waiting_days ?? 0) >= STALE_DAYS)
+          .map((r) => ({
+            booking_code: r.booking_code,
+            customer_name: r.customer_name,
+            missing: r.total - r.out,
+            waiting_days: r.waiting_days,
+          }))
+          .sort((a, b) => (b.waiting_days || 0) - (a.waiting_days || 0)),
       });
     } catch (err) {
       logger.error('packing board failed', err.message);

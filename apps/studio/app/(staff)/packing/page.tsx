@@ -87,10 +87,24 @@ interface BookingRow {
   shelf_label: string | null;
   photo_taken_by: string | null;
   table_photo_taken_at: string | null;
+  waiting_days: number | null;
   pieces: Piece[];
 }
 
-interface Board { today: string; ready: BookingRow[]; waiting: BookingRow[] }
+interface Stale {
+  booking_code: string;
+  customer_name: string;
+  missing: number;
+  waiting_days: number | null;
+}
+
+interface Board {
+  today: string;
+  ready: BookingRow[];
+  waiting: BookingRow[];
+  packed_waiting_handover: number;
+  stale: Stale[];
+}
 
 const dueChip = (b: BookingRow, today: string) => {
   if (!b.collection_date) return null;
@@ -194,7 +208,10 @@ export default function PackingPage() {
       if (left === 0) {
         setPendingConfirm({
           title: 'All packed',
-          body: 'Print the label for this booking now?',
+          // [15 Oct] Says where it has gone, because it is about to leave
+          // this screen. Packed is not collected: the box is on the shelf
+          // until somebody is handed it, and Collect is where that happens.
+          body: `${b.customer_name} moves to Collect, ready to be handed over. Print the label now?`,
           confirmLabel: 'Print label',
           run: () => router.push(`/print-label?code=${encodeURIComponent(b.booking_code)}`),
         });
@@ -520,8 +537,58 @@ export default function PackingPage() {
 
       <Toolbar>
         <Tool onClick={() => router.push('/out-of-kiln')} icon={<Flame size={15} />}>Unloading a kiln</Tool>
+        {board.packed_waiting_handover > 0 && (
+          <Tool onClick={() => router.push('/collect')} tone="dark" icon={<Package size={15} />}>
+            {board.packed_waiting_handover} boxed, waiting to go
+          </Tool>
+        )}
         <Tool onClick={load}>Refresh</Tool>
       </Toolbar>
+
+      {/* [15 Oct] THE ONE THING A PHOTOGRAPH CANNOT TELL YOU.
+          A piece that is lost, or that a shelf photo simply missed, reads
+          exactly like a piece that has not been fired yet: both say "still
+          in the kiln", and neither ever asks for attention. This line is
+          the only nudge, and it is not a deadline -- just the pieces that
+          have been waiting markedly longer than the rest, counted from the
+          table photo that already exists. */}
+      {board.stale.length > 0 && (
+        <div style={{
+          margin: '0.6rem 0', padding: '0.7rem 0.8rem',
+          borderRadius: 'var(--radius-md)', background: '#fdf3e0',
+          border: '1px solid #f0dcb8',
+        }}>
+          <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, color: '#8A5A00' }}>
+            {board.stale.length === 1
+              ? 'One booking has been waiting far longer than the rest'
+              : `${board.stale.length} bookings have been waiting far longer than the rest`}
+          </span>
+          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8A5A00', marginTop: '0.15rem' }}>
+            Probably worth a look on the shelves. A piece that was dropped, or missed by a kiln photo, sits here looking like one that simply has not been fired.
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.45rem' }}>
+            {board.stale.slice(0, 6).map((s) => (
+              <button
+                key={s.booking_code}
+                onClick={() => setOpen(s.booking_code)}
+                style={{
+                  textAlign: 'left', border: 'none', background: 'none', padding: '0.15rem 0',
+                  fontSize: 'var(--text-xs)', color: '#8A5A00', cursor: 'pointer',
+                }}
+              >
+                <b>{s.customer_name}</b>{' · '}
+                {s.missing} piece{s.missing === 1 ? '' : 's'} missing{' · '}
+                {s.waiting_days} day{s.waiting_days === 1 ? '' : 's'} since the table photo
+              </button>
+            ))}
+            {board.stale.length > 6 && (
+              <span style={{ fontSize: 'var(--text-xs)', color: '#8A5A00' }}>
+                and {board.stale.length - 6} more below.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <Section icon={<Package size={14} />} tone="good" n={board.ready.length}>Ready to pack</Section>
       {board.ready.length === 0 ? (

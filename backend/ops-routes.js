@@ -39,6 +39,13 @@ const isWheel = (b) => (typeof b.wheel === 'boolean' ? b.wheel : /wheel|throwing
 const isReal = (b) => b.booking_type !== 'test' && !/cancel/i.test(b.status || '');
 const OPEN_DAYS = new Set([0, 3, 4, 5, 6]); // Sun, Wed-Sat (Daisy: open Wednesday to Sunday)
 
+// [15 Oct] The same line the packing board draws: only a photograph of
+// fired pottery taken on or after the 14th means a kiln being emptied.
+// Anything a piece carries from before that is a sighting during a hunt,
+// which is a different claim. Imported rather than copied, so the two
+// screens cannot drift apart and disagree about the same booking.
+import { FIRED_PHOTOS_FROM } from './spec-routes-2.js';
+
 export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
   const { sendCollectionEmail, customerEmailState, heartbeat } = deps;
 
@@ -650,7 +657,7 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
         .eq('studio_id', STUDIO_ID).gte('session_start', since).is('collected_at', null);
       const bookings = (bk || []).filter(isReal);
       const codes = bookings.map((b) => b.booking_code);
-      const pieces = codes.length ? await piecesFor(codes, 'id, booking_id, status, shelf_id, packed_at, returned_at, fulfilment, damaged, last_seen_box_number, reference_photo_url, photo_box') : [];
+      const pieces = codes.length ? await piecesFor(codes, 'id, booking_id, status, shelf_id, packed_at, last_seen_at, returned_at, fulfilment, damaged, last_seen_box_number, reference_photo_url, photo_box') : [];
       const sd = await statusDates(codes);
       const daysTo = (d) => Math.round((new Date(`${d}T12:00:00Z`) - new Date(`${today}T12:00:00Z`)) / 86400000);
       const handOver = [], toPack = [], inKiln = [];
@@ -662,7 +669,15 @@ export function registerOpsRoutes(app, supabase, STUDIO_ID, logger, deps = {}) {
         if (!live.length) continue;
         const due = String(sd[b.booking_code] || b.collection_date || '').slice(0, 10) || null;
         const packed = live.filter((p) => p.packed_at).length;
-        const out = live.filter((p) => p.packed_at || p.shelf_id || p.status === 'ready').length;
+        // [15 Oct] Was packed_at || shelf_id || status 'ready'. Checked
+        // against the live data: all 42 pieces photographed out of a kiln
+        // since the 14th have no shelf_id and no 'ready' status, because
+        // the sweep that found them writes last_seen_at. So this counted
+        // none of them, and every booking the packing board called ready
+        // was sitting under "still in the kiln" over here. Two screens,
+        // two answers, same bookings.
+        const out = live.filter((p) => p.packed_at || p.shelf_id
+          || (p.last_seen_at && p.last_seen_at >= FIRED_PHOTOS_FROM)).length;
         const boxes = [...new Set(live.map((p) => p.last_seen_box_number).filter(Boolean))];
         const first = live.find((p) => p.reference_photo_url);
         const row = {
