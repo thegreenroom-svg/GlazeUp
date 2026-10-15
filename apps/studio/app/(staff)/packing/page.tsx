@@ -261,7 +261,13 @@ export default function PackingPage() {
         >
           {isOpen ? <ChevronDown size={16} style={{ flexShrink: 0, color: '#8a8178' }} /> : <ChevronRight size={16} style={{ flexShrink: 0, color: '#8a8178' }} />}
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700 }}>{b.customer_name}</span>
+            {/* [15 Oct] David: "I want to be able to see booking names." They
+                were there, in the theme's own text colour, on a card that
+                paints itself cream whatever the theme is -- so in dark mode
+                the names went white on white and only the lines with an
+                explicit colour survived. Every piece of text on this page
+                that sits on one of these cards now names its colour. */}
+            <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--charcoal)' }}>{b.customer_name}</span>
             <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>
               {kind === 'ready'
                 ? `${toPack.length} to pack${b.packed ? ` · ${b.packed} done` : ''}`
@@ -366,7 +372,7 @@ export default function PackingPage() {
                         </span>
                       </span>
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600 }}>{p.piece_type || 'Piece'}</span>
+                        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--charcoal)' }}>{p.piece_type || 'Piece'}</span>
                         {p.description && (
                           <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>{p.description}</span>
                         )}

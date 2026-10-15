@@ -371,7 +371,7 @@ export default function OutOfKilnPage() {
         <PieceThumb url={u.shot_url} box={u.box} size={52} ring="#A6761D" />
       </button>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600 }}>{u.description}</span>
+        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--charcoal)' }}>{u.description}</span>
         <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>
           {(u.reason && REASON[u.reason]) || 'Not identified'}
           {inTray ? ` · ${shelfName(u.shelf_no)}` : ''}
@@ -522,7 +522,7 @@ export default function OutOfKilnPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.5rem' }}>
             <PieceThumb url={identifying.shot_url} box={identifying.box} size={56} ring="#B8562E" />
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700 }}>{identifying.description}</span>
+              <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--charcoal)' }}>{identifying.description}</span>
               <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#8a8178' }}>Whose is it?</span>
             </span>
             <Tool onClick={() => setIdentifying(null)} small label="Close" icon={<X size={13} />} />
