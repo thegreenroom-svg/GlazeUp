@@ -125,7 +125,7 @@ export default function CollectionPage() {
       // [11 Oct] Back closes an open card and otherwise goes to Collect,
       // which is where nearly everyone arrives from. Opening a card used to
       // be a one-way street: nothing but a hand-over put the list back.
-      back={card ? () => { setCard(null); setQr(null); } : '/collect'}
+      back={card ? () => { setCard(null); setQr(null); } : '/menu'}
     >
       {/* [11 Oct] The clay "Scan a collection card" button was a full-width
           band of its own above everything else. It is a chip on the one

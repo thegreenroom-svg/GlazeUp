@@ -1049,7 +1049,7 @@ export default function DailyCardsPage() {
           ))}
           {/* Daisy: need to get to packing etc. The other daily steps, one
               tap from the cards rather than via Menu. */}
-          {([['/returns', 'Returns shelf'], ['/out-of-kiln', 'Out of the kiln'], ['/packing', 'Packing']] as const).map(([href, label]) => (
+          {([['/out-of-kiln', 'Out of the kiln'], ['/packing', 'Packing']] as const).map(([href, label]) => (
             <button
               key={href}
               onClick={() => router.push(href)}
@@ -1344,7 +1344,9 @@ export default function DailyCardsPage() {
                       {(b.visit_number || 1) > 1 && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#efeaf6', color: '#6a5a8a' }}>Visit {b.visit_number}</span>}
                       {b.live_ticket_name && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#eef3ee', color: '#3d7a4a' }}>Till: {b.live_ticket_name}</span>}
                       {b.fulfilment_method === 'postal' && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A6761D' }}>Posting</span>}
-                      {back > 0 && <span role="link" onClick={(e) => { e.stopPropagation(); router.push('/returns'); }} style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A8651A', cursor: 'pointer' }}>{back} on the returns shelf ›</span>}
+                      {/* [15 Oct] The returns shelf lost its own page, so this
+                          states the count instead of going there. */}
+                      {back > 0 && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fdf3e0', color: '#A8651A' }}>{back} back for another visit</span>}
                       {(b.photo_count || 0) > 0 && !b.is_wheel && (b.party_size || 0) > (b.photo_count || 0) && (
                         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fff4d6', color: '#8a5a00' }}>{b.photo_count} for {b.party_size} seats</span>
                       )}

@@ -538,7 +538,11 @@ export default function PackingPage() {
       <Toolbar>
         <Tool onClick={() => router.push('/out-of-kiln')} icon={<Flame size={15} />}>Unloading a kiln</Tool>
         {board.packed_waiting_handover > 0 && (
-          <Tool onClick={() => router.push('/collect')} tone="dark" icon={<Package size={15} />}>
+          /* [15 Oct] Goes to Collection, the printed card and the handover
+             itself, rather than the collect board, which has gone. This is
+             now the only way into a handover that does not start from a
+             daily card, and handing over is still what closes a booking. */
+          <Tool onClick={() => router.push('/collection')} tone="dark" icon={<Package size={15} />}>
             {board.packed_waiting_handover} boxed, waiting to go
           </Tool>
         )}

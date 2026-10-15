@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 // [11 Oct] Eleven icons left over from the twenty-three tiles this page
 // used to have were still being imported. Only the nine still drawn.
-import { Printer, Camera, TrendingUp, Tags, ScanSearch, AlertTriangle, Activity, Flame } from 'lucide-react';
+import { Printer, Camera, TrendingUp, ScanSearch, Flame, Package } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -46,11 +46,24 @@ type Link = { label: string; href: string };
 //
 // Nothing is deleted. Each step's lesser screens hang off it, and every
 // page still works at its own address.
+// [15 Oct, afternoon] FOUR, AND PACKING IS ONE OF THEM. David: "Get rid of
+// needs a look, Stock, Is everything running, Collect, Returns shelf, Table
+// total. Packing needs to be a separate function, own big button."
+//
+// Packing was a chip under the kiln, which was wrong in the way that
+// matters: it is not a thing you do while unloading, it is a different
+// person on a different day with a box in their hands. A chip the size of
+// a fingernail under someone else's step is not how you find your own job.
+//
+// The six that went were each a page that watched something rather than
+// did it. What is left is four things a person does, in order, and one
+// chip: the kiln photographs themselves, which is the evidence behind the
+// step above it.
 const STEPS: { key: string; label: string; detail: string; href: string; icon: typeof Printer; tint: string; also: Link[] }[] = [
   { key: 'bookings', label: 'Bookings', detail: "Today's tables, and any name or date", href: '/daily-cards', icon: Printer, tint: '#8C6A4A',
-    also: [{ label: 'Find a booking', href: '/find' }, { label: 'Table total', href: '/table-total' }] },
+    also: [{ label: 'Find a booking', href: '/find' }] },
   { key: 'table', label: 'Table photos', detail: 'Photograph a table, or let the iPad send them through', href: '/floor', icon: Camera, tint: '#4F6D7A',
-    also: [{ label: 'Needs a look', href: '/needs-a-look' }] },
+    also: [] },
   // [15 Oct] David: "Kiln just photo when opened, no dip, no fire
   // schedule, simplify."
   //
@@ -65,23 +78,18 @@ const STEPS: { key: string; label: string; detail: string; href: string; icon: t
   // So the step goes straight to the camera. What is still waiting to be
   // fired is already on the packing screen, by name, under Waiting on the
   // kiln.
-  { key: 'kiln', label: 'Kiln and packing', detail: "Photograph it as it's opened, then pack what comes out", href: '/out-of-kiln', icon: Flame, tint: '#B8562E',
-    also: [
-      { label: 'Packing', href: '/packing' },
-      { label: 'Collect', href: '/collect' },
-      { label: 'Kiln photos', href: '/shelves' },
-      { label: 'Returns shelf', href: '/returns' },
-    ] },
+  { key: 'kiln', label: 'The kiln', detail: "Photograph each shelf as it's opened", href: '/out-of-kiln', icon: Flame, tint: '#B8562E',
+    also: [{ label: 'Kiln photos', href: '/shelves' }] },
+  { key: 'packing', label: 'Packing', detail: 'Who is complete, piece by piece against the table photo', href: '/packing', icon: Package, tint: '#2E7D6B',
+    also: [] },
 ];
 
-// [11 Oct] The "needs a look" piles are one page now: /needs-a-look.
-
-// The office: owner only.
+// The office: owner only. Stock and the job monitor went with the rest --
+// one priced the shapes, the other watched the watchers, and neither is
+// anybody's job during a day in the studio.
 const BACKROOM = [
   { key: 'owner',    label: 'The numbers',          detail: 'Takings, records and where it comes from', href: '/owner', icon: TrendingUp, tint: '#2E7D6B' },
-  { key: 'stock',    label: 'Stock',                detail: 'Every shape, price and how many are in', href: '/stock', icon: Tags, tint: '#B87946' },
   { key: 'shapes',   label: 'Shape recognition',    detail: 'Which shape each painted piece is', href: '/recognition', icon: ScanSearch, tint: '#5B6E8C' },
-  { key: 'heartbeat',  label: 'Is everything running?', detail: 'The jobs that keep the numbers honest', href: '/heartbeat', icon: Activity, tint: '#3D7A4A' },
 ];
 
 // [6 Oct] Owner-only screens: the money, the job monitor and the data
@@ -101,12 +109,6 @@ export default function StudioHome() {
     } catch { /* leave everything showing */ }
   }, []);
   const backroom = isOwner ? BACKROOM : [];
-  const [look, setLook] = useState<{ shapes: number; backfill: number; total: number } | null>(null);
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/needs-a-look/counts`)
-      .then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setLook(d); }).catch(() => {});
-  }, []);
-  const lookCount = look ? (isOwner ? look.total - (look.backfill || 0) : look.shapes) : 0;
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
   // From the app review: the tiles said what each step IS but nothing
@@ -138,7 +140,7 @@ export default function StudioHome() {
     <div style={{ padding: '1rem 0.9rem 2rem' }}>
       <div style={{ marginBottom: '1.4rem' }}>
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>The Kiln Cafe</h1>
-        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Three steps. Everything else hangs off them.</p>
+        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Four things, in the order the pottery moves.</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -172,8 +174,12 @@ export default function StudioHome() {
               </div>
               {(() => {
                 if (!counts) return null;
+                // [15 Oct] Packing has its own button now, so the number
+                // that belongs to packing goes on packing. The kiln tile
+                // carries nothing: what is waiting to be fired is not a
+                // queue the app can count, it is whatever is on the shelf.
                 const n = step.key === 'bookings' ? counts.today_bookings
-                  : step.key === 'kiln' ? (counts.to_pack || 0) + (counts.due_collection || 0)
+                  : step.key === 'packing' ? (counts.to_pack || 0) + (counts.due_collection || 0)
                   : null;
                 if (!n) return null;
                 return (
@@ -198,16 +204,12 @@ export default function StudioHome() {
         })}
       </div>
 
-      {/* [11 Oct] One list, one button, with how many things are waiting. */}
-      <button onClick={() => open({ key: 'needs-a-look', href: '/needs-a-look' })} disabled={!!opening}
-        style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', marginTop: '1.4rem', padding: '0.85rem 0.9rem', borderRadius: 'var(--radius-md)', border: '1px solid #ece5db', background: 'white', color: 'var(--charcoal)', cursor: 'pointer', textAlign: 'left' }}>
-        <span style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 'var(--radius-md)', background: '#E0A23C', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={17} /></span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 'var(--text-base)', fontWeight: 700 }}>Needs a look</span>
-          <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: '#777' }}>{isOwner ? 'Shapes, missing pieces, unknown items' : 'Guessed shapes to confirm'}</span>
-        </span>
-        {lookCount > 0 && <span style={{ flexShrink: 0, minWidth: 28, height: 28, padding: '0 0.5rem', borderRadius: 14, background: '#E0A23C', color: 'white', fontWeight: 800, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{lookCount}</span>}
-      </button>
+      {/* [15 Oct] Needs a look went too. It was a waiting room: four piles
+          of things the app had noticed and nobody had answered, which is a
+          list about the app rather than about pottery. The two piles that
+          were real work -- a guessed shape to confirm, a booking charged
+          for more pieces than were photographed -- belong next to the
+          photograph that raised them, not behind a fifth button. */}
 
       {/* One line, not eight tiles. Everything here is still one tap away,
           it has just stopped shouting over the work. */}
