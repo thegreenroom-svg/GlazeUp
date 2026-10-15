@@ -7877,11 +7877,95 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         const da = dueKey(a), db = dueKey(b);
         return da < db ? -1 : da > db ? 1 : 0;
       });
-      const pieces = eligible.slice(0, CANDIDATE_CAP);
+      let pieces = eligible.slice(0, CANDIDATE_CAP);
       // Said out loud rather than hidden. If a sweep only looked at part
       // of what is waiting, whoever is standing at the shelf needs to
       // know that "not found" might mean "not searched".
       const notSearched = Math.max(0, eligible.length - pieces.length);
+      // The real size of the pool, kept because `pieces` is about to be
+      // narrowed and the person at the shelf should be told what was
+      // actually considered, not what survived the shortlist.
+      const poolSize = pieces.length;
+
+      // The kiln photo itself, prepared once. Both passes below need it.
+      const shelfGemini = await forGemini(sharp, sourceBuffer, logger, null, 1600);
+      const base64 = shelfGemini.buffer.toString('base64');
+
+      // ======================================================================
+      // [15 Oct] TWO PASSES, BECAUSE ONE PASS NEVER LOOKED AT THE PICTURES.
+      // ----------------------------------------------------------------------
+      // David: "It doesn't seem to be able to recognize things from a photo of
+      // a photo."
+      //
+      // It wasn't trying. Reference photos were attached only when the whole
+      // candidate pool was 15 or fewer, and the pool is 110 to 126 pieces, so
+      // that test has been false every single time this route has ever run.
+      // Every match yesterday was made from one kiln photo and a list of 126
+      // sentences -- "white mug with blue spots, handle details, and name
+      // GRAN" against 125 other sentences describing near-identical blanks.
+      // It never saw Stacey's mug, which is why it settled for a striped jar.
+      //
+      // The cap was there for a real reason: 80 reference images in one call
+      // was slow and caused timeouts. The answer is not to send 126 images,
+      // it is to send the right 20.
+      //
+      // So: pass one reads the photo against the full list as text and comes
+      // back with a shortlist -- cheap, generous, and no decision made. Pass
+      // two is the strict call that already exists, run against those twenty
+      // with their actual reference crops attached, which is the comparison
+      // this engine was supposed to be making all along.
+      // ======================================================================
+      const SHORTLIST_CAP = 20;
+      let shortlisted = false;
+      if (pieces.length > SHORTLIST_CAP) {
+        const roughList = pieces
+          .map((p, i) => `${i + 1}. ${p.piece_type || 'Piece'} — ${p.description || 'no description'}`)
+          .join('\n');
+        try {
+          const { response: pass1 } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+            input: [
+              { type: 'text', text: `This photo shows fired pottery from a paint-your-own-pottery studio, either coming out of a kiln or laid out after unloading.
+
+Below is a numbered list of pieces the studio is waiting to hand out, described as they were when painted.
+
+${roughList}
+
+Your job here is only to NARROW THE LIST, not to decide anything. Return up to ${SHORTLIST_CAP} numbers whose description could plausibly belong to something you can see in this photo -- right shape, right kind of object, colours in the right family.
+
+Be generous at this stage. A second pass will compare the actual photographs of these pieces against this one and make the real decision, so including a number that turns out to be wrong costs nothing, while leaving out a piece that IS in the photo means it is never found. If fewer than ${SHORTLIST_CAP} are plausible, return fewer. Order them most likely first.` },
+              { type: 'text', text: 'The photo:' },
+              { type: 'image', data: base64, mime_type: shelfGemini.mimeType || sourceMime },
+            ],
+            response_format: {
+              type: 'text',
+              mime_type: 'application/json',
+              schema: {
+                type: 'object',
+                properties: {
+                  numbers: {
+                    type: 'array',
+                    items: { type: 'integer' },
+                    description: `Up to ${SHORTLIST_CAP} numbers from the list, most likely first`,
+                  },
+                },
+                required: ['numbers'],
+              },
+            },
+          }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
+          const rawShort = extractGeminiText(pass1.data);
+          const parsedShort = JSON.parse((rawShort.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+          const picked = [...new Set(parsedShort.numbers || [])]
+            .map((n) => pieces[n - 1])
+            .filter(Boolean)
+            .slice(0, SHORTLIST_CAP);
+          if (picked.length) { pieces = picked; shortlisted = true; }
+        } catch (err) {
+          // A failed shortlist is not a failed sweep. It falls through to the
+          // old behaviour -- the full pool, no reference images -- which is
+          // worse but is exactly what this route did until today.
+          logger.warn(`[shelf-sweep] shortlist pass failed, falling back to the full list: ${err.message}`);
+        }
+      }
 
       // Daisy, direct: "it needs to look at images surely not just
       // descriptions, that's the point." Fair, and correct -- this route
@@ -7898,13 +7982,19 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
       // cap, every candidate gets a real reference image. At or above
       // it, this falls back to the original text-only comparison for
       // the excess rather than risk the whole call timing out again.
-      const IMAGE_COMPARE_CAP = 15;
+      // Comfortably above SHORTLIST_CAP, so a shortlisted pool always gets
+      // its pictures. Below the cap the pool was already small enough to send
+      // whole, which is the case this number was originally written for.
+      const IMAGE_COMPARE_CAP = 24;
       const withImages = pieces.length <= IMAGE_COMPARE_CAP;
 
+      // [15 Oct] Fetched together rather than one after another. Twenty
+      // round trips to storage in series is ten seconds of the request spent
+      // waiting, and the client gives up at seventy.
       const referenceImages = [];
       if (withImages) {
-        for (const p of pieces) {
-          if (!p.reference_photo_url) continue;
+        const fetched = await Promise.all(pieces.map(async (p, i) => {
+          if (!p.reference_photo_url) return null;
           try {
             const imgRes = await axios.get(p.reference_photo_url, { responseType: 'arraybuffer', timeout: 8000 });
             const cropped = await cropReferenceByBox(sharp, Buffer.from(imgRes.data), p.photo_box);
@@ -7912,11 +8002,13 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
             // not a whole busy scene, so they don't need the shelf
             // photo's own 1600px detail to be useful for comparison.
             const compact = await forGemini(sharp, cropped, logger, null, 500);
-            referenceImages.push({ pieceIndex: pieces.indexOf(p), buffer: compact.buffer, mimeType: compact.mimeType || 'image/jpeg' });
+            return { pieceIndex: i, buffer: compact.buffer, mimeType: compact.mimeType || 'image/jpeg' };
           } catch (err) {
             logger.warn(`[shelf-sweep] could not fetch reference for piece ${p.id}: ${err.message}`);
+            return null;
           }
-        }
+        }));
+        for (const r of fetched) if (r) referenceImages.push(r);
       }
 
       const list = pieces
@@ -7926,8 +8018,6 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         })
         .join('\n');
 
-      const shelfGemini = await forGemini(sharp, sourceBuffer, logger, null, 1600);
-      const base64 = shelfGemini.buffer.toString('base64');
       const prompt = `This first photo shows a shelf of finished, fired pottery in a paint-your-own-pottery studio.
 
 Below is a numbered list of pieces the studio is currently waiting to hand out. Each was photographed and described when it was painted.
@@ -8071,7 +8161,7 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
       // as the AI finishes, so this is the only moment the photo exists
       // for BOTH outcomes. A failed sweep keeps its photo, which was the
       // whole ask.
-      await recordSweep({ candidates_checked: pieces.length });
+      await recordSweep({ candidates_checked: poolSize });
 
       let aiRes, modelUsed;
       try {
@@ -8288,7 +8378,11 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
       }
 
       res.json({
-        candidates: pieces.length,
+        candidates: poolSize,
+        // How many the photographs were actually compared against, where a
+        // shortlist narrowed it. Null when the pool was small enough to send
+        // whole.
+        compared_with_photos: shortlisted ? pieces.length : (withImages ? pieces.length : null),
         collection_date_searched: onlyCollectionDate,
         waiting_total: eligible.length,
         not_searched: notSearched,
