@@ -135,7 +135,7 @@ export default function CollectPage() {
           <Section icon={<AlertTriangle size={14} />} tone="warn" n={board.kiln_late.length}>Due soon, still in the kiln</Section>
           {board.kiln_late.map((r) => (
             <RowCard key={r.booking_code} r={r} action={
-              <RowAction tone="quiet" onClick={() => router.push(r.due ? `/kiln?date=${r.due}` : '/kiln')}>Kiln</RowAction>
+              <RowAction tone="quiet" onClick={() => router.push('/out-of-kiln')}>Photograph it out</RowAction>
             } />
           ))}
         </>

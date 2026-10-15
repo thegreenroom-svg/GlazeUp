@@ -392,7 +392,7 @@ export default function OutOfKilnPage() {
   );
 
   return (
-    <PageShell title="Out of the kiln" subtitle="One shelf at a time, until it's empty" back="/kiln">
+    <PageShell title="Out of the kiln" subtitle="One shelf at a time, until it's empty" back="/menu">
       {closed !== null && (
         <div style={{ background: '#F4F8F4', border: '1px solid #CDE3CD', borderRadius: 'var(--radius-md)', padding: '0.8rem', marginBottom: '0.9rem' }}>
           <p style={{ margin: 0, fontWeight: 700, color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -694,7 +694,6 @@ export default function OutOfKilnPage() {
       <Toolbar>
         <Tool onClick={() => router.push('/shelves')} icon={<Boxes size={15} />}>Kiln photos</Tool>
         <Tool onClick={() => router.push('/packing')} icon={<Layers size={15} />}>Packing</Tool>
-        <Tool onClick={() => router.push('/kiln')}>Kiln</Tool>
       </Toolbar>
 
       {viewer && (

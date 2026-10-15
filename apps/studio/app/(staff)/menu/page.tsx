@@ -51,13 +51,25 @@ const STEPS: { key: string; label: string; detail: string; href: string; icon: t
     also: [{ label: 'Find a booking', href: '/find' }, { label: 'Table total', href: '/table-total' }] },
   { key: 'table', label: 'Table photos', detail: 'Photograph a table, or let the iPad send them through', href: '/floor', icon: Camera, tint: '#4F6D7A',
     also: [{ label: 'Needs a look', href: '/needs-a-look' }] },
-  { key: 'kiln', label: 'Kiln and packing', detail: 'Dip, fire, empty it, pack what comes out, hand it over', href: '/kiln', icon: Flame, tint: '#B8562E',
+  // [15 Oct] David: "Kiln just photo when opened, no dip, no fire
+  // schedule, simplify."
+  //
+  // The kiln screen tracked four stages per collection date -- on the
+  // shelf, dipped, into the kiln, out -- plus which kiln, which program
+  // and a planned firing day. All of it was someone telling the app what
+  // they had just done, and none of it is what the app knows anything
+  // about. The photograph taken as the kiln is opened is the only record
+  // that earns its keep: it is evidence, it names pieces, and it moves
+  // bookings to packing on its own.
+  //
+  // So the step goes straight to the camera. What is still waiting to be
+  // fired is already on the packing screen, by name, under Waiting on the
+  // kiln.
+  { key: 'kiln', label: 'Kiln and packing', detail: "Photograph it as it's opened, then pack what comes out", href: '/out-of-kiln', icon: Flame, tint: '#B8562E',
     also: [
-      { label: 'Out of the kiln', href: '/out-of-kiln' },
       { label: 'Packing', href: '/packing' },
       { label: 'Collect', href: '/collect' },
       { label: 'Kiln photos', href: '/shelves' },
-      { label: 'Shelf labels', href: '/shelf-stickers' },
       { label: 'Returns shelf', href: '/returns' },
     ] },
 ];
