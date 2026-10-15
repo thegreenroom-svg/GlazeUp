@@ -7791,10 +7791,32 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
       // are a liability now that a match means a piece is accounted for.
       // They are not lost -- they show as still in the kiln, which is what
       // the app honestly knows about them.
-      const eligible = (allPieces || [])
+      // [15 Oct] David: "You can forget the collections for the 14th. They
+      // have probably been processed, but not through kiln photos, so they
+      // can go." A booking whose collection day has already gone was handed
+      // over off the system, so its pieces are not in this kiln and every
+      // candidate they add is one more way to be wrong. Today and later
+      // only. Nothing is deleted -- they simply stop being looked for.
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const usable = (allPieces || [])
         .filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit' && !excludeIds.includes(p.id))
         .filter((p) => p.reference_photo_url && p.photo_box)
         .filter((p) => !onlyBookingCode || p.booking_id === onlyBookingCode);
+
+      // The bookings behind those pieces, read before the pool is settled
+      // because the collection date decides who is in it.
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, collection_date')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', Array.from(new Set(usable.map((p) => p.booking_id))));
+      const nameByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.customer_name]));
+      const collectionDateByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.collection_date]));
+
+      const eligible = usable.filter((p) => {
+        const due = collectionDateByCode.get(p.booking_id);
+        return !due || String(due).slice(0, 10) >= todayIso;
+      });
 
       if (!eligible.length) {
         return res.json({
@@ -7804,21 +7826,9 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
             ? 'Everything found across your photos so far -- nothing left to search for.'
             : onlyBookingCode
               ? 'Nothing waiting for this booking with a table photo to match against.'
-              : 'Nothing waiting has a table photo to match against',
+              : 'Nothing is waiting with a table photo and a collection date still to come',
         });
       }
-
-      // Fetched for the WHOLE eligible pool, not just the slice, because
-      // the collection date is what decides which pieces make the slice
-      // at all. Previously this ran after the cut, which was fine only
-      // while the pool was smaller than the cap.
-      const { data: bookingRows } = await supabase
-        .from('bookings')
-        .select('booking_code, customer_name, collection_date')
-        .eq('studio_id', STUDIO_ID)
-        .in('booking_code', Array.from(new Set(eligible.map((p) => p.booking_id))));
-      const nameByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.customer_name]));
-      const collectionDateByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.collection_date]));
 
       // [6 Sep] THE CAP HAD NO ORDER. 80 was written when the whole
       // studio held about thirty pieces, so the slice never actually
@@ -7877,7 +7887,7 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         const da = dueKey(a), db = dueKey(b);
         return da < db ? -1 : da > db ? 1 : 0;
       });
-      let pieces = eligible.slice(0, CANDIDATE_CAP);
+      const pieces = eligible.slice(0, CANDIDATE_CAP);
       // Said out loud rather than hidden. If a sweep only looked at part
       // of what is waiting, whoever is standing at the shelf needs to
       // know that "not found" might mean "not searched".
@@ -7892,290 +7902,64 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
       const base64 = shelfGemini.buffer.toString('base64');
 
       // ======================================================================
-      // [15 Oct] TWO PASSES, BECAUSE ONE PASS NEVER LOOKED AT THE PICTURES.
+      // [15 Oct] DETECT, THEN COMPARE.
       // ----------------------------------------------------------------------
-      // David: "It doesn't seem to be able to recognize things from a photo of
-      // a photo."
+      // David: "is the AI doing too much here? ... effectively all that is
+      // then doing is photographing, zooming in, framing, and comparing a
+      // glazed fired piece to a crop of a piece on a table. Pretty
+      // straightforward, hey?"
       //
-      // It wasn't trying. Reference photos were attached only when the whole
-      // candidate pool was 15 or fewer, and the pool is 110 to 126 pieces, so
-      // that test has been false every single time this route has ever run.
-      // Every match yesterday was made from one kiln photo and a list of 126
-      // sentences -- "white mug with blue spots, handle details, and name
-      // GRAN" against 125 other sentences describing near-identical blanks.
-      // It never saw Stacey's mug, which is why it settled for a striped jar.
+      // It was doing the hard version. One call was handed a photo with
+      // fifteen objects in it and a list of candidates, and asked to detect
+      // every object, box it, and decide which candidate each one was, all at
+      // once. One answer to grade, no way to tell which part failed, and
+      // nothing stopping it putting two names on the same object -- which is
+      // exactly what it did at 07:37, one bowl claimed by two bookings and
+      // one Christmas tree by two more.
       //
-      // The cap was there for a real reason: 80 reference images in one call
-      // was slow and caused timeouts. The answer is not to send 126 images,
-      // it is to send the right 20.
+      // So it is two easy steps now instead of one hard one.
       //
-      // So: pass one reads the photo against the full list as text and comes
-      // back with a shortlist -- cheap, generous, and no decision made. Pass
-      // two is the strict call that already exists, run against those twenty
-      // with their actual reference crops attached, which is the comparison
-      // this engine was supposed to be making all along.
+      // ONE: look at the photo and box the pottery. No names, no list, no
+      // candidates. This is the same job the app already does well on table
+      // photos -- it is how all 135 of these pieces got described in the
+      // first place.
+      //
+      // TWO: for each thing it found, crop it out and ask one small question
+      // against a handful of candidates: is this the same piece? A fired
+      // white jug with green leaves against four unfired candidates is a
+      // question with an obvious answer, and when two customers both painted
+      // a bird on a tree, the two crops side by side are what settles it.
+      //
+      // The shortlist for each object is picked HERE, in code, from words
+      // that are already in the database -- the kind of object and the
+      // colours. No AI call is spent choosing what to compare.
+      //
+      // What this buys, by construction rather than by instruction:
+      //   - one object can only become one piece, so nothing is claimed twice
+      //   - "none of these" is an ordinary answer, so unmatched is the
+      //     default rather than the nearest description winning
+      //   - every decision is one pair of pictures, so a wrong one can be
+      //     looked at and understood instead of guessed at
       // ======================================================================
-      const SHORTLIST_CAP = 20;
-      let shortlisted = false;
-      if (pieces.length > SHORTLIST_CAP) {
-        const roughList = pieces
-          .map((p, i) => `${i + 1}. ${p.piece_type || 'Piece'} — ${p.description || 'no description'}`)
-          .join('\n');
+
+      let modelUsed = null;
+
+      // [15 Oct] One sweep is now a detect call plus a dozen small
+      // comparisons rather than a single call, so the cost counter has to
+      // add them up or it quietly stops seeing this route at all -- which
+      // would be exactly the wrong moment to lose sight of it.
+      const usageTotals = {};
+      const addUsage = (data) => {
         try {
-          const { response: pass1 } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
-            input: [
-              { type: 'text', text: `This photo shows fired pottery from a paint-your-own-pottery studio, either coming out of a kiln or laid out after unloading.
-
-Below is a numbered list of pieces the studio is waiting to hand out, described as they were when painted.
-
-${roughList}
-
-Your job here is only to NARROW THE LIST, not to decide anything. Return up to ${SHORTLIST_CAP} numbers whose description could plausibly belong to something you can see in this photo -- right shape, right kind of object, colours in the right family.
-
-Be generous at this stage. A second pass will compare the actual photographs of these pieces against this one and make the real decision, so including a number that turns out to be wrong costs nothing, while leaving out a piece that IS in the photo means it is never found. If fewer than ${SHORTLIST_CAP} are plausible, return fewer. Order them most likely first.` },
-              { type: 'text', text: 'The photo:' },
-              { type: 'image', data: base64, mime_type: shelfGemini.mimeType || sourceMime },
-            ],
-            response_format: {
-              type: 'text',
-              mime_type: 'application/json',
-              schema: {
-                type: 'object',
-                properties: {
-                  numbers: {
-                    type: 'array',
-                    items: { type: 'integer' },
-                    description: `Up to ${SHORTLIST_CAP} numbers from the list, most likely first`,
-                  },
-                },
-                required: ['numbers'],
-              },
-            },
-          }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
-          const rawShort = extractGeminiText(pass1.data);
-          const parsedShort = JSON.parse((rawShort.match(/\{[\s\S]*\}/) || [])[0] || '{}');
-          const picked = [...new Set(parsedShort.numbers || [])]
-            .map((n) => pieces[n - 1])
-            .filter(Boolean)
-            .slice(0, SHORTLIST_CAP);
-          if (picked.length) { pieces = picked; shortlisted = true; }
-        } catch (err) {
-          // A failed shortlist is not a failed sweep. It falls through to the
-          // old behaviour -- the full pool, no reference images -- which is
-          // worse but is exactly what this route did until today.
-          logger.warn(`[shelf-sweep] shortlist pass failed, falling back to the full list: ${err.message}`);
-        }
-      }
-
-      // Daisy, direct: "it needs to look at images surely not just
-      // descriptions, that's the point." Fair, and correct -- this route
-      // used to send Gemini one photo and a page of words, never a real
-      // picture to compare against. Now it fetches each candidate's own
-      // stored reference photo, crops it to just that piece, and sends
-      // the actual images alongside the shelf photo.
-      //
-      // CAPPED, not unlimited, and the cap is stated plainly rather than
-      // silently changing behaviour past it: 80 candidates as text is
-      // cheap, but 80 extra images in one call would be a genuinely
-      // different, much slower and heavier request -- close to what
-      // caused this evening's timeouts in the first place. Below the
-      // cap, every candidate gets a real reference image. At or above
-      // it, this falls back to the original text-only comparison for
-      // the excess rather than risk the whole call timing out again.
-      // Comfortably above SHORTLIST_CAP, so a shortlisted pool always gets
-      // its pictures. Below the cap the pool was already small enough to send
-      // whole, which is the case this number was originally written for.
-      const IMAGE_COMPARE_CAP = 24;
-      const withImages = pieces.length <= IMAGE_COMPARE_CAP;
-
-      // [15 Oct] Fetched together rather than one after another. Twenty
-      // round trips to storage in series is ten seconds of the request spent
-      // waiting, and the client gives up at seventy.
-      const referenceImages = [];
-      if (withImages) {
-        const fetched = await Promise.all(pieces.map(async (p, i) => {
-          if (!p.reference_photo_url) return null;
-          try {
-            const imgRes = await axios.get(p.reference_photo_url, { responseType: 'arraybuffer', timeout: 8000 });
-            const cropped = await cropReferenceByBox(sharp, Buffer.from(imgRes.data), p.photo_box);
-            // Small on purpose -- these are reference crops of ONE piece,
-            // not a whole busy scene, so they don't need the shelf
-            // photo's own 1600px detail to be useful for comparison.
-            const compact = await forGemini(sharp, cropped, logger, null, 500);
-            return { pieceIndex: i, buffer: compact.buffer, mimeType: compact.mimeType || 'image/jpeg' };
-          } catch (err) {
-            logger.warn(`[shelf-sweep] could not fetch reference for piece ${p.id}: ${err.message}`);
-            return null;
+          const u = extractGeminiUsage(data);
+          if (!u) return;
+          for (const [k, v] of Object.entries(u)) {
+            if (typeof v === 'number') usageTotals[k] = (usageTotals[k] || 0) + v;
           }
-        }));
-        for (const r of fetched) if (r) referenceImages.push(r);
-      }
-
-      const list = pieces
-        .map((p, i) => {
-          const hasImage = referenceImages.some((r) => r.pieceIndex === i);
-          return `${i + 1}. ${p.piece_type || 'Piece'} — ${p.description || 'no description'}${hasImage ? ' [reference photo attached]' : ''}`;
-        })
-        .join('\n');
-
-      const prompt = `This first photo shows a shelf of finished, fired pottery in a paint-your-own-pottery studio.
-
-Below is a numbered list of pieces the studio is currently waiting to hand out. Each was photographed and described when it was painted.
-
-${list}
-
-${referenceImages.length
-  ? `The reference photos that follow show what each of those pieces actually looks like -- marked "[reference photo attached]" above, in the same order as this sentence. Those were taken AT THE TABLE, BEFORE FIRING. COMPARE THEM VISUALLY against the shelf photo. The fired piece is the same piece: same shape, same colours, same pattern in the same places, only shinier and a shade deeper. Treat all of that as evidence that has to agree.`
-  : `No reference photos are attached this time -- go on the written descriptions alone.`}
-
-If a number is written by hand ON A CARDBOARD BOX in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only.
-
-A DATE CHALKED ON THE FRONT OF A SHELF IS NOT A BOX NUMBER. The metal shelves have a front lip about 3cm deep, and a collection date is chalked along it -- "19/9", "26/9", "17/10" -- as a short line of text on a narrow horizontal strip. That date belongs to the whole shelf, not to any box or piece on it. Report it as shelf_date, in the form written. NEVER report it as box_number: "26/9" is the twenty-sixth of September, not box 2619.
-
-Chalk written on a cardboard box, as opposed to the shelf lip, is left over from an older way of working. It is out of date and means nothing; ignore it.
-
-IGNORE ALL OTHER WRITING -- cardboard sheets, paper, packaging, printed labels. If there is no cardboard box with a marker number on it, return an empty string for box_number rather than offering a date.
-
-Writing on the POTTERY ITSELF is different and does still count -- a name or message painted onto a plate or mug is part of that piece and is worth using to identify it.
-
-FIRST, WHAT IS NOT POTTERY. A studio shelf is full of things that are not customer pieces: cardboard boxes and flat-packed card, shipping cartons with printed labels or barcodes, paper and tissue, bubble wrap, crates and trays of stock, kiln furniture and shelf props, tools, cleaning bottles, drinks. Never match any of those to a piece.
-
-Be especially careful with rectangular cardboard: a flat brown box is not a tray, a dish or a plaque, however close the shape. Painted pottery is glazed and coloured and sits ON a shelf as a finished object; packaging is brown, matte, printed on, and usually stacked or folded. If something is cardboard, it is not a match, no matter how well its outline fits a description.
-
-Look at the shelf photo and decide which of the numbered pieces you can actually see.
-
-A shelving unit holds several batches at once, so pieces due on different dates sit on different shelves in the same photo. Judge every piece on what it looks like. Do not use the chalked dates to decide what is or is not on the shelf -- they label the wood, not the pottery, and a piece can easily sit on the wrong shelf.
-
-THE TWO PHOTOS SHOW THE SAME PIECE AT DIFFERENT STAGES, AND LESS CHANGES THAN YOU WOULD THINK. The reference photo was taken at the table before firing, when the glaze is chalky and matt. Firing makes it glossy and a little deeper. It does not repaint it.
-
-So the piece keeps its SHAPE and it keeps its COLOURS. A mug painted with blue spots comes out of the kiln a glossier mug with blue spots. A pale green plate comes out a slightly stronger green plate. White stays white. What changes is the shine and a step of saturation, nothing else.
-
-This means colour is evidence, not a hint. If the description says blue spots and the object in front of you has grey stripes, that is a different object, however well the shape agrees. If the description says pink and the object is green, it is a different object. Do not excuse a colour disagreement as "the firing changed it", because firing does not do that.
-
-Judge on all of it together: the shape, the colours, where the decoration sits, the drawing, any lettering, the number and arrangement of elements. Each has to agree. The only allowance you make for firing is that the fired piece is shinier and slightly deeper in tone than its reference photo.
-
-A PIECE CUT OFF BY THE EDGE OF THE PHOTO IS NOT A MATCH. If an object is clipped by the frame -- half a plate at the bottom corner, a rim leaving the side -- you are looking at a fraction of it, and a fraction of a white plate is every white plate. Report it as unplaced with reason "obscured". Do not match it, however well the visible part agrees.
-
-Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. This photograph is a kiln being emptied, and a match means a piece is accounted for and ready to be packed and handed over. A piece you leave out is simply reported as still in the kiln, which is honest and costs nothing -- the next photo can find it. A piece you match wrongly sends someone to a box that does not contain their pottery.
-
-WORDS BEAT EVERYTHING. If a description mentions a name, a word or lettering, that lettering decides it. A mug described as carrying the name FLO is NOT the mug in the photo reading MILL -- different words mean a different piece, however well the shape, colour and glaze agree. Painted lettering is the most reliable evidence on a shelf because it is unique to one customer, so treat any disagreement in it as a rejection rather than a detail to overlook. Lettering you cannot read clearly is not agreement either: leave it out.
-
-THE DISTINGUISHING DETAIL MUST BE VISIBLE. Each description ends with whatever separates that piece from its neighbours -- an embossed leaf, a brown stalk, green and grey leaves, a grid texture. That part IS the match. If you can see the general form but not the specific detail, you have found the right SHAPE and not the right PIECE, and a studio shelf is nothing but repeated shapes. Leave it out.
-
-CHECK IT IS THE SAME KIND OF OBJECT. A spoon rest is not a butter dish, a teapot is not a bowl, a jug is not a vase. Getting the class of object wrong is not a near miss, it is a different piece.
-
-For each match give the number, a confidence from 0 to 1, and its bounding box in the photo.
-
-LAST, THE POTTERY YOU COULD NOT PLACE. Report every piece of customer pottery in this photo that you did NOT match to a number, as unplaced. This matters as much as the matches: a kiln is emptied against this photo, and anything you leave unreported is something nobody knows is there.
-
-Four kinds turn up, and all four belong in unplaced:
-- A PART of something. Lids, bases, saucers, plinths and halves are fired separately and laid out separately, but were photographed at the table as one piece, so no description will ever name them on their own. A lid with no pot beside it is unplaced, not ignored.
-- A piece whose description you can see belongs to one of the numbers, but not confidently enough to match. Say which number you suspect in maybe_number.
-- A piece you can see clearly that matches nothing on the list at all.
-- A piece too obscured, too far back or too dark to judge.
-
-For each, give its bounding box and a short plain description of what you see -- "small blue lid", "white bowl, pink flowers", "base of a tall jug" -- enough for a person holding it to recognise it. Say in reason which of the four it is.
-
-This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays of unpainted stock and drinks are not pottery and are not reported anywhere. Only report something as unplaced if you are confident it is a customer's painted piece or part of one.`;
-
-      const schema = {
-        type: 'object',
-        properties: {
-          matches: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                number: { type: 'integer', description: 'The number from the list' },
-                confidence: { type: 'number', description: '0 to 1' },
-                box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
-              },
-              required: ['number', 'confidence'],
-            },
-          },
-          // Daisy: boxes are numbered by hand in thick marker on every
-          // corner and face, so the number is in the photo already --
-          // no reason to make anyone type it. Read here, but NEVER
-          // trusted silently: handwritten digits misread easily (3 for
-          // 8, 1 for 7), and a wrong box number sends someone
-          // confidently to the wrong box. The app shows it back for
-          // confirmation instead.
-          box_number: {
-            type: 'string',
-            description: 'Number written in marker on a CARDBOARD BOX, digits only. Never a date chalked on a shelf edge. Empty string if there is no box number.',
-          },
-          // [12 Oct] Daisy: "collection dates are chalked onto metal
-          // shelves front approx 3cm thick". Giving the date somewhere of
-          // its own to go is what stops it being forced into box_number,
-          // which is how three September sweeps ended up labelled "Box
-          // 2619" -- the 26th of September. Read, never trusted silently:
-          // it is shown back the same way a box number is.
-          shelf_date: {
-            type: 'string',
-            description: 'Collection date chalked along the front lip of the shelf, as written, e.g. "26/9" or "17/10". Empty string if nothing is chalked there.',
-          },
-          // [14 Oct] David, on emptying a kiln: "if there are any pieces
-          // unidentified that may be half pieces, bases, lids, that weren't
-          // in the photo originally, as separated, or pieces that aren't
-          // identified need to be flagged at that stage".
-          //
-          // Until now a sweep only ever said what it FOUND, which was fine
-          // while it was a search -- you were looking for one booking and
-          // everything else was somebody else's problem. Emptying a kiln is
-          // the opposite job: the photo is a stocktake, and the piece
-          // nobody can name is the one that gets left on the shelf for
-          // three weeks. A lid is the common case and the one no
-          // description will ever match, because at the table it was
-          // photographed sitting on its pot as a single piece.
-          unplaced: {
-            type: 'array',
-            description: 'Customer pottery visible in the photo that was not matched to a number. Never packaging, kiln furniture or unpainted stock.',
-            items: {
-              type: 'object',
-              properties: {
-                description: { type: 'string', description: 'Short plain description, e.g. "small blue lid"' },
-                reason: { type: 'string', description: 'part | unsure | no match | obscured' },
-                maybe_number: { type: 'integer', description: 'The number from the list this might belong to, if any' },
-                box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
-              },
-              required: ['description'],
-            },
-          },
-        },
-        required: ['matches'],
+        } catch { /* a cost counter is never worth failing a sweep for */ }
       };
 
-      // Each reference image gets its OWN text label naming its exact
-      // candidate number directly before it, rather than trusting Gemini
-      // to infer that from ordering alone -- a candidate with no
-      // reference_photo_url, or one whose fetch failed, would otherwise
-      // silently shift every image after it out of alignment with the
-      // list. Explicit beats implicit here, since a misattributed
-      // reference photo is worse than no reference photo at all.
-      const referenceInputBlocks = referenceImages.flatMap((r) => ([
-        { type: 'text', text: `Reference photo for item ${r.pieceIndex + 1}:` },
-        { type: 'image', data: r.buffer.toString('base64'), mime_type: r.mimeType },
-      ]));
-
-      // Archived here, before the call: the temp file is deleted as soon
-      // as the AI finishes, so this is the only moment the photo exists
-      // for BOTH outcomes. A failed sweep keeps its photo, which was the
-      // whole ask.
-      await recordSweep({ candidates_checked: poolSize });
-
-      let aiRes, modelUsed;
-      try {
-        // Same fast-first chain, applied consistently.
-        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
-          input: [
-            { type: 'text', text: prompt },
-            { type: 'text', text: 'Shelf photo:' },
-            { type: 'image', data: base64, mime_type: shelfGemini.mimeType || sourceMime },
-            ...referenceInputBlocks,
-          ],
-          response_format: { type: 'text', mime_type: 'application/json', schema },
-        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
-      } catch (err) {
+      const sweepFailed = async (err) => {
         logger.error('shelf sweep: Gemini call failed', err.response?.data || err.message);
         if (sweepId) {
           await supabase.from('shelf_sweeps').update({
@@ -8184,20 +7968,255 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
           }).eq('id', sweepId);
         }
         return res.status(500).json({ error: friendlyGeminiError(err) });
+      };
+
+      // Archived before the AI runs, so a failed sweep still keeps its photo.
+      await recordSweep({ candidates_checked: poolSize });
+
+      // ---------- ONE: what is actually in this photograph ----------
+      const detectPrompt = `This photo shows fired, glazed pottery from a paint-your-own-pottery studio, either inside a kiln that has just been opened or laid out on a table after unloading.
+
+Find every piece of CUSTOMER POTTERY in it and give each one a box.
+
+A studio is full of things that are not customer pieces, and none of them belong in your answer: kiln shelves and props, cardboard boxes and packaging, paper and bubble wrap, trays of unpainted stock, tools, cleaning bottles, drinks, furniture. If it is cardboard, it is not pottery.
+
+For each real piece give:
+- kind: what sort of object it is in one or two words -- mug, plate, bowl, jug, figurine, vase, lidded pot, money box, ornament
+- colours: the main colours you can see, plainly, e.g. "white with blue spots", "dark green and red"
+- description: one short line describing it as a person would, including any painted words, names or lettering, which are the most useful thing of all
+- clipped: true if the piece is cut off by the edge of the photo and you can only see part of it
+
+Count lids, bases, saucers and halves as pieces in their own right, because they are fired separately and a person has to find them separately.
+
+Also read, if they are there:
+- a number written by hand in marker on a CARDBOARD BOX, digits only
+- a collection date chalked along the front lip of a metal shelf, as written, e.g. "26/9"
+A date chalked on a shelf is never a box number.`;
+
+      const detectSchema = {
+        type: 'object',
+        properties: {
+          objects: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                kind: { type: 'string' },
+                colours: { type: 'string' },
+                description: { type: 'string' },
+                clipped: { type: 'boolean' },
+                box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
+              },
+              required: ['description', 'box_2d'],
+            },
+          },
+          box_number: { type: 'string', description: 'Digits written in marker on a cardboard box, or empty' },
+          shelf_date: { type: 'string', description: 'Date chalked on a shelf lip as written, or empty' },
+        },
+        required: ['objects'],
+      };
+
+      let detected = [];
+      let readBoxNumber = '';
+      let readShelfDate = '';
+      try {
+        const { response: det, modelUsed: m1 } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input: [
+            { type: 'text', text: detectPrompt },
+            { type: 'image', data: base64, mime_type: shelfGemini.mimeType || sourceMime },
+          ],
+          response_format: { type: 'text', mime_type: 'application/json', schema: detectSchema },
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
+        modelUsed = m1;
+        addUsage(det.data);
+        const rawDet = extractGeminiText(det.data);
+        const gotDet = JSON.parse((rawDet.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+        detected = (gotDet.objects || []).slice(0, 30);
+        readBoxNumber = (gotDet.box_number || '').toString();
+        readShelfDate = (gotDet.shelf_date || '').toString();
+      } catch (err) {
+        return sweepFailed(err);
       } finally {
         try { if (req.file) fs.unlinkSync(req.file.path); } catch { /* temp file */ }
       }
 
-      const usage = extractGeminiUsage(aiRes.data);
-      if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'shelf-sweep-gemini', usage, modelUsed);
+      // Each piece cut out of the photo, which is the thing that gets
+      // compared. A piece falling off the edge of the frame is dropped here
+      // rather than compared: a rim is every rim.
+      const CLIPPED_AREA = 150; // about 12% by 12% of the frame
+      const isClipped = (box, flagged) => {
+        if (!box) return true;
+        const w = box.right_pct - box.left_pct;
+        const h = box.bottom_pct - box.top_pct;
+        const touches = box.left_pct <= 1 || box.top_pct <= 1 || box.right_pct >= 99 || box.bottom_pct >= 99;
+        return (touches && w * h < CLIPPED_AREA) || (flagged === true && w * h < CLIPPED_AREA);
+      };
 
-      let parsed;
-      try {
-        const raw = extractGeminiText(aiRes.data);
-        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
-      } catch {
-        return res.status(500).json({ error: 'Could not read the response from Gemini' });
+      let clippedDropped = 0;
+      const cut = (await Promise.all(detected.map(async (o) => {
+        const box = boxFromGemini(o.box_2d);
+        if (isClipped(box, o.clipped)) { clippedDropped++; return null; }
+        try {
+          const cropped = await cropReferenceByBox(sharp, sourceBuffer, box);
+          const compact = await forGemini(sharp, cropped, logger, null, 520);
+          return { o, box, buffer: compact.buffer, mime: compact.mimeType || 'image/jpeg' };
+        } catch (err) {
+          logger.warn(`[shelf-sweep] could not crop a detected piece: ${err.message}`);
+          return null;
+        }
+      }))).filter(Boolean);
+
+      // ---------- the shortlist, chosen in code ----------
+      const COLOUR_WORDS = new Set(['white','cream','beige','black','grey','gray','pink','red','orange','yellow','green','blue','purple','lilac','lavender','brown','turquoise','teal','gold','silver','rainbow','pastel']);
+      const wordsOf = (t) => new Set(String(t || '').toLowerCase().match(/[a-z]+/g) || []);
+      const pieceWords = pieces.map((p) => wordsOf(`${p.piece_type || ''} ${p.description || ''}`));
+      const SHORTLIST = 6;
+      const shortlistFor = (o) => {
+        const seen = wordsOf(`${o.kind || ''} ${o.colours || ''} ${o.description || ''}`);
+        const kind = String(o.kind || '').toLowerCase().trim();
+        return pieces
+          .map((p, i) => {
+            let sc = 0;
+            for (const w of seen) {
+              if (!pieceWords[i].has(w)) continue;
+              sc += COLOUR_WORDS.has(w) ? 3 : w.length > 4 ? 3 : 1;
+            }
+            // Being the same sort of object at all is worth more than any
+            // single shared word: a mug is never a plate.
+            if (kind && pieceWords[i].has(kind)) sc += 5;
+            return { i, sc };
+          })
+          .filter((x) => x.sc > 0)
+          .sort((a, b) => b.sc - a.sc)
+          .slice(0, SHORTLIST);
+      };
+
+      // Every candidate any object wants to see, fetched once and reused.
+      const wanted = new Map();
+      const perObject = cut.map((c) => {
+        const list = shortlistFor(c.o);
+        for (const { i } of list) if (!wanted.has(i)) wanted.set(i, null);
+        return { ...c, list };
+      });
+      await Promise.all([...wanted.keys()].map(async (i) => {
+        const p = pieces[i];
+        if (!p.reference_photo_url) return;
+        try {
+          const imgRes = await axios.get(p.reference_photo_url, { responseType: 'arraybuffer', timeout: 8000 });
+          const cropped = await cropReferenceByBox(sharp, Buffer.from(imgRes.data), p.photo_box);
+          const compact = await forGemini(sharp, cropped, logger, null, 420);
+          wanted.set(i, { buffer: compact.buffer, mime: compact.mimeType || 'image/jpeg' });
+        } catch (err) {
+          logger.warn(`[shelf-sweep] no reference crop for ${p.id}: ${err.message}`);
+        }
+      }));
+
+      // ---------- TWO: is this the same piece? ----------
+      const compareSchema = {
+        type: 'object',
+        properties: {
+          number: { type: 'integer', description: 'The candidate that is the SAME piece, or 0 if none of them are' },
+          confidence: { type: 'number', description: '0 to 1' },
+          reason: { type: 'string', description: 'A few words on what decided it' },
+        },
+        required: ['number', 'confidence'],
+      };
+
+      const compareOne = async (entry) => {
+        const withPhotos = entry.list.filter(({ i }) => wanted.get(i));
+        if (!withPhotos.length) return null;
+        const lines = withPhotos
+          .map(({ i }, n) => `${n + 1}. ${pieces[i].piece_type || 'Piece'} — ${pieces[i].description || 'no description'}`)
+          .join('\n');
+        const prompt = `The first photo is ONE piece of pottery, fired and glazed, just out of the kiln.
+
+The photos after it are candidates: the same studio's pieces as they were photographed at the table, before firing, one photo each, in this order:
+
+${lines}
+
+Which candidate, if any, is the SAME PIECE as the first photo? Answer with its number, or 0 if none of them is.
+
+Firing makes a piece glossier and a shade deeper. It does not repaint it. The shape stays the same, the colours stay the same, the painting stays in the same places. So a chalky pale green at the table is a stronger green here, and white is still white -- but blue spots are never grey stripes, and pink is never green.
+
+These are studio blanks, so several candidates may be the same shape. The shape tells you which ones are possible; the PAINTING tells you which one it is. Look at the decoration itself: what is drawn, where it sits, how many there are, and any letters or names, which are the surest evidence of all because they belong to one customer.
+
+Answer 0 whenever you are not sure. A piece left unmatched is reported as still in the kiln, which is honest and costs nothing, and the next photo will find it. A piece matched to the wrong candidate sends someone home with another customer's pottery.`;
+
+        const input = [
+          { type: 'text', text: prompt },
+          { type: 'text', text: 'The piece out of the kiln:' },
+          { type: 'image', data: entry.buffer.toString('base64'), mime_type: entry.mime },
+        ];
+        withPhotos.forEach(({ i }, n) => {
+          const ref = wanted.get(i);
+          input.push({ type: 'text', text: `Candidate ${n + 1}, at the table:` });
+          input.push({ type: 'image', data: ref.buffer.toString('base64'), mime_type: ref.mime });
+        });
+
+        try {
+          const { response, modelUsed: mN } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+            input,
+            response_format: { type: 'text', mime_type: 'application/json', schema: compareSchema },
+          }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
+          modelUsed = modelUsed || mN;
+          addUsage(response.data);
+          const raw = extractGeminiText(response.data);
+          const got = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+          const n = Number(got.number || 0);
+          if (!n || n < 1 || n > withPhotos.length) return { entry, pieceIndex: null, confidence: 0, reason: got.reason || null };
+          return {
+            entry,
+            pieceIndex: withPhotos[n - 1].i,
+            confidence: Math.max(0, Math.min(1, Number(got.confidence ?? 0))),
+            reason: got.reason || null,
+          };
+        } catch (err) {
+          logger.warn(`[shelf-sweep] comparison failed: ${err.message}`);
+          return { entry, pieceIndex: null, confidence: 0, reason: 'comparison failed' };
+        }
+      };
+
+      // A few at a time: fifteen of these in series is a minute the person
+      // holding the box does not have, and all at once is a rate limit.
+      const LANES = 4;
+      const decided = [];
+      for (let i = 0; i < perObject.length; i += LANES) {
+        decided.push(...await Promise.all(perObject.slice(i, i + LANES).map(compareOne)));
       }
+
+      if (Object.keys(usageTotals).length) {
+        await logGeminiUsage(supabase, STUDIO_ID, 'shelf-sweep-gemini', usageTotals, modelUsed);
+      }
+
+      // ---------- the answer, in the shape the rest of this route expects ----------
+      const asBox2d = (b) => [Math.round(b.top_pct * 10), Math.round(b.left_pct * 10), Math.round(b.bottom_pct * 10), Math.round(b.right_pct * 10)];
+      const claimed = new Map(); // piece index -> confidence that won it
+      const matches = [];
+      const unplacedOut = [];
+      for (const d of decided.filter(Boolean).sort((a, b) => b.confidence - a.confidence)) {
+        const o = d.entry.o;
+        const asUnplaced = (reason, maybe) => unplacedOut.push({
+          description: o.description || `${o.colours || ''} ${o.kind || 'piece'}`.trim(),
+          reason,
+          ...(maybe != null ? { maybe_number: maybe + 1 } : {}),
+          box_2d: asBox2d(d.entry.box),
+        });
+        if (d.pieceIndex == null) { asUnplaced(d.entry.list.length ? 'no match' : 'unsure'); continue; }
+        // One object is one piece, and one piece is one object. The highest
+        // confidence wins it; anything else that wanted it is reported rather
+        // than quietly dropped.
+        if (claimed.has(d.pieceIndex)) { asUnplaced('unsure', d.pieceIndex); continue; }
+        claimed.set(d.pieceIndex, d.confidence);
+        matches.push({ number: d.pieceIndex + 1, confidence: d.confidence, box_2d: asBox2d(d.entry.box) });
+      }
+
+      const parsed = {
+        matches,
+        unplaced: unplacedOut,
+        box_number: readBoxNumber,
+        shelf_date: readShelfDate,
+      };
+      const rejectedClipped = clippedDropped;
 
       // [14 Oct, evening] 0.55 was the floor while this was a hunt, when a
       // speculative match cost a glance at the wrong shelf. Looked at two of
@@ -8217,26 +8236,14 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
       // pottery.
       const MIN_CONFIDENCE = 0.75;
 
-      // And nothing that is falling off the edge of the photograph. A piece
-      // clipped by the frame shows a fraction of itself -- a rim, a corner
-      // -- which is never enough to tell one white plate from another, and
-      // is exactly where the sunflower plate went wrong. The model is asked
-      // not to do this; this is the part that does not depend on asking.
-      const clipped = (box) => {
-        if (!box) return false;
-        const w = box.right_pct - box.left_pct;
-        const h = box.bottom_pct - box.top_pct;
-        const touches = box.left_pct <= 1 || box.top_pct <= 1 || box.right_pct >= 99 || box.bottom_pct >= 99;
-        return touches && w * h < 150; // under about 12% by 12% of the frame
-      };
-
+      // A piece falling off the edge of the frame never reaches here any
+      // more: it is dropped before it is cropped, because a rim is every rim
+      // and there is nothing to compare.
       const byBooking = new Map();
-      let rejectedClipped = 0;
       for (const m of parsed.matches || []) {
         const piece = pieces[m.number - 1];
         if (!piece) continue;
         if ((m.confidence ?? 0) < MIN_CONFIDENCE) continue;
-        if (clipped(boxFromGemini(m.box_2d))) { rejectedClipped++; continue; }
         const cur = byBooking.get(piece.booking_id) || { pieces: [], total_in_booking: 0 };
         cur.pieces.push({
           id: piece.id,
@@ -8264,9 +8271,9 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
         v.total_in_booking = pieces.filter((p) => p.booking_id === code).length;
       }
 
-      // Put what was recognised on the shelf. Only the confident matches --
-      // the same 0.55 floor -- because a wrong assignment here would put a
-      // customer's pottery on someone else's trolley.
+      // Put what was recognised on the shelf. Only the confident matches,
+      // because a wrong assignment here would put a customer's pottery on
+      // someone else's trolley.
       let placed = 0;
       if (shelfId) {
         const matchedIds = Array.from(byBooking.values()).flatMap((v) => v.pieces.map((p) => p.id));
@@ -8379,10 +8386,11 @@ This is NOT where packaging goes. Cardboard, kiln furniture, props, tools, trays
 
       res.json({
         candidates: poolSize,
-        // How many the photographs were actually compared against, where a
-        // shortlist narrowed it. Null when the pool was small enough to send
-        // whole.
-        compared_with_photos: shortlisted ? pieces.length : (withImages ? pieces.length : null),
+        // What the photograph was actually read as: how many pieces of
+        // pottery were found in it, and how many of those were settled
+        // against a candidate's own picture.
+        pieces_in_photo: detected.length,
+        compared_with_photos: perObject.length,
         collection_date_searched: onlyCollectionDate,
         waiting_total: eligible.length,
         not_searched: notSearched,
