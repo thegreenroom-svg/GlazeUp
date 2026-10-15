@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 // [11 Oct] Eleven icons left over from the twenty-three tiles this page
 // used to have were still being imported. Only the nine still drawn.
-import { Printer, Package, Search, TrendingUp, Tags, ScanSearch, AlertTriangle, Activity, Flame } from 'lucide-react';
+import { Printer, Camera, TrendingUp, Tags, ScanSearch, AlertTriangle, Activity, Flame } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -33,14 +33,33 @@ import { Printer, Package, Search, TrendingUp, Tags, ScanSearch, AlertTriangle, 
 // Each place's lesser screens hang off it as small links, so nothing is
 // lost, and every old page still works at its own address.
 type Link = { label: string; href: string };
+// [15 Oct] THREE STEPS. David: "So now we streamline. App only needs the
+// following steps. Bookings. Photo table or automations. Photograph kiln
+// shelves or when emptied and packing."
+//
+// That is the whole studio, and it is what the app is for. Everything the
+// pottery actually does is: a booking exists, its table gets photographed,
+// and then at some point it comes out of a kiln and gets packed. Four tiles
+// made Find a destination of its own when it is really a way into a
+// booking, and it put Collect alongside the kiln when handing over is the
+// end of the same thread as packing.
+//
+// Nothing is deleted. Each step's lesser screens hang off it, and every
+// page still works at its own address.
 const STEPS: { key: string; label: string; detail: string; href: string; icon: typeof Printer; tint: string; also: Link[] }[] = [
-  { key: 'cards', label: 'Today', detail: 'The cards. Photograph each table; done ones open their booking', href: '/daily-cards', icon: Printer, tint: '#8C6A4A',
-    also: [{ label: 'Photograph a table', href: '/floor' }, { label: 'Table total', href: '/table-total' }] },
-  { key: 'firing', label: 'Kiln', detail: 'A shelf for each date: dip, fire, out', href: '/kiln', icon: Flame, tint: '#B8562E',
-    also: [{ label: 'Kiln plan', href: '/kiln-plan' }, { label: 'Shelf labels', href: '/shelf-stickers' }, { label: 'Out of the kiln', href: '/out-of-kiln' }, { label: 'Kiln photos', href: '/shelves' }] },
-  { key: 'packing', label: 'Collect', detail: 'Hand over, pack, and what is overdue', href: '/collect', icon: Package, tint: '#9C5A3C',
-    also: [{ label: 'Packing', href: '/packing' }, { label: 'Returns shelf', href: '/returns' }] },
-  { key: 'find', label: 'Find', detail: 'Any name or date, opens the booking', href: '/find', icon: Search, tint: '#4F6D7A', also: [] },
+  { key: 'bookings', label: 'Bookings', detail: "Today's tables, and any name or date", href: '/daily-cards', icon: Printer, tint: '#8C6A4A',
+    also: [{ label: 'Find a booking', href: '/find' }, { label: 'Table total', href: '/table-total' }] },
+  { key: 'table', label: 'Table photos', detail: 'Photograph a table, or let the iPad send them through', href: '/floor', icon: Camera, tint: '#4F6D7A',
+    also: [{ label: 'Needs a look', href: '/needs-a-look' }] },
+  { key: 'kiln', label: 'Kiln and packing', detail: 'Dip, fire, empty it, pack what comes out, hand it over', href: '/kiln', icon: Flame, tint: '#B8562E',
+    also: [
+      { label: 'Out of the kiln', href: '/out-of-kiln' },
+      { label: 'Packing', href: '/packing' },
+      { label: 'Collect', href: '/collect' },
+      { label: 'Kiln photos', href: '/shelves' },
+      { label: 'Shelf labels', href: '/shelf-stickers' },
+      { label: 'Returns shelf', href: '/returns' },
+    ] },
 ];
 
 // [11 Oct] The "needs a look" piles are one page now: /needs-a-look.
@@ -107,7 +126,7 @@ export default function StudioHome() {
     <div style={{ padding: '1rem 0.9rem 2rem' }}>
       <div style={{ marginBottom: '1.4rem' }}>
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>The Kiln Cafe</h1>
-        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Four places. Everything else hangs off them.</p>
+        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Three steps. Everything else hangs off them.</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -141,8 +160,8 @@ export default function StudioHome() {
               </div>
               {(() => {
                 if (!counts) return null;
-                const n = step.key === 'cards' ? counts.today_bookings
-                  : step.key === 'packing' ? (counts.to_pack || 0) + (counts.due_collection || 0)
+                const n = step.key === 'bookings' ? counts.today_bookings
+                  : step.key === 'kiln' ? (counts.to_pack || 0) + (counts.due_collection || 0)
                   : null;
                 if (!n) return null;
                 return (
