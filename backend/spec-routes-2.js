@@ -10146,7 +10146,9 @@ const BACKFILL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ba
 const BACKFILL_PROMPT = `This is a photo of one table in a pottery painting studio, taken at the end of a customer's session.
 
 FIRST, AND MOST IMPORTANT: READ THE CHALK TAG.
-Somewhere on this table is a small black chalkboard tag with white chalk handwriting on it. It carries the paint date and time along the top, the CUSTOMER'S NAME in the middle in the largest writing, a collection date at the bottom left, and a table number and piece count like "x3" at the bottom right.
+Somewhere on this table is a small black chalkboard tag with white chalk handwriting on it. It carries the paint date and time along the top, the CUSTOMER'S NAME in the middle in the largest writing, a collection date at the bottom left, and a table number and a count like "x3" at the bottom right.
+
+The "x3" is HOW MANY PEOPLE were sitting at this table. It is not how many pieces they painted. One person often paints two or three things and sometimes none at all, so never use this number to decide how many pieces to list, and never stop counting pieces because you have reached it. Count the pottery by looking at the pottery.
 
 Read the customer's name and return it as tag_name. Also return the paint date from the top of the tag as paint_date, and the collection date from the bottom left as collect_date, both exactly as written (for example "28/8" and "4/9"). These are how we tell apart two visits by the same customer, so copy the digits faithfully and return an empty string if a date is not legible.
 
@@ -10155,7 +10157,9 @@ Read the rest of the tag too. Bottom right usually carries the room or table, wr
 The tags are wiped and reused, so faint ghost writing from previous bookings often shows underneath the current writing. Report only the clearest, most recent name. Handwriting varies and some names are unusual: give your best faithful reading of the letters you can see rather than holding out for certainty. Only if there is genuinely no legible tag in the photo at all, return tag_name as an empty string.
 
 SECOND: LIST THE POTTERY.
-Identify every painted pottery piece belonging to this customer -- what they will take home after firing. Mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar.
+Identify every pottery piece on this table that the customer has worked on -- what they will take home after firing. Mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar.
+
+Unfired paint is chalky, pale and flat, and it looks almost nothing like the finished piece. A dish painted one soft colour all over, with no pattern, looks very much like bare unpainted pottery in this light, and it is still that customer's piece. Include anything that is plainly a finished shape sitting on the customer's table. Leave out only the studio's bare white stock if a shelf or rack of unpainted pieces happens to be in the frame. When you are unsure whether a piece has been painted, include it: a piece listed in error is corrected in a second, a piece left out is not noticed until someone is missing their pottery.
 
 Do not list studio equipment as pieces: paint pots, brushes, water pots, palettes, paint-mixing trays, colour charts, menus, price cards, drinks, glasses, phones or bags.
 
@@ -10171,7 +10175,7 @@ Give a bounding box for each piece.
 
 THIRD: TWO MORE BOXES. Give a bounding box for the chalk tag itself as tag_box_2d (the whole board, edge to edge), and, if there is a printed paper card on the table (white card with the customer's name printed on it and a small square QR code in a corner), a bounding box for that card as card_box_2d. Return an empty list for either one that is not in the photo. These are used as a ruler, so box the object's real edges tightly.
 
-This photo is of a screen, so colours carry a warm cast and there is some moire banding. Judge colour against the pink paper placemat and prefer form and pattern over fine colour distinctions.`;
+Some of these photos are taken of a screen rather than of the table directly. If you see moire banding or a warm cast across the whole frame, that is why: judge colour against the pink paper placemat and prefer form and pattern over fine colour distinctions. If the photo is sharp and evenly lit, it is the table itself and you can trust the colours as you see them.`;
 
 const BACKFILL_SCHEMA = {
   type: 'object',
