@@ -166,12 +166,13 @@ export default function BookingPage() {
             <p style={{ margin: '0.4rem 0 0', fontSize: 'var(--text-xs)', color: '#777' }}>The pieces move to that date's kiln shelf. Re-label them if they are already on a shelf.</p>
           </div>
         )}
+        {/* [15 Oct] Was a button through to the kiln planner. The planner is
+            gone, so this says where the pieces are and stops there. */}
         {s && (
-          <button onClick={() => router.push(`/kiln?date=${s.collection_date}`)}
-            style={{ ...btn, width: '100%', justifyContent: 'space-between', marginTop: '0.7rem' }}>
+          <div style={{ ...btn, width: '100%', justifyContent: 'space-between', marginTop: '0.7rem', cursor: 'default' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Flame size={15} /> Kiln shelf: {shelfStage}</span>
             {s.plan_fire_date && !s.into_kiln_at && <span style={{ fontWeight: 600, color: '#777', fontSize: 'var(--text-xs)' }}>firing {dayName(s.plan_fire_date)}</span>}
-          </button>
+          </div>
         )}
       </div>
 

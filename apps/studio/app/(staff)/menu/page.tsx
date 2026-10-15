@@ -256,29 +256,14 @@ export default function StudioHome() {
       )}
 
 
-      <button
-        onClick={() => router.push('/test-card')}
-        disabled={!!opening}
-        style={{
-          marginTop: '1.6rem', width: '100%', padding: '0.7rem',
-          borderRadius: 'var(--radius-md)', border: '1px dashed #c9c0b4', background: 'transparent',
-          color: '#8a8178', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer',
-        }}
-      >
-        Make a test card
-      </button>
-
-      {/* From the app review: four maintenance pages existed with no way
-          in except typing their URLs -- including the Square access
-          checker, which matters urgently before the token expires. Kept
-          deliberately quiet: tiny, grey, below everything, invisible in
-          normal use. */}
-      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', gap: '0.9rem', flexWrap: 'wrap' }}>
+      {/* [15 Oct] David: "Just nothing in between." The test card, the
+          ticket linker, the verification queue and the party-size
+          backfill were all one-off jobs that are done, each leaving a
+          page behind. Deleted. Square access stays because the token
+          expires and this is the only place that says so. */}
+      <div style={{ marginTop: '1.6rem', display: 'flex', justifyContent: 'center', gap: '0.9rem', flexWrap: 'wrap' }}>
         {[
           ['Square access', '/square-access'],
-          ['Ticket link', '/ticket-link'],
-          ['Verification', '/needs-verification'],
-          ['Party sizes', '/backfill-party-sizes'],
         ].map(([label, href]) => (
           <button
             key={href}

@@ -1334,9 +1334,11 @@ export default function DailyCardsPage() {
                       {due && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#f6ece1', color: 'var(--clay)' }}>{b.collected_at ? 'Collected' : `Collect ${due}`}</span>}
                       {/* [11 Oct] No buttons: the labels themselves go where they say. */}
                       {b.collection_date && !b.collected_at && (
-                        <span role="link" onClick={(e) => { e.stopPropagation(); router.push(`/kiln?date=${String(b.collection_date).slice(0, 10)}`); }}
-                          style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fbe9e1', color: '#B8562E', cursor: 'pointer' }}>
-                          {b.kiln_stage || 'Kiln shelf'} ›
+                        /* [15 Oct] Was a link to the kiln planner. That page is
+                           gone -- the kiln step is now just photographing it as
+                           it opens -- so the stage stays as a label. */
+                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#fbe9e1', color: '#B8562E' }}>
+                          {b.kiln_stage || 'Kiln shelf'}
                         </span>
                       )}
                       {(b.visit_number || 1) > 1 && <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: 999, background: '#efeaf6', color: '#6a5a8a' }}>Visit {b.visit_number}</span>}
